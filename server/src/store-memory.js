@@ -47,5 +47,11 @@ export function memoryStore() {
       const s = pushSubs.get(endpoint);
       if (s) s.last_notified = ts;
     },
+    async deleteAccount(uid) {
+      for (const [email, u] of usersByEmail) if (u.id === uid) usersByEmail.delete(email);
+      states.delete(uid);
+      for (let i = moods.length - 1; i >= 0; i--) if (moods[i].user_id === uid) moods.splice(i, 1);
+      for (const [ep, s] of pushSubs) if (s.user_id === uid) pushSubs.delete(ep);
+    },
   };
 }

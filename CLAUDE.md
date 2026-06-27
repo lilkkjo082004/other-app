@@ -49,6 +49,8 @@ src/
 │   ├── api.js               # backend client: auth, cloud state sync, mood, push
 │   ├── push.js              # Web Push subscribe/unsubscribe (companion check-ins)
 │   ├── location.js          # opt-in location (on-device coords; coarse area → prompt)
+│   ├── disclosure.js        # recurring AI-disclosure reminder hook (ToS §13)
+│   ├── crisis.js            # self-harm/suicide detection + crisis resources (ToS §13)
 │   ├── evolution.js         # mood/familiarity/bond → system-prompt evolution block
 │   ├── entitlements.js      # trial/ownership rules (trialDaysLeft, isLimited)
 │   ├── purchase.js          # simulated one-time unlock (swap for a real SDK)
@@ -107,11 +109,13 @@ Wire up real AI by deploying `worker/` (see `worker/README.md`) and creating a
 - Push notifications (Web Push): client subscribe in Settings (`lib/push.js`), SW push/notificationclick handlers, backend subscription storage + RFC 8291/8292 sender, daily cron for companion check-ins
 - In-app legal: Terms of Service (`data/legal.js`) rendered by `screens/Legal.jsx` with a tiny markdown subset; linked from Welcome, Auth (signup), and Settings via `LegalLink`. Privacy Policy slot is wired but awaiting the source document.
 - Location services (opt-in, `lib/location.js`): browser geolocation or manual entry, managed in a Settings "Location" section. Per ToS §12, precise coordinates stay in device-local storage and never reach our servers; only a coarse, user-confirmable area label is injected into the companion system prompt (`locationBlock`) so companions can offer local suggestions.
+- Safety/compliance (ToS §13): recurring AI-disclosure reminders in chat (`lib/disclosure.js`, shown at open + hourly of active use, not user-disableable); crisis detection + resource card (`lib/crisis.js`) when self-harm/suicidal ideation appears, with the system prompt and offline fallback both directing to 988; account + full server-data deletion (`DELETE /account`, surfaced in Settings → Account).
 
 ### Needs Building (web)
 - Privacy Policy + Disclaimer source documents (drop the markdown into `data/legal.js`; the Terms reference both)
-- Real payment integration (replace `lib/purchase.js`)
+- Real payment integration (replace `lib/purchase.js`) — on hold
 - Store packaging (native wrapper for Google Play)
+- Real age verification + web-only gating for explicit content (ToS §1.3; currently a self-declared onboarding flag feeds content filtering)
 
 ## Business Entity
 

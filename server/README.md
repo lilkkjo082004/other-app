@@ -17,6 +17,7 @@ AI-only `../worker/` when you want a full backend.
 | GET    | `/mood/summary` | ✓    | Aggregated mood counts + recent history   |
 | POST   | `/push/subscribe`   | ✓ | `{subscription}` — store a Web Push sub |
 | POST   | `/push/unsubscribe` | ✓ | `{endpoint}` — remove a Web Push sub    |
+| DELETE | `/account`      | ✓    | Erase the user + all server data (ToS §10.1) |
 | POST   | `/ai`           | —    | `{model,system,messages}` → `{text}`      |
 
 Auth is a Bearer token (`Authorization: Bearer <token>`) — a stateless

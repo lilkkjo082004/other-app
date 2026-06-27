@@ -85,6 +85,25 @@ r = await call('POST', '/push/unsubscribe', { token, body: { endpoint: sub.endpo
 ok(r.status === 200 && r.data.ok, 'unsubscribe removes the subscription');
 ok((await env.store.listPushSubs()).length === 0, 'subscription is gone after unsubscribe');
 
+console.log('account deletion');
+r = await call('DELETE', '/account');
+ok(r.status === 401, 'account deletion requires auth');
+
+const del = await call('POST', '/auth/signup', { body: { email: 'del@other.app', password: 'deletemepw' } });
+const delTok = del.data.token;
+await call('PUT', '/state', { token: delTok, body: { state: { profile: { name: 'Del' }, companions: [] } } });
+await call('POST', '/mood', { token: delTok, body: { mood: 'sad' } });
+await call('POST', '/push/subscribe', { token: delTok, body: { subscription: { endpoint: 'https://push.example/del', keys: { p256dh: 'k', auth: 'a' } } } });
+
+r = await call('DELETE', '/account', { token: delTok });
+ok(r.status === 200 && r.data.ok, 'deletes the account');
+
+r = await call('POST', '/auth/login', { body: { email: 'del@other.app', password: 'deletemepw' } });
+ok(r.status === 401, 'deleted account can no longer log in');
+r = await call('GET', '/state', { token: delTok });
+ok(r.status === 200 && r.data.state === null, 'deleted account has no server state');
+ok((await env.store.listPushSubs()).every((s) => s.endpoint !== 'https://push.example/del'), 'push subs purged on deletion');
+
 r = await call('GET', '/state', { token: 'garbage.token.here' });
 ok(r.status === 401, 'rejects tampered token');
 

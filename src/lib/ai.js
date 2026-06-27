@@ -1,13 +1,17 @@
 import { AI_MODEL, aiEnabled, aiEndpoint } from '../config.js';
 import { authHeader } from './api.js';
 import { buildSystemPrompt } from './prompt.js';
+import { detectCrisis } from './crisis.js';
 
 const MAX_HISTORY = 24;
 
 // ── Real responses via the Cloudflare Worker proxy ──
 async function viaProxy(comp, profile, msgs, allC, mode) {
   const system = buildSystemPrompt(comp, profile, allC, mode, msgs);
-  const recent = msgs.length > MAX_HISTORY ? msgs.slice(msgs.length - MAX_HISTORY) : msgs;
+  // Drop in-app system notes (AI disclosures, crisis cards) — they aren't part
+  // of the conversation the model should see.
+  const convo = msgs.filter((m) => m.role !== 'system');
+  const recent = convo.length > MAX_HISTORY ? convo.slice(convo.length - MAX_HISTORY) : convo;
   const apiMsgs = recent.map((m) => {
     if (m.role === 'user') {
       return { role: 'user', content: `${profile.name || 'User'}: ${m.content}` };
@@ -45,6 +49,13 @@ const has = (msg, words) => words.some((w) => msg.includes(w));
 function placeholder(comp, profile, userMsg) {
   const m = (userMsg || '').toLowerCase();
   const name = profile.name || 'you';
+  // Safety first: respond with care to self-harm/suicidal ideation even offline.
+  if (detectCrisis(userMsg)) {
+    return pick([
+      `${name}, I'm really glad you told me, and I'm taking this seriously. I'm here with you — but please reach out to someone who can be right now: in the US you can call or text 988, any time. You don't have to carry this alone.`,
+      `Hey. I hear how much pain you're in, and you matter to me. Please talk to a real person who can help right now — call or text 988 (US) or someone you trust. I'm not going anywhere.`,
+    ]);
+  }
   if (has(m, ['stressed', 'anxious', 'worried', 'overwhelmed', 'tired', 'sad', 'lonely', 'rough day', 'bad day', 'depressed'])) {
     return pick([
       `Hey, I hear you ${name}. That sounds heavy. Want to talk it through, or do you just need someone to sit with you for a minute?`,

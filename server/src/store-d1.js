@@ -44,5 +44,13 @@ export function d1Store(DB) {
     async setNotified(endpoint, ts) {
       await DB.prepare('UPDATE push_subscriptions SET last_notified = ? WHERE endpoint = ?').bind(ts, endpoint).run();
     },
+    async deleteAccount(uid) {
+      await DB.batch([
+        DB.prepare('DELETE FROM push_subscriptions WHERE user_id = ?').bind(uid),
+        DB.prepare('DELETE FROM mood_events WHERE user_id = ?').bind(uid),
+        DB.prepare('DELETE FROM states WHERE user_id = ?').bind(uid),
+        DB.prepare('DELETE FROM users WHERE id = ?').bind(uid),
+      ]);
+    },
   };
 }

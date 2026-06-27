@@ -5,6 +5,7 @@ import { cap } from '../lib/zodiac.js';
 import { trialDaysLeft } from '../lib/entitlements.js';
 import { pushConfigured, pushSupported, isSubscribed, enablePush, disablePush } from '../lib/push.js';
 import { locationSupported, locationEnabled, locationLabel, requestLocation, setLabel, clearLocation } from '../lib/location.js';
+import { deleteAccount } from '../lib/api.js';
 import { LegalLink } from './Legal.jsx';
 
 export default function Settings({ profile, comps, autoSpeak, trialStart, cloud, authed, email, onSignIn, onSignOut, onAutoSpeak, onSleepAll, onWakeAll, onReset, onBack }) {
@@ -53,6 +54,18 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
     setLocOn(false); setLocArea(null); setLocManual(false); setLocErr(null);
   }
 
+  const [delBusy, setDelBusy] = useState(false);
+  const [delErr, setDelErr] = useState(null);
+  async function removeAccount() {
+    try { if (!window.confirm('Permanently delete your account and ALL of your data from our servers? This cannot be undone.')) return; } catch (e) { /* headless */ }
+    setDelErr(null); setDelBusy(true);
+    try {
+      await deleteAccount();
+      onSignOut?.();   // clear the local token/email
+      onReset?.();     // wipe this device and return to the start
+    } catch (e) { setDelErr(String(e.message || e)); setDelBusy(false); }
+  }
+
   const trialLabel = () => {
     if (!trialStart) return 'Free plan · one companion is yours forever';
     const left = trialDaysLeft(trialStart);
@@ -89,6 +102,11 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
                   <div><div style={{ fontSize: 13 }}>Sign out</div><div style={{ fontSize: 11, color: C.textDim }}>Keeps this device's copy; stops syncing</div></div>
                   <span style={{ color: C.textDim }}>›</span>
                 </button>
+                <button onClick={removeAccount} disabled={delBusy} style={{ ...card, width: '100%', textAlign: 'left', cursor: 'pointer', border: `1px solid ${C.danger}33`, fontFamily: "'DM Sans',sans-serif", display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div><div style={{ fontSize: 13, color: C.danger }}>{delBusy ? 'Deleting…' : 'Delete account'}</div><div style={{ fontSize: 11, color: C.textDim }}>Erase your account and all server data permanently</div></div>
+                  <span style={{ color: C.danger }}>›</span>
+                </button>
+                {delErr && <div style={{ fontSize: 11, color: C.danger, margin: '0 2px 8px' }}>{delErr}</div>}
               </>
             ) : (
               <button onClick={onSignIn} style={{ ...card, width: '100%', textAlign: 'left', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", border: `1px solid ${C.glow1}55`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

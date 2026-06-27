@@ -8,6 +8,8 @@ import { isLimited } from '../lib/entitlements.js';
 import { genComp } from '../lib/companions.js';
 import { pickSigns } from '../lib/zodiac.js';
 import { detectMood } from '../lib/evolution.js';
+import { useDisclosureReminder, DISCLOSURE_TEXT } from '../lib/disclosure.js';
+import { detectCrisis, CRISIS_RESOURCES, CRISIS_INTRO } from '../lib/crisis.js';
 import { isAuthed as apiAuthed, logMood } from '../lib/api.js';
 import UnlockSheet from '../components/UnlockSheet.jsx';
 import Settings from './Settings.jsx';
@@ -43,15 +45,27 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
 
   useEffect(() => {
     (async () => {
-      if (restored) return;
+      // AI disclosure is shown up front, then repeats hourly (see below).
+      const disc = { role: 'system', kind: 'disclosure', content: DISCLOSURE_TEXT };
+      if (restored) {
+        setMsgs((p) => (p[p.length - 1]?.kind === 'disclosure' ? p : [...p, disc]));
+        return;
+      }
+      let init = [disc];
       if (comps.length > 1) {
         const a = genAmbient(comps);
-        if (a) setMsgs(a.map((m) => ({ role: 'assistant', companion: m.from, content: m.text, isAmbient: true })));
+        if (a) init = [...init, ...a.map((m) => ({ role: 'assistant', companion: m.from, content: m.text, isAmbient: true }))];
       }
+      setMsgs(init);
       await greet();
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Recurring AI disclosure reminder (ToS §13 — required, not user-disableable).
+  useDisclosureReminder(useCallback(() => {
+    setMsgs((p) => [...p, { role: 'system', kind: 'disclosure', content: DISCLOSURE_TEXT }]);
+  }, []));
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); }, [msgs, loading]);
 
@@ -78,6 +92,8 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     const nm = [...msgs, { role: 'user', content: u }];
     setMsgs(nm);
     setLoading(true);
+    // Safety: surface crisis resources when self-harm/suicidal ideation appears.
+    if (detectCrisis(u)) setMsgs((p) => [...p, { role: 'system', kind: 'crisis' }]);
     // Long-term mood tracking (best-effort; only when signed in to the backend).
     const mood = detectMood(u);
     if (mood && apiAuthed()) logMood(mood, { companionId: priv ? priv.id : undefined });
@@ -180,7 +196,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     }
   }
 
-  const visible = msgs.filter((m) => chatMode === 'group' || m.role === 'user' || m.companion?.id === chatMode);
+  const visible = msgs.filter((m) => m.role === 'system' || chatMode === 'group' || m.role === 'user' || m.companion?.id === chatMode);
 
   return (
     <Shell>
@@ -244,6 +260,9 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
 
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '10px 10px 4px' }}>
         {visible.map((m, i) => (
+          m.role === 'system' ? (
+            m.kind === 'crisis' ? <CrisisCard key={i} /> : <DisclosureNote key={i} text={m.content} />
+          ) : (
           <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', marginBottom: 7, animation: 'fadeUp 0.3s both' }}>
             {m.role === 'assistant' && <div style={{ width: 24, height: 24, borderRadius: '50%', background: `radial-gradient(circle,${m.companion?.color?.primary || C.glow1},${m.companion?.color?.primary || C.glow1}55)`, marginRight: 7, flexShrink: 0, marginTop: chatMode === 'group' ? 14 : 0 }} />}
             <div style={{ maxWidth: '78%' }}>
@@ -257,6 +276,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
               </div>
             </div>
           </div>
+          )
         ))}
         {loading && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 7 }}>
@@ -284,3 +304,28 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
 }
 
 const menuBtn = { background: 'none', border: `1px solid ${C.border}`, borderRadius: 5, padding: '2px 7px', color: C.textSoft, cursor: 'pointer', fontSize: 9, fontFamily: "'DM Sans',sans-serif" };
+
+function DisclosureNote({ text }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', margin: '8px 0' }}>
+      <div style={{ maxWidth: '88%', textAlign: 'center', fontSize: 10, color: C.textDim, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '6px 12px', lineHeight: 1.5 }}>ⓘ {text}</div>
+    </div>
+  );
+}
+
+function CrisisCard() {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', margin: '10px 0' }}>
+      <div style={{ width: '92%', background: `${C.glow2}10`, border: `1px solid ${C.glow2}55`, borderRadius: 14, padding: '12px 14px' }}>
+        <div style={{ fontSize: 12, color: C.text, lineHeight: 1.55, marginBottom: 10 }}>{CRISIS_INTRO}</div>
+        {CRISIS_RESOURCES.map((r) => (
+          <a key={r.name} href={r.href} target="_blank" rel="noreferrer" style={{ display: 'block', textDecoration: 'none', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '9px 12px', marginBottom: 6 }}>
+            <div style={{ fontSize: 12.5, color: C.glow2, fontWeight: 600 }}>{r.name}</div>
+            <div style={{ fontSize: 11, color: C.textSoft }}>{r.detail}</div>
+          </a>
+        ))}
+        <div style={{ fontSize: 9.5, color: C.textDim, marginTop: 4 }}>If you’re in immediate danger, call your local emergency number.</div>
+      </div>
+    </div>
+  );
+}

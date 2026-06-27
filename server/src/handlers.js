@@ -7,7 +7,7 @@ const MAX_TOKENS_CAP = 1024;
 function cors(env) {
   return {
     'access-control-allow-origin': env.ALLOWED_ORIGIN || '*',
-    'access-control-allow-methods': 'GET, POST, PUT, OPTIONS',
+    'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'access-control-allow-headers': 'content-type, authorization',
     'access-control-max-age': '86400',
   };
@@ -82,6 +82,15 @@ export async function handle(request, env) {
       const b = await body(request);
       if (!b?.endpoint) return json({ error: 'endpoint required' }, 400, env);
       await env.store.deletePushSub(uid, b.endpoint);
+      return json({ ok: true }, 200, env);
+    }
+
+    // Account deletion (ToS §10.1 / GDPR / CCPA): erase the user and ALL of
+    // their server-side data — state, mood history, and push subscriptions.
+    if (p === '/account' && request.method === 'DELETE') {
+      const uid = await authUid(request, env);
+      if (!uid) return json({ error: 'unauthorized' }, 401, env);
+      await env.store.deleteAccount(uid);
       return json({ ok: true }, 200, env);
     }
 

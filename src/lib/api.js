@@ -46,6 +46,11 @@ export async function login(email, password) {
 }
 export function logout() { setToken(''); setEmail(''); }
 
+// Permanently delete the account and all server-side data (ToS §10.1).
+export async function deleteAccount() {
+  await call('/account', { method: 'DELETE' });
+}
+
 export async function pullState() {
   const d = await call('/state');
   return d.state;
