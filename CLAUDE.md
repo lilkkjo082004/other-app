@@ -43,7 +43,7 @@ src/
 │   ├── zodiac.js            # multi-system engine + compatibility
 │   ├── companions.js        # name pools, personality seeds, genComp
 │   ├── voice.js             # speakAs + useSpeechRec
-│   ├── ambient.js           # ambient companion-to-companion threads
+│   ├── relationships.js     # inter-companion bonds + personality-aware ambient
 │   ├── prompt.js            # per-companion system prompt builder
 │   ├── ai.js                # askCompanion / greetCompanion (proxy + placeholder)
 │   ├── api.js               # backend client: auth, cloud state sync, mood, push
@@ -112,6 +112,8 @@ Wire up real AI by deploying `worker/` (see `worker/README.md`) and creating a
 - Location services (opt-in, `lib/location.js`): browser geolocation or manual entry, managed in a Settings "Location" section. Per ToS §12, precise coordinates stay in device-local storage and never reach our servers; only a coarse, user-confirmable area label is injected into the companion system prompt (`locationBlock`) so companions can offer local suggestions.
 - Safety/compliance (ToS §13): recurring AI-disclosure reminders in chat (`lib/disclosure.js`, shown at open + hourly of active use, not user-disableable); crisis detection + resource card (`lib/crisis.js`) when self-harm/suicidal ideation appears, with the system prompt and offline fallback both directing to 988; account + full server-data deletion (`DELETE /account`, surfaced in Settings → Account).
 - Age verification (ToS §1, `lib/age.js`): the onboarding DOB drives a real gate — under-13 is blocked, 13–17 is locked to friendship-only, 18+ requires explicit confirmation. The age group is derived from and locked to the DOB (a false "18+" claim can't outrank an under-18 birth date), persisted as `ageVerified`, and re-checked on resume/sync. Mature themes are gated to verified adults on the web build only (`matureContentAllowed`), feeding the system prompt.
+- Cosmetic customization (ToS §4.1 free tier): an 8-color cosmic palette in `theme.js`; the companion profile's "Appearance" picker recolors a companion live (avatar, chat, badge) and persists it.
+- Companion relationship storylines (ToS §4.1, `lib/relationships.js`): bonds between companion pairs grow as they share ambient moments (persisted in the session as `bonds`); ambient conversations are generated from the pair's personalities + bond stage (just met → close), shown on each open and surfaced on the profile's "Relationships" card.
 
 ### Needs Building (web)
 - Privacy Policy + Disclaimer source documents (drop the markdown into `data/legal.js`; the Terms reference both)

@@ -12,6 +12,11 @@ export const COMP_COLORS = [
   { primary: '#7c5bf5', glow: 'rgba(124,91,245,0.35)', name: 'Violet Nebula' },
   { primary: '#e84393', glow: 'rgba(232,67,147,0.35)', name: 'Rose Nova' },
   { primary: '#00cec9', glow: 'rgba(0,206,201,0.35)', name: 'Teal Drift' },
+  { primary: '#f5a623', glow: 'rgba(245,166,35,0.35)', name: 'Amber Flare' },
+  { primary: '#2ecc71', glow: 'rgba(46,204,113,0.35)', name: 'Emerald Mist' },
+  { primary: '#4f9dff', glow: 'rgba(79,157,255,0.35)', name: 'Azure Pulse' },
+  { primary: '#ff7a59', glow: 'rgba(255,122,89,0.35)', name: 'Coral Ember' },
+  { primary: '#b388ff', glow: 'rgba(179,136,255,0.35)', name: 'Lavender Haze' },
 ];
 
 export const CSS = `@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Cormorant+Garamond:wght@400;500;600;700&display=swap');

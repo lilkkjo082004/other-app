@@ -1,11 +1,12 @@
 import React from 'react';
-import { C } from '../theme.js';
+import { C, COMP_COLORS } from '../theme.js';
 import { Shell } from '../components/ui.jsx';
 import { ZODIAC, cap } from '../lib/zodiac.js';
 import { trialDaysLeft, COMPANION_PRICE } from '../lib/entitlements.js';
 import { bondInfo } from '../lib/evolution.js';
+import { relationshipsFor } from '../lib/relationships.js';
 
-export default function CompanionProfile({ companion: c, trialStart, history, onPrivate, onSleepToggle, onDelete, onUnlock, onBack }) {
+export default function CompanionProfile({ companion: c, trialStart, history, comps, bonds, onCustomize, onPrivate, onSleepToggle, onDelete, onUnlock, onBack }) {
   const col = c.color.primary;
   const z = ZODIAC[c.zodiac];
   const sleeping = c.status === 'sleeping';
@@ -22,6 +23,7 @@ export default function CompanionProfile({ companion: c, trialStart, history, on
   const label = { fontSize: 10, color: C.textDim, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8 };
   const traits = c.builderTraits ? Object.values(c.builderTraits).flat().filter(Boolean) : [];
   const bond = bondInfo(history || []);
+  const rels = relationshipsFor(c, comps || [], bonds || {});
 
   const action = (text, bg, onClick, { danger, outlined } = {}) => (
     <button onClick={onClick} style={{ width: '100%', padding: '13px', borderRadius: 12, marginBottom: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: "'DM Sans',sans-serif", background: outlined ? 'transparent' : (danger ? `${bg}1f` : bg), color: danger ? bg : (outlined ? C.text : '#fff'), border: `1px solid ${danger ? `${bg}88` : (outlined ? C.border : bg)}` }}>{text}</button>
@@ -45,6 +47,33 @@ export default function CompanionProfile({ companion: c, trialStart, history, on
           <div style={card}><div style={label}>Trait seeds</div><div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{traits.map((t, i) => <span key={i} style={{ padding: '5px 10px', borderRadius: 20, background: C.surfaceUp, border: `1px solid ${C.border}`, fontSize: 11 }}>{t}</span>)}</div></div>
         )}
         {c.freeText && <div style={card}><div style={label}>Drawn toward</div><div style={{ fontSize: 14 }}>{c.freeText}</div></div>}
+        {onCustomize && c.status !== 'deleted' && (
+          <div style={card}>
+            <div style={label}>Appearance</div>
+            <div style={{ fontSize: 12, color: C.textSoft, marginBottom: 10 }}>{c.colorName}</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+              {COMP_COLORS.map((opt) => {
+                const on = opt.name === c.colorName;
+                return (
+                  <button key={opt.name} onClick={() => onCustomize({ color: opt, colorName: opt.name })} title={opt.name}
+                    style={{ width: 34, height: 34, borderRadius: '50%', cursor: 'pointer', padding: 0, background: `radial-gradient(circle,${opt.primary},${opt.primary}66)`, border: on ? `2px solid ${C.text}` : `2px solid ${C.border}`, boxShadow: on ? `0 0 14px ${opt.glow}` : 'none' }} />
+                );
+              })}
+            </div>
+          </div>
+        )}
+        {rels.length > 0 && (
+          <div style={card}>
+            <div style={label}>Relationships</div>
+            {rels.map((r) => (
+              <div key={r.name} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <span style={{ width: 9, height: 9, borderRadius: '50%', background: r.color || C.glow1, flexShrink: 0 }} />
+                <span style={{ fontSize: 13, flex: 1 }}>{r.name}</span>
+                <span style={{ fontSize: 11, color: C.textSoft, textTransform: 'capitalize' }}>{r.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
         <div style={card}>
           <div style={label}>Your bond</div>
           <div style={{ fontSize: 14, textTransform: 'capitalize' }}>{bond.label}</div>

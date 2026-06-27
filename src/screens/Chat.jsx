@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { C, COMP_COLORS } from '../theme.js';
 import { Shell } from '../components/ui.jsx';
 import { speakAs, useSpeechRec } from '../lib/voice.js';
-import { genAmbient } from '../lib/ambient.js';
+import { genAmbient, bumpBond } from '../lib/relationships.js';
 import { askCompanion, greetCompanion } from '../lib/ai.js';
 import { isLimited } from '../lib/entitlements.js';
 import { genComp } from '../lib/companions.js';
@@ -25,6 +25,8 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const [showMenu, setShowMenu] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(restored?.autoSpeak || false);
   const [panel, setPanel] = useState(null);            // null | 'settings' | { profile: id }
+  const [ambient, setAmbient] = useState([]);          // ephemeral "while you were away" thread
+  const [bonds, setBonds] = useState(restored?.bonds || {});
   const [unlock, setUnlock] = useState(null);          // { companion, onResult(ok) }
   const [summonCandidate, setSummonCandidate] = useState(null);
   const scrollRef = useRef(null);
@@ -45,18 +47,20 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
 
   useEffect(() => {
     (async () => {
+      // Companions catching up with each other while you were away — regenerated
+      // each open (ephemeral, not persisted) and nudges their bond forward.
+      const res = genAmbient(comps, bonds);
+      if (res) {
+        setAmbient(res.thread.map((m) => ({ role: 'assistant', companion: m.from, content: m.text, isAmbient: true })));
+        setBonds((b) => bumpBond(b, res.pair[0], res.pair[1]));
+      }
       // AI disclosure is shown up front, then repeats hourly (see below).
       const disc = { role: 'system', kind: 'disclosure', content: DISCLOSURE_TEXT };
       if (restored) {
         setMsgs((p) => (p[p.length - 1]?.kind === 'disclosure' ? p : [...p, disc]));
         return;
       }
-      let init = [disc];
-      if (comps.length > 1) {
-        const a = genAmbient(comps);
-        if (a) init = [...init, ...a.map((m) => ({ role: 'assistant', companion: m.from, content: m.text, isAmbient: true }))];
-      }
-      setMsgs(init);
+      setMsgs([disc]);
       await greet();
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -70,9 +74,9 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); }, [msgs, loading]);
 
   useEffect(() => {
-    onPersist?.({ companions: comps, messages: msgs, chatMode, autoSpeak, trialStart });
+    onPersist?.({ companions: comps, messages: msgs, chatMode, autoSpeak, trialStart, bonds });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [comps, msgs, chatMode, autoSpeak]);
+  }, [comps, msgs, chatMode, autoSpeak, bonds]);
 
   async function greet() {
     setLoading(true);
@@ -185,7 +189,8 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     if (pc) {
       return (
         <CompanionProfile
-          companion={pc} trialStart={trialStart} history={msgs}
+          companion={pc} trialStart={trialStart} history={msgs} comps={comps} bonds={bonds}
+          onCustomize={(updates) => setComps((p) => p.map((c) => (c.id === pc.id ? { ...c, ...updates } : c)))}
           onBack={() => setPanel(null)}
           onPrivate={() => { setChatMode(pc.id); setPanel(null); }}
           onSleepToggle={() => { togSleep(pc.id); setPanel(null); }}
@@ -197,6 +202,8 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   }
 
   const visible = msgs.filter((m) => m.role === 'system' || chatMode === 'group' || m.role === 'user' || m.companion?.id === chatMode);
+  // Ambient catch-up is companion-to-companion, so it only shows in group view.
+  const stream = chatMode === 'group' ? [...ambient, ...visible] : visible;
 
   return (
     <Shell>
@@ -259,7 +266,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       )}
 
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '10px 10px 4px' }}>
-        {visible.map((m, i) => (
+        {stream.map((m, i) => (
           m.role === 'system' ? (
             m.kind === 'crisis' ? <CrisisCard key={i} /> : <DisclosureNote key={i} text={m.content} />
           ) : (
