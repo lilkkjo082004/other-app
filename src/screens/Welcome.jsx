@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { C } from '../theme.js';
 import { Shell } from '../components/ui.jsx';
+import { LegalLink } from './Legal.jsx';
 
 export default function Welcome({ onStart, onSignIn }) {
   const [shown, setShown] = useState(false);
@@ -18,6 +19,9 @@ export default function Welcome({ onStart, onSignIn }) {
             Have an account? <span style={{ color: C.glow1 }}>Sign in</span>
           </button>
         )}
+        <p style={{ color: C.textDim, fontSize: 11, lineHeight: 1.6, maxWidth: 300, marginTop: 28 }}>
+          By continuing you agree to our <LegalLink docKey="tos">Terms of Service</LegalLink> and <LegalLink docKey="privacy">Privacy Policy</LegalLink>.
+        </p>
       </div>
     </Shell>
   );

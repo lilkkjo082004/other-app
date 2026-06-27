@@ -4,6 +4,7 @@ import { Shell } from '../components/ui.jsx';
 import { cap } from '../lib/zodiac.js';
 import { trialDaysLeft } from '../lib/entitlements.js';
 import { pushConfigured, pushSupported, isSubscribed, enablePush, disablePush } from '../lib/push.js';
+import { LegalLink } from './Legal.jsx';
 
 export default function Settings({ profile, comps, autoSpeak, trialStart, cloud, authed, email, onSignIn, onSignOut, onAutoSpeak, onSleepAll, onWakeAll, onReset, onBack }) {
   const living = comps.filter((c) => c.status !== 'deleted');
@@ -104,6 +105,13 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
         <div style={{ height: 10 }} />
         {section('Plan')}
         <div style={{ ...card, display: 'flex', gap: 10, alignItems: 'center' }}><span style={{ fontSize: 16 }}>✦</span><span style={{ fontSize: 12, color: C.textSoft, lineHeight: 1.4 }}>{trialLabel()}</span></div>
+
+        <div style={{ height: 10 }} />
+        {section('Legal')}
+        <div style={{ ...card }}>
+          <div style={{ fontSize: 13, marginBottom: 4 }}><LegalLink docKey="tos" style={{ textDecoration: 'none', color: C.text }}>Terms of Service ›</LegalLink></div>
+          <div style={{ fontSize: 13 }}><LegalLink docKey="privacy" style={{ textDecoration: 'none', color: C.text }}>Privacy Policy ›</LegalLink></div>
+        </div>
 
         <div style={{ height: 10 }} />
         {section('Data')}

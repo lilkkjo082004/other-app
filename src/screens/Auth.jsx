@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { C } from '../theme.js';
 import { Shell } from '../components/ui.jsx';
+import { LegalLink } from './Legal.jsx';
 import * as api from '../lib/api.js';
 
 // Sign in / create account. On success, pulls the cloud session and hands it
@@ -51,6 +52,12 @@ export default function Auth({ onAuthed, onBack }) {
         <button onClick={() => { setError(null); setMode(isSignup ? 'login' : 'signup'); }} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 13, cursor: 'pointer', marginTop: 16, fontFamily: "'DM Sans',sans-serif" }}>
           {isSignup ? 'Already have an account? Sign in' : 'New here? Create an account'}
         </button>
+
+        {isSignup && (
+          <p style={{ color: C.textDim, fontSize: 11, lineHeight: 1.6, marginTop: 18 }}>
+            By creating an account you agree to our <LegalLink docKey="tos">Terms of Service</LegalLink> and <LegalLink docKey="privacy">Privacy Policy</LegalLink>.
+          </p>
+        )}
       </div>
     </Shell>
   );

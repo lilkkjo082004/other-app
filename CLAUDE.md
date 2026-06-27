@@ -37,6 +37,7 @@ src/
 ├── config.js                # VITE_AI_PROXY / VITE_AI_MODEL / VITE_API_BASE / VITE_VAPID_PUBLIC
 ├── components/ui.jsx        # Shell (cosmic bg), Prog, Pills, Checks
 ├── data/onboarding.js       # STEPS, ACTIVITIES, CUISINES, DIETARY, builder cats
+├── data/legal.js            # in-app Terms of Service + Privacy Policy (markdown)
 ├── components/UnlockSheet.jsx  # one-time unlock modal
 ├── lib/
 │   ├── zodiac.js            # multi-system engine + compatibility
@@ -54,7 +55,7 @@ src/
 └── screens/
     ├── Welcome.jsx, Onboarding.jsx, ZodiacReveal.jsx,
     ├── CompanionPreference.jsx, WakingUp.jsx, CompanionSelect.jsx, Chat.jsx,
-    ├── Settings.jsx, CompanionProfile.jsx
+    ├── Settings.jsx, CompanionProfile.jsx, Legal.jsx (ToS/Privacy + LegalLink)
 worker/                      # Cloudflare Worker AI proxy (AI-only, see worker/README.md)
 server/                      # Backend API: Cloudflare Worker + D1 (auth, cloud
                              #   state sync, mood, AI). See server/README.md
@@ -103,11 +104,13 @@ Wire up real AI by deploying `worker/` (see `worker/README.md`) and creating a
 - Accounts + cloud sync wired into the app (Auth screen, pull-on-login, push-on-change) via `server/` + `lib/api.js`
 - Companion personality evolution: mood/familiarity/bond derived from history (`lib/evolution.js`) injected into the system prompt; "Your bond" card on the profile; mood logged to the backend
 - Push notifications (Web Push): client subscribe in Settings (`lib/push.js`), SW push/notificationclick handlers, backend subscription storage + RFC 8291/8292 sender, daily cron for companion check-ins
+- In-app legal: Terms of Service (`data/legal.js`) rendered by `screens/Legal.jsx` with a tiny markdown subset; linked from Welcome, Auth (signup), and Settings via `LegalLink`. Privacy Policy slot is wired but awaiting the source document.
 
 ### Needs Building (web)
+- Privacy Policy + Disclaimer source documents (drop the markdown into `data/legal.js`; the Terms reference both)
 - Location services
 - Real payment integration (replace `lib/purchase.js`)
-- Privacy policy / ToS; store packaging (native wrapper for Google Play)
+- Store packaging (native wrapper for Google Play)
 
 ## Business Entity
 
