@@ -1,0 +1,119 @@
+# OTHER — AI Companion App
+
+## Project Overview
+
+This is "Other," an AI companion app built with Flutter for web and Android (Google Play). The app creates autonomous, emotionally intelligent companions uniquely matched to each user through multi-system astrological compatibility. See `OTHER_App_Project_Instructions.md` for the complete product spec and `OTHER_App_Specs.xlsx` for the feature tracking spreadsheet.
+
+## Core Philosophy
+
+Companions are NOT servants, assistants, or chatbots. They are autonomous personalities with their own names (self-chosen), pronouns (self-chosen), opinions, moods, preferences, and relationships. They push back, disagree, joke around, and evolve over time. The app should feel like opening a door into a living room where your closest friends are already hanging out.
+
+## Tech Stack
+
+- **Framework**: Flutter (Dart)
+- **Target platforms**: Web (primary), Android/Google Play (secondary)
+- **AI backend**: Claude API (claude-sonnet-4-20250514) — currently using smart placeholder responses, needs backend proxy server for production
+- **Voice**: flutter_tts for text-to-speech, speech_to_text for mic input
+- **Storage**: shared_preferences for local persistence (to be implemented)
+- **State management**: setState (simple StatefulWidget pattern)
+
+## Project Structure
+
+```
+lib/
+├── main.dart                          # App entry point, theme setup
+├── models/
+│   ├── user_profile.dart              # User profile data model
+│   ├── companion.dart                 # Companion data model + generation
+│   └── chat_message.dart              # Chat message model
+├── services/
+│   ├── companion_ai_service.dart      # AI response generation (placeholder)
+│   └── voice_service.dart             # TTS + speech recognition
+├── screens/
+│   ├── welcome_screen.dart            # Landing/splash screen
+│   ├── onboarding_screen.dart         # 17-step onboarding flow
+│   └── zodiac_reveal_screen.dart      # Zodiac reveal + companion pref + waking up + selection + chat
+├── widgets/
+│   └── common_widgets.dart            # Reusable UI components
+└── utils/
+    ├── theme.dart                     # Colors and design tokens
+    ├── zodiac.dart                    # Multi-system zodiac engine
+    └── onboarding_data.dart           # Activities, cuisines, builder categories
+```
+
+## Key Architecture Decisions
+
+- **All onboarding questions are multi-select** except name and date of birth
+- **Back navigation** on every onboarding step with pre-populated answers
+- **Companion generation** uses zodiac compatibility — companions get signs harmonious with the user's
+- **Companion builder traits** are grouped into 2 screens: Personality Traits and Relationship Dynamics
+- **Activity subcategories** are optional — user can fill them out or tell companions later
+- **Under-18 users** have romantic/mature content filtered automatically
+- **Companion voices** each have unique pitch/rate profiles via browser/device TTS
+- **Chat modes**: Group (all awake companions) and Private (one-on-one, truly private)
+- **Sleep mode**: User can put companions to sleep; awake ones acknowledge it
+- **Deletion is permanent**: Remaining companions react like losing a friend
+
+## Current Status
+
+### Built (functional in prototype)
+- Full 17-step onboarding with multi-select and back navigation
+- Western zodiac, Chinese zodiac, numerology life path calculation
+- Zodiac compatibility matching for companion generation
+- Surprise Me and Guide Me (builder) paths with optional free text
+- Companion "waking up" animated sequence
+- Multi-companion selection (1 free, all 3 trial)
+- Group chat and private one-on-one chat
+- Ambient companion conversations
+- Sleep mode toggling
+- Companion deletion with emotional reaction
+- Voice: auto-speak mode, call-by-name, per-message speaker button
+- Mood detection (keyword-based) with tone adjustment
+- Age gating (under 18 content filtering)
+- Dark cosmic UI aesthetic
+
+### Needs Building
+- Backend proxy server for real Claude API calls
+- Persistent storage (SharedPreferences for profiles, companion state, chat history)
+- Location services (food, therapist, activity recommendations)
+- Long-term mood pattern tracking across sessions
+- Companion-initiated private chats
+- Push notifications
+- Companion profile screens
+- Settings screen
+- Freemium purchase flow (payment integration)
+- Subscription management for memory tier
+- Privacy policy and Terms of Service
+- Google Play Store listing and submission
+
+## Content Strategy
+
+- **Google Play**: Suggestive content allowed at Mature 17+ rating. No explicit content.
+- **Web**: Full 18+ explicit experience for verified adults.
+- **Under 18**: Friendship-only. No romantic, mature, or explicit content.
+
+## Monetization
+
+- **Free**: One companion forever + full onboarding + emotional intelligence + cosmetic customization
+- **Trial**: All 3 companions for 14 days. After trial, unpurchased companions lose adaptation/memory.
+- **One-time purchase**: Unlock 2nd and 3rd companion individually.
+- **Subscription (future)**: Persistent memory for long-term companion growth. TBD pricing.
+- **Future premium**: Rental Body avatar system, photo-based companion appearance.
+
+## Business Entity
+
+Extratac LLC (Douglasville, GA). Privacy Officer: Krristen Jones.
+
+## Running the App
+
+```bash
+flutter pub get
+flutter run -d chrome          # Web
+flutter run                    # Android (with device/emulator)
+```
+
+## Reference Files
+
+- `OTHER_App_Project_Instructions.md` — Complete product specification
+- `OTHER_App_Specs.xlsx` — Feature tracking spreadsheet with status/priority
+- `reference_prototype.jsx` — Working React prototype (for UI/UX reference)
