@@ -35,6 +35,7 @@ src/
 ├── config.js                # VITE_AI_PROXY / VITE_AI_MODEL
 ├── components/ui.jsx        # Shell (cosmic bg), Prog, Pills, Checks
 ├── data/onboarding.js       # STEPS, ACTIVITIES, CUISINES, DIETARY, builder cats
+├── components/UnlockSheet.jsx  # one-time unlock modal
 ├── lib/
 │   ├── zodiac.js            # multi-system engine + compatibility
 │   ├── companions.js        # name pools, personality seeds, genComp
@@ -42,10 +43,13 @@ src/
 │   ├── ambient.js           # ambient companion-to-companion threads
 │   ├── prompt.js            # per-companion system prompt builder
 │   ├── ai.js                # askCompanion / greetCompanion (proxy + placeholder)
+│   ├── entitlements.js      # trial/ownership rules (trialDaysLeft, isLimited)
+│   ├── purchase.js          # simulated one-time unlock (swap for a real SDK)
 │   └── storage.js           # localStorage session save/load/clear
 └── screens/
     ├── Welcome.jsx, Onboarding.jsx, ZodiacReveal.jsx,
-    ├── CompanionPreference.jsx, WakingUp.jsx, CompanionSelect.jsx, Chat.jsx
+    ├── CompanionPreference.jsx, WakingUp.jsx, CompanionSelect.jsx, Chat.jsx,
+    ├── Settings.jsx, CompanionProfile.jsx
 worker/                      # Cloudflare Worker AI proxy (see worker/README.md)
 legacy_flutter/              # the old Flutter app + original React prototype
 ```
@@ -75,13 +79,14 @@ Wire up real AI by deploying `worker/` (see `worker/README.md`) and creating a
 - Real Claude responses via the worker proxy, with a characterful offline fallback
 - Local persistence + resume; full reset (chat menu)
 - Age gating (under-18 content filtering) in the system prompt
+- Settings screen (voice, sleep/wake all, trial status, reset) + companion-profile screens
+- 14-day trial timer, trial degradation (limited badge + dimmed orbs + banner), simulated unlock/purchase
+- Summon-a-companion in-app (free if you own none, else one-time unlock; roster capped at 3)
 
 ### Needs Building (web)
-- Settings screen + companion-profile screens (ported from the Flutter version)
-- 14-day trial timer, trial degradation, and purchase/unlock flow
-- Summon-a-companion in-app
 - Location services, long-term mood tracking, push notifications
-- Payment integration; privacy policy / ToS; store/PWA packaging
+- Real payment integration (replace `lib/purchase.js`)
+- Privacy policy / ToS; store/PWA packaging
 
 ## Business Entity
 

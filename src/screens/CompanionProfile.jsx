@@ -1,0 +1,60 @@
+import React from 'react';
+import { C } from '../theme.js';
+import { Shell } from '../components/ui.jsx';
+import { ZODIAC, cap } from '../lib/zodiac.js';
+import { trialDaysLeft, COMPANION_PRICE } from '../lib/entitlements.js';
+
+export default function CompanionProfile({ companion: c, trialStart, onPrivate, onSleepToggle, onDelete, onUnlock, onBack }) {
+  const col = c.color.primary;
+  const z = ZODIAC[c.zodiac];
+  const sleeping = c.status === 'sleeping';
+
+  const ownership = () => {
+    if (c.purchased) return 'Yours · free companion';
+    if (!trialStart) return 'Trial companion';
+    const left = trialDaysLeft(trialStart);
+    if (left > 0) return `Trial · ${left} ${left === 1 ? 'day' : 'days'} left`;
+    return 'Trial ended · memory limited';
+  };
+
+  const card = { width: '100%', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 16, marginBottom: 10, textAlign: 'left' };
+  const label = { fontSize: 10, color: C.textDim, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8 };
+  const traits = c.builderTraits ? Object.values(c.builderTraits).flat().filter(Boolean) : [];
+
+  const action = (text, bg, onClick, { danger, outlined } = {}) => (
+    <button onClick={onClick} style={{ width: '100%', padding: '13px', borderRadius: 12, marginBottom: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: "'DM Sans',sans-serif", background: outlined ? 'transparent' : (danger ? `${bg}1f` : bg), color: danger ? bg : (outlined ? C.text : '#fff'), border: `1px solid ${danger ? `${bg}88` : (outlined ? C.border : bg)}` }}>{text}</button>
+  );
+
+  return (
+    <Shell>
+      <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: `1px solid ${C.border}` }}>
+        <button onClick={onBack} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 20, cursor: 'pointer' }}>←</button>
+        <span style={{ fontSize: 15, fontWeight: 600 }}>{c.name}</span>
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px 40px', textAlign: 'center' }}>
+        <div style={{ width: 110, height: 110, borderRadius: '50%', margin: '8px auto 0', background: `radial-gradient(circle,${col},${col}40)`, boxShadow: `0 0 50px ${c.color.glow}` }} />
+        <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 30, fontWeight: 700, margin: '18px 0 0' }}>{c.name}</h1>
+        <p style={{ fontSize: 13, color: C.textSoft }}>{c.pronouns}</p>
+        <div style={{ display: 'inline-block', margin: '8px 0 24px', padding: '4px 12px', borderRadius: 20, background: `${col}1f`, border: `1px solid ${col}66`, fontSize: 11, color: col, fontWeight: 600 }}>{sleeping ? '💤 Sleeping' : (c.status === 'deleted' ? 'Gone' : '● Awake')}</div>
+
+        <div style={card}><div style={label}>Astrology</div><div style={{ fontSize: 14 }}>{z.sym} {cap(c.zodiac)}</div><div style={{ fontSize: 12, color: C.textSoft }}>{z.el} · {z.trait}</div></div>
+        <div style={card}><div style={label}>Personality</div><div style={{ fontSize: 14, lineHeight: 1.4 }}>{c.personality}</div><div style={{ fontSize: 12, color: C.textSoft, marginTop: 4 }}>Quirk: {c.quirk}</div></div>
+        {traits.length > 0 && (
+          <div style={card}><div style={label}>Trait seeds</div><div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{traits.map((t, i) => <span key={i} style={{ padding: '5px 10px', borderRadius: 20, background: C.surfaceUp, border: `1px solid ${C.border}`, fontSize: 11 }}>{t}</span>)}</div></div>
+        )}
+        {c.freeText && <div style={card}><div style={label}>Drawn toward</div><div style={{ fontSize: 14 }}>{c.freeText}</div></div>}
+        <div style={card}><div style={label}>Access</div><div style={{ fontSize: 14 }}>{ownership()}</div></div>
+
+        <div style={{ height: 14 }} />
+        {c.status !== 'deleted' && (
+          <>
+            {!c.purchased && trialStart && action(`Unlock ${c.name} · ${COMPANION_PRICE}`, C.glow1, onUnlock)}
+            {c.status === 'awake' && action('Open private chat', col, onPrivate, { outlined: !c.purchased && trialStart })}
+            {action(sleeping ? `Wake ${c.name}` : `Put ${c.name} to sleep`, C.surfaceUp, onSleepToggle, { outlined: true })}
+            {action(`Delete ${c.name}`, C.danger, onDelete, { danger: true })}
+          </>
+        )}
+      </div>
+    </Shell>
+  );
+}

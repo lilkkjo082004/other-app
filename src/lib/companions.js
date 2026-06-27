@@ -42,5 +42,6 @@ export function genComp(sign, ci, used) {
     builderTraits: null,
     freeText: null,
     voiceIdx: ci,
+    purchased: true,
   };
 }

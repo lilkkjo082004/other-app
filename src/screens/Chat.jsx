@@ -1,11 +1,18 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { C } from '../theme.js';
+import { C, COMP_COLORS } from '../theme.js';
 import { Shell } from '../components/ui.jsx';
 import { speakAs, useSpeechRec } from '../lib/voice.js';
 import { genAmbient } from '../lib/ambient.js';
 import { askCompanion, greetCompanion } from '../lib/ai.js';
+import { isLimited } from '../lib/entitlements.js';
+import { genComp } from '../lib/companions.js';
+import { pickSigns } from '../lib/zodiac.js';
+import UnlockSheet from '../components/UnlockSheet.jsx';
+import Settings from './Settings.jsx';
+import CompanionProfile from './CompanionProfile.jsx';
+import WakingUp from './WakingUp.jsx';
 
-export default function Chat({ companions: init, profile, restored, onPersist, onReset }) {
+export default function Chat({ companions: init, profile, trialStart, restored, onPersist, onReset }) {
   const [comps, setComps] = useState(init.map((c) => ({ ...c, status: c.status || 'awake' })));
   const [msgs, setMsgs] = useState(restored ? restored.messages || [] : []);
   const [input, setInput] = useState('');
@@ -13,11 +20,16 @@ export default function Chat({ companions: init, profile, restored, onPersist, o
   const [chatMode, setChatMode] = useState(restored?.chatMode || 'group');
   const [showMenu, setShowMenu] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(restored?.autoSpeak || false);
+  const [panel, setPanel] = useState(null);            // null | 'settings' | { profile: id }
+  const [unlock, setUnlock] = useState(null);          // { companion, onResult(ok) }
+  const [summonCandidate, setSummonCandidate] = useState(null);
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
 
   const active = comps.filter((c) => c.status === 'awake');
   const priv = chatMode !== 'group' ? comps.find((c) => c.id === chatMode) : null;
+  const living = comps.filter((c) => c.status !== 'deleted');
+  const limited = living.filter((c) => isLimited(c, trialStart));
 
   const handleVoice = useCallback((t) => {
     const lo = t.toLowerCase();
@@ -27,7 +39,6 @@ export default function Chat({ companions: init, profile, restored, onPersist, o
   }, [active]);
   const { listening, startListening } = useSpeechRec(handleVoice);
 
-  // First open: ambient thread + greetings. Skipped when resuming a session.
   useEffect(() => {
     (async () => {
       if (restored) return;
@@ -42,9 +53,8 @@ export default function Chat({ companions: init, profile, restored, onPersist, o
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); }, [msgs, loading]);
 
-  // Persist after every change so a refresh resumes here.
   useEffect(() => {
-    onPersist?.({ companions: comps, messages: msgs, chatMode, autoSpeak });
+    onPersist?.({ companions: comps, messages: msgs, chatMode, autoSpeak, trialStart });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comps, msgs, chatMode, autoSpeak]);
 
@@ -88,12 +98,80 @@ export default function Chat({ companions: init, profile, restored, onPersist, o
 
   function delComp(id) {
     try { if (!window.confirm('This is permanent. Delete this companion?')) return; } catch (e) { /* headless */ }
+    const dl = comps.find((c) => c.id === id);
+    const al = comps.filter((c) => c.id !== id && c.status === 'awake');
     setComps((p) => p.map((c) => (c.id === id ? { ...c, status: 'deleted' } : c)));
     if (chatMode === id) setChatMode('group');
     setShowMenu(false);
-    const al = comps.filter((c) => c.id !== id && c.status === 'awake');
-    const dl = comps.find((c) => c.id === id);
     if (al.length && dl) setMsgs((p) => [...p, { role: 'assistant', companion: al[0], content: `...${dl.name} is gone. I'm going to miss ${dl.pronouns.split('/')[1] || 'them'}.` }]);
+  }
+
+  function markPurchased(id) {
+    setComps((p) => p.map((c) => (c.id === id ? { ...c, purchased: true } : c)));
+    const c = comps.find((x) => x.id === id);
+    const others = comps.filter((o) => o.id !== id && o.status === 'awake');
+    if (c && others.length) setMsgs((p) => [...p, { role: 'assistant', companion: others[0], content: `${c.name} is staying for good. honestly? wouldn't be the same without ${c.pronouns.split('/')[1] || 'them'}.` }]);
+  }
+
+  async function addCompanion(c) {
+    setComps((p) => [...p, c]);
+    const t = await greetCompanion(c, profile, 'group', [...comps, c]);
+    setMsgs((p) => [...p, { role: 'assistant', companion: c, content: t }]);
+  }
+
+  function summon() {
+    setShowMenu(false);
+    if (living.length >= 3) return;
+    const usedNames = comps.map((c) => c.name);
+    const usedSigns = new Set(living.map((c) => c.zodiac));
+    const pool = pickSigns(profile.astrology.western);
+    const sign = pool.find((s) => !usedSigns.has(s)) || pool[0];
+    const usedColors = new Set(living.map((c) => c.color?.name));
+    let ci = living.length % COMP_COLORS.length;
+    for (let i = 0; i < COMP_COLORS.length; i++) { if (!usedColors.has(COMP_COLORS[i].name)) { ci = i; break; } }
+    const cand = genComp(sign, ci, usedNames);
+    cand.purchased = false; // decided after the waking-up sequence
+    setSummonCandidate(cand);
+  }
+
+  function onSummonDone() {
+    const cand = summonCandidate;
+    setSummonCandidate(null);
+    if (!cand) return;
+    const freeAvailable = !living.some((c) => c.purchased);
+    if (freeAvailable) { cand.purchased = true; addCompanion(cand); }
+    else setUnlock({ companion: cand, onResult: (ok) => { if (ok) { cand.purchased = true; addCompanion(cand); } } });
+  }
+
+  function openProfile(c) { setShowMenu(false); setPanel({ profile: c.id }); }
+
+  // ── Panels (full-screen views) ──
+  if (panel === 'settings') {
+    return (
+      <Settings
+        profile={profile} comps={comps} autoSpeak={autoSpeak} trialStart={trialStart}
+        onAutoSpeak={setAutoSpeak}
+        onSleepAll={() => setComps((p) => p.map((c) => (c.status === 'awake' ? { ...c, status: 'sleeping' } : c)))}
+        onWakeAll={() => setComps((p) => p.map((c) => (c.status === 'sleeping' ? { ...c, status: 'awake' } : c)))}
+        onReset={onReset}
+        onBack={() => setPanel(null)}
+      />
+    );
+  }
+  if (panel && panel.profile) {
+    const pc = comps.find((c) => c.id === panel.profile);
+    if (pc) {
+      return (
+        <CompanionProfile
+          companion={pc} trialStart={trialStart}
+          onBack={() => setPanel(null)}
+          onPrivate={() => { setChatMode(pc.id); setPanel(null); }}
+          onSleepToggle={() => { togSleep(pc.id); setPanel(null); }}
+          onDelete={() => { delComp(pc.id); setPanel(null); }}
+          onUnlock={() => { setPanel(null); setUnlock({ companion: pc, onResult: (ok) => { if (ok) markPurchased(pc.id); } }); }}
+        />
+      );
+    }
   }
 
   const visible = msgs.filter((m) => chatMode === 'group' || m.role === 'user' || m.companion?.id === chatMode);
@@ -104,7 +182,7 @@ export default function Chat({ companions: init, profile, restored, onPersist, o
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {chatMode === 'group' ? (
             <>
-              <div style={{ display: 'flex' }}>{active.map((c, i) => <div key={c.id} style={{ width: 26, height: 26, borderRadius: '50%', background: `radial-gradient(circle,${c.color.primary},${c.color.primary}66)`, border: `2px solid ${C.bg}`, marginLeft: i ? -7 : 0, zIndex: 3 - i }} />)}</div>
+              <div style={{ display: 'flex' }}>{active.map((c, i) => <div key={c.id} style={{ width: 26, height: 26, borderRadius: '50%', background: `radial-gradient(circle,${c.color.primary},${c.color.primary}66)`, border: `2px solid ${C.bg}`, marginLeft: i ? -7 : 0, zIndex: 3 - i, opacity: isLimited(c, trialStart) ? 0.4 : 1 }} />)}</div>
               <div><div style={{ fontSize: 13, fontWeight: 600 }}>Group Chat</div><div style={{ fontSize: 9, color: C.textSoft }}>{active.map((c) => c.name).join(', ') || 'Everyone resting'}</div></div>
             </>
           ) : (
@@ -123,18 +201,28 @@ export default function Chat({ companions: init, profile, restored, onPersist, o
 
       {listening && <div style={{ background: `${C.danger}15`, borderBottom: `1px solid ${C.danger}33`, padding: '6px 14px', textAlign: 'center', fontSize: 11, color: C.danger }}>🎤 Say a companion's name or speak your message</div>}
 
+      {limited.length > 0 && (
+        <div onClick={() => setUnlock({ companion: limited[0], onResult: (ok) => { if (ok) markPurchased(limited[0].id); } })} style={{ background: `${C.glow2}14`, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+          <span style={{ fontSize: 12 }}>✦</span>
+          <span style={{ flex: 1, fontSize: 11, color: C.textSoft }}>{limited.length === 1 ? `${limited[0].name}'s memory is limited since the trial ended.` : `${limited.length} companions have limited memory since the trial ended.`}</span>
+          <span style={{ fontSize: 11, color: C.glow2, fontWeight: 700 }}>Unlock</span>
+        </div>
+      )}
+
       {showMenu && (
-        <div style={{ position: 'absolute', top: 46, right: 0, width: 240, background: C.card, border: `1px solid ${C.border}`, borderRadius: '0 0 0 14px', padding: 12, zIndex: 20, animation: 'fadeIn 0.2s', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
+        <div style={{ position: 'absolute', top: 46, right: 0, width: 248, background: C.card, border: `1px solid ${C.border}`, borderRadius: '0 0 0 14px', padding: 12, zIndex: 20, animation: 'fadeIn 0.2s', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
           <div style={{ fontSize: 9, color: C.textDim, textTransform: 'uppercase', letterSpacing: 2, marginBottom: 8 }}>Chat Mode</div>
           <button onClick={() => { setChatMode('group'); setShowMenu(false); }} style={{ width: '100%', background: chatMode === 'group' ? C.surfaceUp : 'transparent', border: `1px solid ${chatMode === 'group' ? C.borderLit : 'transparent'}`, borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', marginBottom: 6, fontSize: 12, fontFamily: "'DM Sans',sans-serif" }}>👥 Group</button>
           {comps.filter((c) => c.status !== 'deleted').map((c) => (
             <div key={c.id} style={{ marginBottom: 6 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
-                <div style={{ width: 14, height: 14, borderRadius: '50%', background: c.color.primary, opacity: c.status === 'sleeping' ? 0.3 : 1 }} />
+                <div style={{ width: 14, height: 14, borderRadius: '50%', background: c.color.primary, opacity: c.status === 'sleeping' || isLimited(c, trialStart) ? 0.3 : 1 }} />
                 <span style={{ fontSize: 12, fontWeight: 600, flex: 1, color: c.status === 'sleeping' ? C.textDim : C.text }}>{c.name}</span>
                 <span style={{ fontSize: 8 }}>{c.status === 'sleeping' ? '💤' : '●'}</span>
               </div>
-              <div style={{ display: 'flex', gap: 3, paddingLeft: 19 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, paddingLeft: 19 }}>
+                <button onClick={() => openProfile(c)} style={menuBtn}>Profile</button>
+                {!c.purchased && trialStart && <button onClick={() => setUnlock({ companion: c, onResult: (ok) => { if (ok) markPurchased(c.id); } })} style={{ ...menuBtn, border: `1px solid ${C.glow2}55`, color: C.glow2, fontWeight: 700 }}>Unlock</button>}
                 {c.status === 'awake' && <button onClick={() => { setChatMode(c.id); setShowMenu(false); }} style={menuBtn}>Private</button>}
                 <button onClick={() => togSleep(c.id)} style={menuBtn}>{c.status === 'sleeping' ? 'Wake' : 'Sleep'}</button>
                 <button onClick={() => delComp(c.id)} style={{ ...menuBtn, border: `1px solid ${C.danger}33`, color: C.danger }}>Delete</button>
@@ -142,7 +230,8 @@ export default function Chat({ companions: init, profile, restored, onPersist, o
             </div>
           ))}
           <div style={{ borderTop: `1px solid ${C.border}`, margin: '8px 0' }} />
-          <button onClick={() => onReset?.()} style={{ width: '100%', background: 'none', border: `1px solid ${C.danger}33`, borderRadius: 7, padding: '6px', color: C.danger, cursor: 'pointer', fontSize: 11, fontFamily: "'DM Sans',sans-serif", marginBottom: 6 }}>Reset everything</button>
+          {living.length < 3 && <button onClick={summon} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.glow2, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif" }}>✦  Summon a companion</button>}
+          <button onClick={() => { setShowMenu(false); setPanel('settings'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>⚙  Settings</button>
           <button onClick={() => setShowMenu(false)} style={{ width: '100%', background: 'none', border: `1px solid ${C.border}`, borderRadius: 7, padding: '5px', color: C.textSoft, cursor: 'pointer', fontSize: 11, fontFamily: "'DM Sans',sans-serif" }}>Close</button>
         </div>
       )}
@@ -181,6 +270,9 @@ export default function Chat({ companions: init, profile, restored, onPersist, o
           </div>
         )}
       </div>
+
+      {summonCandidate && <div style={{ position: 'fixed', inset: 0, zIndex: 40 }}><WakingUp comp={summonCandidate} onDone={onSummonDone} /></div>}
+      {unlock && <UnlockSheet companion={unlock.companion} onClose={(ok) => { const f = unlock.onResult; setUnlock(null); f?.(ok); }} />}
     </Shell>
   );
 }

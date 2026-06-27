@@ -20,6 +20,7 @@ export default function App() {
   const [allC, setAllC] = useState([]);
   const [wI, setWI] = useState(0);
   const [selC, setSelC] = useState(resumable ? saved.companions : []);
+  const [trialStart, setTrialStart] = useState(resumable ? (saved.trialStart || null) : null);
   const [restored, setRestored] = useState(
     resumable ? { messages: saved.messages, chatMode: saved.chatMode, autoSpeak: saved.autoSpeak } : null
   );
@@ -55,16 +56,24 @@ export default function App() {
     setProfile(null);
     setSelC([]);
     setAllC([]);
+    setTrialStart(null);
     setRestored(null);
     setScreen('welcome');
   };
 
-  if (screen === 'chat') return <Chat companions={selC} profile={profile} restored={restored} onPersist={persist} onReset={reset} />;
+  if (screen === 'chat') return <Chat companions={selC} profile={profile} trialStart={trialStart} restored={restored} onPersist={persist} onReset={reset} />;
   if (screen === 'welcome') return <Welcome onStart={() => setScreen('onboarding')} />;
   if (screen === 'onboarding') return <Onboarding onComplete={handleOB} />;
   if (screen === 'zodiac') return <ZodiacReveal profile={profile} onContinue={() => setScreen('preference')} />;
   if (screen === 'preference') return <CompanionPreference onChoice={handlePref} ageGroup={profile?.ageGroup} />;
   if (screen === 'waking') return <WakingUp comp={allC[wI]} key={wI} onDone={() => (wI < allC.length - 1 ? setWI(wI + 1) : setScreen('select'))} />;
-  if (screen === 'select') return <CompanionSelect comps={allC} onSelect={(s) => { setSelC(s); setRestored(null); setScreen('chat'); }} />;
+  if (screen === 'select') return <CompanionSelect comps={allC} onSelect={(s) => {
+    // First chosen companion is free forever; any extras start a 14-day trial.
+    s.forEach((c, i) => { c.purchased = i === 0; });
+    setTrialStart(s.length > 1 ? Date.now() : null);
+    setSelC(s);
+    setRestored(null);
+    setScreen('chat');
+  }} />;
   return null;
 }
