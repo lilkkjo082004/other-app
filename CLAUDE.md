@@ -20,6 +20,8 @@ The app is a **web app**, framework-agnostic by design.
 - **Voice**: browser `speechSynthesis` (TTS) + `SpeechRecognition` (call-by-name)
 - **Persistence**: `localStorage` (single-blob session) — the app resumes into chat
 - **State**: React hooks (`useState`), screen-routed from `src/App.jsx`
+- **PWA**: installable (`public/manifest.webmanifest` + icons) with an offline
+  app-shell service worker (`public/sw.js`, registered in `src/main.jsx`)
 
 > The original Flutter implementation is preserved under `legacy_flutter/` for
 > reference. It is no longer the active codebase.
@@ -84,9 +86,11 @@ Wire up real AI by deploying `worker/` (see `worker/README.md`) and creating a
 - Summon-a-companion in-app (free if you own none, else one-time unlock; roster capped at 3)
 
 ### Needs Building (web)
-- Location services, long-term mood tracking, push notifications
+- Backend + persistent memory (cross-device, evolution, long-term mood tracking)
+- Push notifications (PWA install/service-worker foundation is in place)
+- Location services
 - Real payment integration (replace `lib/purchase.js`)
-- Privacy policy / ToS; store/PWA packaging
+- Privacy policy / ToS; store packaging (native wrapper for Google Play)
 
 ## Business Entity
 
