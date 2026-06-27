@@ -66,6 +66,25 @@ export async function handle(request, env) {
       return json(await env.store.moodSummary(uid), 200, env);
     }
 
+    if (p === '/push/subscribe' && request.method === 'POST') {
+      const uid = await authUid(request, env);
+      if (!uid) return json({ error: 'unauthorized' }, 401, env);
+      const b = await body(request);
+      const sub = b?.subscription;
+      if (!sub?.endpoint || !sub?.keys?.p256dh || !sub?.keys?.auth) return json({ error: 'invalid subscription' }, 400, env);
+      await env.store.savePushSub(uid, sub);
+      return json({ ok: true }, 200, env);
+    }
+
+    if (p === '/push/unsubscribe' && request.method === 'POST') {
+      const uid = await authUid(request, env);
+      if (!uid) return json({ error: 'unauthorized' }, 401, env);
+      const b = await body(request);
+      if (!b?.endpoint) return json({ error: 'endpoint required' }, 400, env);
+      await env.store.deletePushSub(uid, b.endpoint);
+      return json({ ok: true }, 200, env);
+    }
+
     return json({ error: 'not found' }, 404, env);
   } catch (e) {
     return json({ error: 'server error', detail: String(e) }, 500, env);

@@ -64,6 +64,27 @@ r = await call('GET', '/mood/summary', { token });
 const stressed = r.data.counts?.find((c) => c.mood === 'stressed');
 ok(stressed?.n === 2 && r.data.recent?.length === 3, 'mood summary aggregates');
 
+console.log('push subscriptions');
+const sub = { endpoint: 'https://push.example/abc', keys: { p256dh: 'BPp256dhkey', auth: 'authsecret' } };
+r = await call('POST', '/push/subscribe', { body: { subscription: sub } });
+ok(r.status === 401, 'push subscribe requires auth');
+
+r = await call('POST', '/push/subscribe', { token, body: { subscription: { endpoint: 'x' } } });
+ok(r.status === 400, 'rejects malformed subscription');
+
+r = await call('POST', '/push/subscribe', { token, body: { subscription: sub } });
+ok(r.status === 200 && r.data.ok, 'subscribe stores the push subscription');
+
+const stored = await env.store.listPushSubs();
+ok(stored.length === 1 && stored[0].p256dh === 'BPp256dhkey', 'subscription is persisted with keys');
+
+r = await call('POST', '/push/unsubscribe', { token });
+ok(r.status === 400, 'unsubscribe requires an endpoint');
+
+r = await call('POST', '/push/unsubscribe', { token, body: { endpoint: sub.endpoint } });
+ok(r.status === 200 && r.data.ok, 'unsubscribe removes the subscription');
+ok((await env.store.listPushSubs()).length === 0, 'subscription is gone after unsubscribe');
+
 r = await call('GET', '/state', { token: 'garbage.token.here' });
 ok(r.status === 401, 'rejects tampered token');
 

@@ -4,6 +4,7 @@ export function memoryStore() {
   const usersByEmail = new Map();
   const states = new Map();
   const moods = [];
+  const pushSubs = new Map(); // endpoint -> sub
   let seq = 1;
 
   return {
@@ -32,6 +33,19 @@ export function memoryStore() {
         counts: Object.entries(counts).map(([mood, n]) => ({ mood, n })),
         recent: mine.slice(-30).reverse().map((m) => ({ mood: m.mood, created_at: m.created_at })),
       };
+    },
+    async savePushSub(uid, sub) {
+      pushSubs.set(sub.endpoint, { user_id: uid, endpoint: sub.endpoint, p256dh: sub.keys.p256dh, auth: sub.keys.auth, last_notified: 0 });
+    },
+    async deletePushSub(uid, endpoint) {
+      pushSubs.delete(endpoint);
+    },
+    async listPushSubs() {
+      return [...pushSubs.values()];
+    },
+    async setNotified(endpoint, ts) {
+      const s = pushSubs.get(endpoint);
+      if (s) s.last_notified = ts;
     },
   };
 }

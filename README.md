@@ -50,7 +50,15 @@ never hard-fails.
 
 The build ships a web manifest, icons, and a service worker (offline app shell).
 Open the deployed site in a mobile/desktop browser and use "Add to Home Screen"
-/ "Install". This is also the foundation for future push notifications.
+/ "Install".
+
+### Companion check-ins (push notifications)
+
+With the backend (`server/`) deployed and a VAPID keypair configured, signed-in
+users can enable "Companion check-ins" in Settings. A daily cron in the worker
+sends a Web Push notification from one of their awake companions. Set
+`VITE_VAPID_PUBLIC` in `.env` (matching the worker's `VAPID_PUBLIC`); see
+`server/README.md` for the keys and schedule.
 
 ## Project layout
 

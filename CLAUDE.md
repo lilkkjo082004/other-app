@@ -34,7 +34,7 @@ src/
 ├── main.jsx                 # React entry
 ├── App.jsx                  # screen router + resume-from-storage + reset
 ├── theme.js                 # design tokens (C), COMP_COLORS, global CSS
-├── config.js                # VITE_AI_PROXY / VITE_AI_MODEL
+├── config.js                # VITE_AI_PROXY / VITE_AI_MODEL / VITE_API_BASE / VITE_VAPID_PUBLIC
 ├── components/ui.jsx        # Shell (cosmic bg), Prog, Pills, Checks
 ├── data/onboarding.js       # STEPS, ACTIVITIES, CUISINES, DIETARY, builder cats
 ├── components/UnlockSheet.jsx  # one-time unlock modal
@@ -45,7 +45,9 @@ src/
 │   ├── ambient.js           # ambient companion-to-companion threads
 │   ├── prompt.js            # per-companion system prompt builder
 │   ├── ai.js                # askCompanion / greetCompanion (proxy + placeholder)
-│   ├── api.js               # backend client: auth, cloud state sync, mood
+│   ├── api.js               # backend client: auth, cloud state sync, mood, push
+│   ├── push.js              # Web Push subscribe/unsubscribe (companion check-ins)
+│   ├── evolution.js         # mood/familiarity/bond → system-prompt evolution block
 │   ├── entitlements.js      # trial/ownership rules (trialDaysLeft, isLimited)
 │   ├── purchase.js          # simulated one-time unlock (swap for a real SDK)
 │   └── storage.js           # localStorage session save/load/clear
@@ -98,11 +100,11 @@ Wire up real AI by deploying `worker/` (see `worker/README.md`) and creating a
 - Settings screen (voice, sleep/wake all, trial status, reset) + companion-profile screens
 - 14-day trial timer, trial degradation (limited badge + dimmed orbs + banner), simulated unlock/purchase
 - Summon-a-companion in-app (free if you own none, else one-time unlock; roster capped at 3)
+- Accounts + cloud sync wired into the app (Auth screen, pull-on-login, push-on-change) via `server/` + `lib/api.js`
+- Companion personality evolution: mood/familiarity/bond derived from history (`lib/evolution.js`) injected into the system prompt; "Your bond" card on the profile; mood logged to the backend
+- Push notifications (Web Push): client subscribe in Settings (`lib/push.js`), SW push/notificationclick handlers, backend subscription storage + RFC 8291/8292 sender, daily cron for companion check-ins
 
 ### Needs Building (web)
-- Wire the backend into the app UI (auth screen + cloud sync of the session; `server/` + `lib/api.js` are built and tested, not yet surfaced in `App.jsx`)
-- Companion personality evolution + surfacing long-term mood (server stores the data; chat doesn't use it yet)
-- Push notifications (PWA install/service-worker foundation is in place)
 - Location services
 - Real payment integration (replace `lib/purchase.js`)
 - Privacy policy / ToS; store packaging (native wrapper for Google Play)

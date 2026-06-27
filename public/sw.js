@@ -38,3 +38,25 @@ self.addEventListener('fetch', (e) => {
     )
   );
 });
+
+// Push notifications (companion check-ins).
+self.addEventListener('push', (e) => {
+  let d = { title: 'Other', body: 'Your companions are thinking about you ✦', url: './' };
+  try { if (e.data) d = { ...d, ...e.data.json() }; } catch (err) { if (e.data) d.body = e.data.text(); }
+  e.waitUntil(self.registration.showNotification(d.title || 'Other', {
+    body: d.body,
+    icon: './icon-192.png',
+    badge: './icon-192.png',
+    data: { url: d.url || './' },
+  }));
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = e.notification.data?.url || './';
+  e.waitUntil((async () => {
+    const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of all) { if ('focus' in c) return c.focus(); }
+    if (self.clients.openWindow) return self.clients.openWindow(url);
+  })());
+});

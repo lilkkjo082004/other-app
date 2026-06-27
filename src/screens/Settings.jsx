@@ -1,12 +1,30 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { C } from '../theme.js';
 import { Shell } from '../components/ui.jsx';
 import { cap } from '../lib/zodiac.js';
 import { trialDaysLeft } from '../lib/entitlements.js';
+import { pushConfigured, pushSupported, isSubscribed, enablePush, disablePush } from '../lib/push.js';
 
 export default function Settings({ profile, comps, autoSpeak, trialStart, cloud, authed, email, onSignIn, onSignOut, onAutoSpeak, onSleepAll, onWakeAll, onReset, onBack }) {
   const living = comps.filter((c) => c.status !== 'deleted');
   const allAwake = living.length > 0 && living.every((c) => c.status === 'awake');
+
+  const showPush = pushConfigured() && pushSupported() && authed;
+  const [pushOn, setPushOn] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushErr, setPushErr] = useState(null);
+  useEffect(() => {
+    if (showPush) isSubscribed().then(setPushOn).catch(() => {});
+  }, [showPush]);
+  async function togglePush() {
+    if (pushBusy) return;
+    setPushErr(null); setPushBusy(true);
+    try {
+      if (pushOn) { await disablePush(); setPushOn(false); }
+      else { await enablePush(); setPushOn(true); }
+    } catch (e) { setPushErr(String(e.message || e)); }
+    setPushBusy(false);
+  }
 
   const trialLabel = () => {
     if (!trialStart) return 'Free plan · one companion is yours forever';
@@ -51,6 +69,21 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
                 <span style={{ color: C.glow1 }}>›</span>
               </button>
             )}
+          </>
+        )}
+
+        {showPush && (
+          <>
+            <div style={{ height: 10 }} />
+            {section('Notifications')}
+            <div style={{ ...card, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ flex: 1, paddingRight: 10 }}>
+                <div style={{ fontSize: 13 }}>Companion check-ins</div>
+                <div style={{ fontSize: 11, color: C.textDim }}>Let your companions reach out during the day</div>
+                {pushErr && <div style={{ fontSize: 11, color: C.danger, marginTop: 4 }}>{pushErr}</div>}
+              </div>
+              <Toggle on={pushOn} onClick={togglePush} />
+            </div>
           </>
         )}
 

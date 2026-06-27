@@ -29,5 +29,20 @@ export function d1Store(DB) {
       const recent = (await DB.prepare('SELECT mood, created_at FROM mood_events WHERE user_id = ? ORDER BY created_at DESC LIMIT 30').bind(uid).all()).results || [];
       return { counts, recent };
     },
+    async savePushSub(uid, sub) {
+      await DB.prepare(
+        'INSERT INTO push_subscriptions (endpoint, user_id, p256dh, auth, last_notified) VALUES (?, ?, ?, ?, 0) ' +
+        'ON CONFLICT(endpoint) DO UPDATE SET user_id = excluded.user_id, p256dh = excluded.p256dh, auth = excluded.auth'
+      ).bind(sub.endpoint, uid, sub.keys.p256dh, sub.keys.auth).run();
+    },
+    async deletePushSub(uid, endpoint) {
+      await DB.prepare('DELETE FROM push_subscriptions WHERE endpoint = ? AND user_id = ?').bind(endpoint, uid).run();
+    },
+    async listPushSubs() {
+      return (await DB.prepare('SELECT user_id, endpoint, p256dh, auth, last_notified FROM push_subscriptions').all()).results || [];
+    },
+    async setNotified(endpoint, ts) {
+      await DB.prepare('UPDATE push_subscriptions SET last_notified = ? WHERE endpoint = ?').bind(ts, endpoint).run();
+    },
   };
 }

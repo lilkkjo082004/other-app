@@ -15,10 +15,31 @@ AI-only `../worker/` when you want a full backend.
 | PUT    | `/state`        | ✓    | `{state}` — save the session blob         |
 | POST   | `/mood`         | ✓    | `{mood,score?,companionId?}` — log a mood |
 | GET    | `/mood/summary` | ✓    | Aggregated mood counts + recent history   |
+| POST   | `/push/subscribe`   | ✓ | `{subscription}` — store a Web Push sub |
+| POST   | `/push/unsubscribe` | ✓ | `{endpoint}` — remove a Web Push sub    |
 | POST   | `/ai`           | —    | `{model,system,messages}` → `{text}`      |
 
 Auth is a Bearer token (`Authorization: Bearer <token>`) — a stateless
 HMAC-signed `uid.exp.sig`. Passwords are hashed with PBKDF2-SHA256.
+
+## Companion check-ins (Web Push)
+
+A `scheduled()` cron handler fans out companion-initiated check-in
+notifications to subscribed devices (RFC 8291 `aes128gcm` payload encryption,
+RFC 8292 VAPID auth — all via Web Crypto, no dependencies). It picks an awake
+companion from each user's synced state and rate-limits to ~once per device per
+day. The schedule lives in `wrangler.toml` (`[triggers] crons`); it is a no-op
+until VAPID keys are configured.
+
+Generate a VAPID keypair (e.g. `npx web-push generate-vapid-keys`), then:
+
+```bash
+wrangler secret put VAPID_PRIVATE   # the private key
+```
+
+and in `wrangler.toml` `[vars]` set `VAPID_PUBLIC` (the public key) and
+`VAPID_SUBJECT` (`mailto:you@example.com`). The same public key goes in the web
+app's `.env` as `VITE_VAPID_PUBLIC`.
 
 ## Deploy
 
@@ -32,6 +53,7 @@ wrangler d1 execute other --remote --file=./schema.sql
 
 wrangler secret put AUTH_SECRET        # a long random string
 wrangler secret put ANTHROPIC_API_KEY  # sk-ant-... (enables /ai)
+wrangler secret put VAPID_PRIVATE      # optional — enables push check-ins
 
 wrangler deploy                    # prints https://other-api.<you>.workers.dev
 ```
