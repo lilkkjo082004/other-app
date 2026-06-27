@@ -49,6 +49,7 @@ src/
 │   ├── api.js               # backend client: auth, cloud state sync, mood, push
 │   ├── push.js              # Web Push subscribe/unsubscribe (companion check-ins)
 │   ├── location.js          # opt-in location (on-device coords; coarse area → prompt)
+│   ├── age.js               # DOB-based age verification + mature-content gating (ToS §1)
 │   ├── disclosure.js        # recurring AI-disclosure reminder hook (ToS §13)
 │   ├── crisis.js            # self-harm/suicide detection + crisis resources (ToS §13)
 │   ├── evolution.js         # mood/familiarity/bond → system-prompt evolution block
@@ -110,12 +111,13 @@ Wire up real AI by deploying `worker/` (see `worker/README.md`) and creating a
 - In-app legal: Terms of Service (`data/legal.js`) rendered by `screens/Legal.jsx` with a tiny markdown subset; linked from Welcome, Auth (signup), and Settings via `LegalLink`. Privacy Policy slot is wired but awaiting the source document.
 - Location services (opt-in, `lib/location.js`): browser geolocation or manual entry, managed in a Settings "Location" section. Per ToS §12, precise coordinates stay in device-local storage and never reach our servers; only a coarse, user-confirmable area label is injected into the companion system prompt (`locationBlock`) so companions can offer local suggestions.
 - Safety/compliance (ToS §13): recurring AI-disclosure reminders in chat (`lib/disclosure.js`, shown at open + hourly of active use, not user-disableable); crisis detection + resource card (`lib/crisis.js`) when self-harm/suicidal ideation appears, with the system prompt and offline fallback both directing to 988; account + full server-data deletion (`DELETE /account`, surfaced in Settings → Account).
+- Age verification (ToS §1, `lib/age.js`): the onboarding DOB drives a real gate — under-13 is blocked, 13–17 is locked to friendship-only, 18+ requires explicit confirmation. The age group is derived from and locked to the DOB (a false "18+" claim can't outrank an under-18 birth date), persisted as `ageVerified`, and re-checked on resume/sync. Mature themes are gated to verified adults on the web build only (`matureContentAllowed`), feeding the system prompt.
 
 ### Needs Building (web)
 - Privacy Policy + Disclaimer source documents (drop the markdown into `data/legal.js`; the Terms reference both)
 - Real payment integration (replace `lib/purchase.js`) — on hold
-- Store packaging (native wrapper for Google Play)
-- Real age verification + web-only gating for explicit content (ToS §1.3; currently a self-declared onboarding flag feeds content filtering)
+- Store packaging (native wrapper for Google Play); set `window.__OTHER_NATIVE__` in that build so mature content stays web-only
+- Deployment/ops: provision the backend (D1, secrets, VAPID, cron) and add rate limiting on `/ai`
 
 ## Business Entity
 

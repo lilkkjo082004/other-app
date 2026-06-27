@@ -86,7 +86,7 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
         {section('You')}
         <div style={{ ...card, display: 'flex', justifyContent: 'space-between' }}><span style={{ color: C.textSoft, fontSize: 13 }}>Name</span><span style={{ fontSize: 13, fontWeight: 500 }}>{profile.name}</span></div>
         {profile.astrology && <div style={{ ...card, display: 'flex', justifyContent: 'space-between' }}><span style={{ color: C.textSoft, fontSize: 13 }}>Stars</span><span style={{ fontSize: 13, fontWeight: 500 }}>{profile.astrology.westernData.sym} {cap(profile.astrology.western)}</span></div>}
-        <div style={{ ...card, display: 'flex', justifyContent: 'space-between' }}><span style={{ color: C.textSoft, fontSize: 13 }}>Mode</span><span style={{ fontSize: 13, fontWeight: 500 }}>{profile.ageGroup === 'under18' ? 'Under 18 (friendship only)' : '18+'}</span></div>
+        <div style={{ ...card, display: 'flex', justifyContent: 'space-between' }}><span style={{ color: C.textSoft, fontSize: 13 }}>Mode</span><span style={{ fontSize: 13, fontWeight: 500 }}>{profile.ageGroup === 'under18' ? 'Under 18 (friendship only)' : (profile.ageVerified ? '18+ · verified' : '18+')}</span></div>
 
         {cloud && (
           <>

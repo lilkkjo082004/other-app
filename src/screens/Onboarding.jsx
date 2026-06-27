@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { C } from '../theme.js';
 import { Shell, Prog, Pills, Checks } from '../components/ui.jsx';
 import { STEPS, ACTIVITIES, CUISINES, DIETARY } from '../data/onboarding.js';
+import { ageTier } from '../lib/age.js';
 
 export default function Onboarding({ onComplete }) {
   const [step, setStep] = useState(0);
@@ -52,7 +53,14 @@ export default function Onboarding({ onComplete }) {
 
   if (sid === 'dob') return W(<><Back /><Q icon="☽" q="When were you born?" sub="We use this to match you with compatible companions." /><input type="date" value={txt} onChange={(e) => setTxt(e.target.value)} style={{ ...inputStyle, colorScheme: 'dark' }} /><button className="bp" disabled={!txt} onClick={() => save(txt)} style={{ marginTop: 10, width: '100%' }}>Reveal My Stars</button></>);
 
-  if (sid === 'ageGroup') return W(<><Back /><Q icon="🔒" q="One quick check —" /><Checks opts={[{ v: '18+', label: "I'm 18 or older", em: '✓' }, { v: 'under18', label: "I'm under 18", em: '✓' }]} sel={sel} onTog={(v) => save(v)} /></>);
+  if (sid === 'ageGroup') {
+    const tier = ageTier(d.dob);
+    if (tier === 'under13') return W(<><Back /><Q icon="🔒" q="You need to be at least 13" sub="Other isn't available to anyone under 13. If you entered the wrong birthday, go back and fix it — otherwise, please come back when you're older." /><button className="bg2" onClick={back} style={{ width: '100%' }}>← Change my birthday</button></>);
+    if (tier === 'minor') return W(<><Back /><Q icon="🛡️" q="You're in friendship mode" sub="Because you're under 18, your companions stay strictly platonic and age-appropriate, with extra safety on at all times. This can't be changed while you're a minor." /><button className="bp" onClick={() => save('under18')} style={{ width: '100%' }}>Got it — continue</button></>);
+    if (tier === 'adult') return W(<><Back /><Q icon="🔞" q="Confirm you're 18 or older" sub="Your birthday says you're an adult. Confirming unlocks companions with romantic and mature themes. Misrepresenting your age is a violation of our Terms." /><button className="bp" onClick={() => save('18+')} style={{ width: '100%', marginBottom: 10 }}>I confirm I'm 18 or older</button><p style={{ fontSize: 11, color: C.textDim, textAlign: 'center' }}>Not 18 yet? <button onClick={back} style={{ background: 'none', border: 'none', color: C.glow1, cursor: 'pointer', fontSize: 11, fontFamily: "'DM Sans',sans-serif", padding: 0 }}>Go back</button></p></>);
+    // No usable birth date — fall back to a self-declared check.
+    return W(<><Back /><Q icon="🔒" q="One quick check —" sub="Please confirm your age." /><Checks opts={[{ v: '18+', label: "I'm 18 or older", em: '✓' }, { v: 'under18', label: "I'm under 18", em: '✓' }]} sel={sel} onTog={(v) => save(v)} /></>);
+  }
 
   if (sid === 'vibe') return W(<><Back /><Q icon="◈" q="What energy do you gravitate toward?" sub="Pick all that resonate." /><Checks opts={[{ v: 'calm', label: 'Calm & grounded', em: '🌿' }, { v: 'playful', label: 'Playful & witty', em: '⚡' }, { v: 'deep', label: 'Deep & introspective', em: '🌙' }, { v: 'warm', label: 'Warm & nurturing', em: '☀️' }, { v: 'chaotic', label: 'Chaotic & spontaneous', em: '🔥' }]} sel={sel} onTog={tog} /><button className="bp" disabled={!sel.length} onClick={() => save(sel)} style={{ marginTop: 12, width: '100%' }}>Continue ({sel.length})</button></>);
 

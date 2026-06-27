@@ -3,6 +3,7 @@ import { getUserAstro, pickSigns } from './lib/zodiac.js';
 import { genComp } from './lib/companions.js';
 import { loadSession, saveSession, clearSession } from './lib/storage.js';
 import { cloudEnabled } from './config.js';
+import { withAgeVerification } from './lib/age.js';
 import * as api from './lib/api.js';
 import Welcome from './screens/Welcome.jsx';
 import Onboarding from './screens/Onboarding.jsx';
@@ -21,7 +22,7 @@ const resumable = hasLiving(saved);
 
 export default function App() {
   const [screen, setScreen] = useState(resumable ? 'chat' : 'welcome');
-  const [profile, setProfile] = useState(resumable ? saved.profile : null);
+  const [profile, setProfile] = useState(resumable ? withAgeVerification(saved.profile) : null);
   const [allC, setAllC] = useState([]);
   const [wI, setWI] = useState(0);
   const [selC, setSelC] = useState(resumable ? saved.companions : []);
@@ -45,7 +46,7 @@ export default function App() {
   }, []);
 
   function applyState(s) {
-    setProfile(s.profile);
+    setProfile(withAgeVerification(s.profile));
     setSelC(s.companions || []);
     setTrialStart(s.trialStart || null);
     setRestored({ messages: s.messages || [], chatMode: s.chatMode || 'group', autoSpeak: !!s.autoSpeak });
@@ -54,7 +55,7 @@ export default function App() {
 
   const handleOB = (a) => {
     const astro = getUserAstro(a.dob);
-    setProfile({ ...a, astrology: astro });
+    setProfile(withAgeVerification({ ...a, astrology: astro }));
     setScreen('zodiac');
   };
 
