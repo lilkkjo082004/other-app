@@ -1,0 +1,188 @@
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { C } from '../theme.js';
+import { Shell } from '../components/ui.jsx';
+import { speakAs, useSpeechRec } from '../lib/voice.js';
+import { genAmbient } from '../lib/ambient.js';
+import { askCompanion, greetCompanion } from '../lib/ai.js';
+
+export default function Chat({ companions: init, profile, restored, onPersist, onReset }) {
+  const [comps, setComps] = useState(init.map((c) => ({ ...c, status: c.status || 'awake' })));
+  const [msgs, setMsgs] = useState(restored ? restored.messages || [] : []);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [chatMode, setChatMode] = useState(restored?.chatMode || 'group');
+  const [showMenu, setShowMenu] = useState(false);
+  const [autoSpeak, setAutoSpeak] = useState(restored?.autoSpeak || false);
+  const scrollRef = useRef(null);
+  const inputRef = useRef(null);
+
+  const active = comps.filter((c) => c.status === 'awake');
+  const priv = chatMode !== 'group' ? comps.find((c) => c.id === chatMode) : null;
+
+  const handleVoice = useCallback((t) => {
+    const lo = t.toLowerCase();
+    const f = active.find((c) => lo.includes(c.name.toLowerCase()));
+    if (f) { setChatMode(f.id); setShowMenu(false); }
+    else if (t.trim()) { setInput(t); setTimeout(() => inputRef.current?.focus(), 50); }
+  }, [active]);
+  const { listening, startListening } = useSpeechRec(handleVoice);
+
+  // First open: ambient thread + greetings. Skipped when resuming a session.
+  useEffect(() => {
+    (async () => {
+      if (restored) return;
+      if (comps.length > 1) {
+        const a = genAmbient(comps);
+        if (a) setMsgs(a.map((m) => ({ role: 'assistant', companion: m.from, content: m.text, isAmbient: true })));
+      }
+      await greet();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); }, [msgs, loading]);
+
+  // Persist after every change so a refresh resumes here.
+  useEffect(() => {
+    onPersist?.({ companions: comps, messages: msgs, chatMode, autoSpeak });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comps, msgs, chatMode, autoSpeak]);
+
+  async function greet() {
+    setLoading(true);
+    const cc = priv ? [priv] : active;
+    for (const c of cc) {
+      const t = await greetCompanion(c, profile, priv ? 'private' : 'group', comps);
+      setMsgs((p) => [...p, { role: 'assistant', companion: c, content: t }]);
+      if (autoSpeak) speakAs(t, c.voiceIdx);
+    }
+    setLoading(false);
+  }
+
+  async function send() {
+    if (!input.trim() || loading) return;
+    const u = input.trim();
+    setInput('');
+    const nm = [...msgs, { role: 'user', content: u }];
+    setMsgs(nm);
+    setLoading(true);
+    const responders = priv ? [priv] : active.filter(() => Math.random() > 0.15);
+    const act = responders.length ? responders : [active[0]].filter(Boolean);
+    let run = [...nm];
+    for (const c of act) {
+      const t = await askCompanion(c, profile, run, comps, priv ? 'private' : 'group');
+      const m = { role: 'assistant', companion: c, content: t };
+      run = [...run, m];
+      setMsgs((p) => [...p, m]);
+      if (autoSpeak) speakAs(t, c.voiceIdx);
+    }
+    setLoading(false);
+    inputRef.current?.focus();
+  }
+
+  function togSleep(id) {
+    setComps((p) => p.map((c) => (c.id === id ? { ...c, status: c.status === 'awake' ? 'sleeping' : 'awake' } : c)));
+    if (chatMode === id) setChatMode('group');
+    setShowMenu(false);
+  }
+
+  function delComp(id) {
+    try { if (!window.confirm('This is permanent. Delete this companion?')) return; } catch (e) { /* headless */ }
+    setComps((p) => p.map((c) => (c.id === id ? { ...c, status: 'deleted' } : c)));
+    if (chatMode === id) setChatMode('group');
+    setShowMenu(false);
+    const al = comps.filter((c) => c.id !== id && c.status === 'awake');
+    const dl = comps.find((c) => c.id === id);
+    if (al.length && dl) setMsgs((p) => [...p, { role: 'assistant', companion: al[0], content: `...${dl.name} is gone. I'm going to miss ${dl.pronouns.split('/')[1] || 'them'}.` }]);
+  }
+
+  const visible = msgs.filter((m) => chatMode === 'group' || m.role === 'user' || m.companion?.id === chatMode);
+
+  return (
+    <Shell>
+      <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${C.border}`, background: `${C.bg}dd`, backdropFilter: 'blur(12px)', position: 'relative', zIndex: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {chatMode === 'group' ? (
+            <>
+              <div style={{ display: 'flex' }}>{active.map((c, i) => <div key={c.id} style={{ width: 26, height: 26, borderRadius: '50%', background: `radial-gradient(circle,${c.color.primary},${c.color.primary}66)`, border: `2px solid ${C.bg}`, marginLeft: i ? -7 : 0, zIndex: 3 - i }} />)}</div>
+              <div><div style={{ fontSize: 13, fontWeight: 600 }}>Group Chat</div><div style={{ fontSize: 9, color: C.textSoft }}>{active.map((c) => c.name).join(', ') || 'Everyone resting'}</div></div>
+            </>
+          ) : (
+            <>
+              <div style={{ width: 30, height: 30, borderRadius: '50%', background: `radial-gradient(circle,${priv.color.primary},${priv.color.primary}66)` }} />
+              <div><div style={{ fontSize: 13, fontWeight: 600 }}>{priv.name}</div><div style={{ fontSize: 9, color: C.glow3 }}>Private</div></div>
+            </>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <button onClick={() => setAutoSpeak(!autoSpeak)} style={{ background: autoSpeak ? `${C.glow3}22` : 'none', border: `1px solid ${autoSpeak ? C.glow3 : C.border}`, borderRadius: 7, padding: '5px 8px', color: autoSpeak ? C.glow3 : C.textDim, fontSize: 13, cursor: 'pointer' }}>{autoSpeak ? '🔊' : '🔇'}</button>
+          <button onClick={startListening} style={{ background: listening ? `${C.danger}22` : 'none', border: `1px solid ${listening ? C.danger : C.border}`, borderRadius: 7, padding: '5px 8px', color: listening ? C.danger : C.textDim, fontSize: 13, cursor: 'pointer', animation: listening ? 'micPulse 1.5s infinite' : 'none' }}>🎤</button>
+          <button onClick={() => setShowMenu(!showMenu)} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 16, cursor: 'pointer', padding: 4 }}>☰</button>
+        </div>
+      </div>
+
+      {listening && <div style={{ background: `${C.danger}15`, borderBottom: `1px solid ${C.danger}33`, padding: '6px 14px', textAlign: 'center', fontSize: 11, color: C.danger }}>🎤 Say a companion's name or speak your message</div>}
+
+      {showMenu && (
+        <div style={{ position: 'absolute', top: 46, right: 0, width: 240, background: C.card, border: `1px solid ${C.border}`, borderRadius: '0 0 0 14px', padding: 12, zIndex: 20, animation: 'fadeIn 0.2s', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
+          <div style={{ fontSize: 9, color: C.textDim, textTransform: 'uppercase', letterSpacing: 2, marginBottom: 8 }}>Chat Mode</div>
+          <button onClick={() => { setChatMode('group'); setShowMenu(false); }} style={{ width: '100%', background: chatMode === 'group' ? C.surfaceUp : 'transparent', border: `1px solid ${chatMode === 'group' ? C.borderLit : 'transparent'}`, borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', marginBottom: 6, fontSize: 12, fontFamily: "'DM Sans',sans-serif" }}>👥 Group</button>
+          {comps.filter((c) => c.status !== 'deleted').map((c) => (
+            <div key={c.id} style={{ marginBottom: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
+                <div style={{ width: 14, height: 14, borderRadius: '50%', background: c.color.primary, opacity: c.status === 'sleeping' ? 0.3 : 1 }} />
+                <span style={{ fontSize: 12, fontWeight: 600, flex: 1, color: c.status === 'sleeping' ? C.textDim : C.text }}>{c.name}</span>
+                <span style={{ fontSize: 8 }}>{c.status === 'sleeping' ? '💤' : '●'}</span>
+              </div>
+              <div style={{ display: 'flex', gap: 3, paddingLeft: 19 }}>
+                {c.status === 'awake' && <button onClick={() => { setChatMode(c.id); setShowMenu(false); }} style={menuBtn}>Private</button>}
+                <button onClick={() => togSleep(c.id)} style={menuBtn}>{c.status === 'sleeping' ? 'Wake' : 'Sleep'}</button>
+                <button onClick={() => delComp(c.id)} style={{ ...menuBtn, border: `1px solid ${C.danger}33`, color: C.danger }}>Delete</button>
+              </div>
+            </div>
+          ))}
+          <div style={{ borderTop: `1px solid ${C.border}`, margin: '8px 0' }} />
+          <button onClick={() => onReset?.()} style={{ width: '100%', background: 'none', border: `1px solid ${C.danger}33`, borderRadius: 7, padding: '6px', color: C.danger, cursor: 'pointer', fontSize: 11, fontFamily: "'DM Sans',sans-serif", marginBottom: 6 }}>Reset everything</button>
+          <button onClick={() => setShowMenu(false)} style={{ width: '100%', background: 'none', border: `1px solid ${C.border}`, borderRadius: 7, padding: '5px', color: C.textSoft, cursor: 'pointer', fontSize: 11, fontFamily: "'DM Sans',sans-serif" }}>Close</button>
+        </div>
+      )}
+
+      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '10px 10px 4px' }}>
+        {visible.map((m, i) => (
+          <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', marginBottom: 7, animation: 'fadeUp 0.3s both' }}>
+            {m.role === 'assistant' && <div style={{ width: 24, height: 24, borderRadius: '50%', background: `radial-gradient(circle,${m.companion?.color?.primary || C.glow1},${m.companion?.color?.primary || C.glow1}55)`, marginRight: 7, flexShrink: 0, marginTop: chatMode === 'group' ? 14 : 0 }} />}
+            <div style={{ maxWidth: '78%' }}>
+              {m.role === 'assistant' && chatMode === 'group' && <span style={{ fontSize: 9, color: m.companion?.color?.primary, fontWeight: 600, display: 'block', marginBottom: 1 }}>{m.companion?.name}</span>}
+              <div style={{ position: 'relative' }}>
+                <div style={{ padding: '8px 12px', borderRadius: m.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: m.role === 'user' ? C.glow1 : C.card, color: m.role === 'user' ? '#fff' : C.text, fontSize: 13, lineHeight: 1.5, border: m.role === 'user' ? 'none' : `1px solid ${C.border}`, whiteSpace: 'pre-wrap' }}>
+                  {m.isAmbient && <span style={{ fontSize: 8, color: C.textDim, display: 'block', marginBottom: 2, fontStyle: 'italic' }}>earlier...</span>}
+                  {m.content}
+                </div>
+                {m.role === 'assistant' && <button onClick={() => speakAs(m.content, m.companion?.voiceIdx || 0)} style={{ position: 'absolute', top: 3, right: -24, background: 'none', border: 'none', color: C.textDim, fontSize: 12, cursor: 'pointer', opacity: 0.5 }}>🔊</button>}
+              </div>
+            </div>
+          </div>
+        ))}
+        {loading && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 7 }}>
+            <div style={{ width: 24, height: 24, borderRadius: '50%', background: `radial-gradient(circle,${C.glow1},${C.glow1}55)` }} />
+            <div style={{ padding: '8px 12px', borderRadius: '14px 14px 14px 4px', background: C.card, border: `1px solid ${C.border}`, display: 'flex', gap: 3 }}>{[0, 1, 2].map((i) => <div key={i} style={{ width: 5, height: 5, borderRadius: '50%', background: C.textDim, animation: `typewriter 1.4s ${i * 0.15}s infinite` }} />)}</div>
+          </div>
+        )}
+      </div>
+
+      <div style={{ padding: '7px 10px 16px', borderTop: `1px solid ${C.border}`, background: `${C.bg}ee` }}>
+        {!active.length ? (
+          <p style={{ textAlign: 'center', color: C.textDim, fontSize: 12, padding: 8 }}>All companions resting 💤</p>
+        ) : (
+          <div style={{ display: 'flex', gap: 7, alignItems: 'flex-end' }}>
+            <input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && send()} placeholder={priv ? `Message ${priv.name}...` : 'Message everyone...'} style={{ flex: 1, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 50, padding: '10px 14px', fontSize: 13, color: C.text, outline: 'none' }} />
+            <button onClick={send} disabled={!input.trim() || loading} style={{ width: 38, height: 38, borderRadius: '50%', background: input.trim() && !loading ? C.glow1 : C.border, border: 'none', color: '#fff', fontSize: 14, cursor: input.trim() && !loading ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>↑</button>
+          </div>
+        )}
+      </div>
+    </Shell>
+  );
+}
+
+const menuBtn = { background: 'none', border: `1px solid ${C.border}`, borderRadius: 5, padding: '2px 7px', color: C.textSoft, cursor: 'pointer', fontSize: 9, fontFamily: "'DM Sans',sans-serif" };
