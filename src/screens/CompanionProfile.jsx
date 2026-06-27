@@ -5,6 +5,8 @@ import { ZODIAC, cap } from '../lib/zodiac.js';
 import { trialDaysLeft, COMPANION_PRICE } from '../lib/entitlements.js';
 import { bondInfo } from '../lib/evolution.js';
 import { relationshipsFor } from '../lib/relationships.js';
+import { naturalVoiceEnabled } from '../config.js';
+import { speakAs, listBrowserVoices, NATURAL_VOICE_PRESETS, VOICE_TONES } from '../lib/voice.js';
 
 export default function CompanionProfile({ companion: c, trialStart, history, comps, bonds, onCustomize, onPrivate, onSleepToggle, onDelete, onUnlock, onBack }) {
   const col = c.color.primary;
@@ -62,6 +64,60 @@ export default function CompanionProfile({ companion: c, trialStart, history, co
             </div>
           </div>
         )}
+        {onCustomize && c.status !== 'deleted' && (() => {
+          const natural = naturalVoiceEnabled();
+          const cv = c.voice && c.voice.kind === 'browser' ? c.voice : {};
+          const devices = listBrowserVoices();
+          const previewLine = `Hi, I'm ${c.name}. This is how I sound.`;
+          return (
+            <div style={card}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={label}>Voice</span>
+                <button onClick={() => speakAs(previewLine, c)} style={{ background: `${col}1f`, border: `1px solid ${col}66`, color: col, borderRadius: 20, padding: '4px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>▶ Preview</button>
+              </div>
+              {natural ? (
+                <>
+                  <div style={{ fontSize: 11, color: C.textSoft, marginBottom: 10 }}>Pick a natural voice for {c.name}.</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {NATURAL_VOICE_PRESETS.map((p) => {
+                      const on = c.voice?.kind === 'natural' && c.voice.voiceId === p.id;
+                      return (
+                        <button key={p.id} onClick={() => onCustomize({ voice: { kind: 'natural', voiceId: p.id, name: p.name } })}
+                          style={{ textAlign: 'left', background: on ? `${col}1f` : C.surfaceUp, border: `1px solid ${on ? col : C.border}`, borderRadius: 10, padding: '7px 11px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>
+                          <div style={{ fontSize: 12, color: on ? col : C.text, fontWeight: 600 }}>{p.name}</div>
+                          <div style={{ fontSize: 10, color: C.textDim }}>{p.vibe}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ fontSize: 11, color: C.textSoft, marginBottom: 10 }}>Choose a system voice and tone for {c.name}.</div>
+                  {devices.length > 0 ? (
+                    <select value={cv.voiceURI || ''} onChange={(e) => onCustomize({ voice: { kind: 'browser', voiceURI: e.target.value, pitch: cv.pitch ?? 1, rate: cv.rate ?? 0.96 } })}
+                      style={{ width: '100%', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 9, padding: '9px 10px', fontSize: 12, color: C.text, outline: 'none', marginBottom: 10 }}>
+                      <option value="">Default voice</option>
+                      {devices.map((v) => <option key={v.voiceURI} value={v.voiceURI}>{v.name}</option>)}
+                    </select>
+                  ) : (
+                    <div style={{ fontSize: 11, color: C.textDim, marginBottom: 10 }}>No system voices detected — tone still applies.</div>
+                  )}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {VOICE_TONES.map((t) => {
+                      const on = (cv.pitch ?? 1) === t.pitch && (cv.rate ?? 0.96) === t.rate;
+                      return (
+                        <button key={t.key} onClick={() => onCustomize({ voice: { kind: 'browser', voiceURI: cv.voiceURI || '', pitch: t.pitch, rate: t.rate } })}
+                          style={{ background: on ? `${col}1f` : 'transparent', border: `1px solid ${on ? col : C.border}`, color: on ? col : C.textSoft, borderRadius: 20, padding: '6px 13px', fontSize: 12, cursor: 'pointer', fontWeight: on ? 600 : 400, fontFamily: "'DM Sans',sans-serif" }}>{t.label}</button>
+                      );
+                    })}
+                  </div>
+                  <div style={{ fontSize: 10, color: C.textDim, marginTop: 10 }}>Want lifelike AI voices? They turn on with the backend (VITE_NATURAL_VOICE).</div>
+                </>
+              )}
+            </div>
+          );
+        })()}
         {rels.length > 0 && (
           <div style={card}>
             <div style={label}>Relationships</div>

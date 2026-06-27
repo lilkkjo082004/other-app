@@ -140,7 +140,9 @@ async function tts(request, env) {
   const text = (b?.text || '').toString().slice(0, 800);
   if (!text.trim()) return json({ error: 'text required' }, 400, env);
   const voices = (env.ELEVEN_VOICE_IDS || '').split(',').map((s) => s.trim()).filter(Boolean);
-  const voiceId = voices.length ? voices[(Number(b.voiceIdx) || 0) % voices.length] : '21m00Tcm4TlvDq8ikWAM';
+  const valid = (id) => typeof id === 'string' && /^[A-Za-z0-9]+$/.test(id);
+  // Prefer a per-companion voice the client picked; else the configured list; else a default.
+  const voiceId = valid(b?.voiceId) ? b.voiceId : (voices.length ? voices[(Number(b.voiceIdx) || 0) % voices.length] : '21m00Tcm4TlvDq8ikWAM');
   let up;
   try {
     up = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {

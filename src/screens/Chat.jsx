@@ -113,7 +113,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     for (const c of cc) {
       const t = await greetCompanion(c, profile, priv ? 'private' : 'group', comps);
       setMsgs((p) => [...p, { role: 'assistant', companion: c, content: t, ts: Date.now() }]);
-      if (autoSpeak) speakAs(t, c.voiceIdx);
+      if (autoSpeak) speakAs(t, c);
     }
     setLoading(false);
   }
@@ -143,7 +143,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       const m = { role: 'assistant', companion: c, content: t, ts: Date.now() };
       run = [...run, m];
       setMsgs((p) => [...p, m]);
-      if (autoSpeak) speakAs(t, c.voiceIdx);
+      if (autoSpeak) speakAs(t, c);
     }
     setTyping(null);
     setLoading(false);
@@ -338,7 +338,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
                   </div>
                   {m.role === 'assistant' && !m.isAmbient && (
                     <div style={{ position: 'absolute', top: 3, right: -46, display: 'flex', gap: 4 }}>
-                      <button aria-label="Read this message aloud" onClick={() => speakAs(m.content, m.companion?.voiceIdx || 0)} style={{ background: 'none', border: 'none', color: C.textDim, fontSize: 12, cursor: 'pointer', opacity: 0.55, padding: 0 }}>🔊</button>
+                      <button aria-label="Read this message aloud" onClick={() => speakAs(m.content, m.companion)} style={{ background: 'none', border: 'none', color: C.textDim, fontSize: 12, cursor: 'pointer', opacity: 0.55, padding: 0 }}>🔊</button>
                       <button aria-label="Copy message with attribution" onClick={() => copyMsg(m, i)} style={{ background: 'none', border: 'none', color: copiedIdx === i ? C.glow3 : C.textDim, fontSize: 11, cursor: 'pointer', opacity: copiedIdx === i ? 1 : 0.55, padding: 0 }}>{copiedIdx === i ? '✓' : '⧉'}</button>
                     </div>
                   )}
