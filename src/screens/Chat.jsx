@@ -21,6 +21,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const [msgs, setMsgs] = useState(restored ? restored.messages || [] : []);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [typing, setTyping] = useState(null);   // companion currently composing a reply
   const [chatMode, setChatMode] = useState(restored?.chatMode || 'group');
   const [showMenu, setShowMenu] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(restored?.autoSpeak || false);
@@ -133,15 +134,18 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     if (mood && apiAuthed()) logMood(mood, { companionId: priv ? priv.id : undefined });
     const responders = priv ? [priv] : active.filter(() => Math.random() > 0.15);
     const act = responders.length ? responders : [active[0]].filter(Boolean);
-    // Ask all responders concurrently and append each as it lands, so group chat
-    // doesn't wait on replies one-by-one. (Auto-speak only when one is replying,
-    // to avoid overlapping audio.)
-    await Promise.allSettled(act.map((c) =>
-      askCompanion(c, profile, nm, comps, priv ? 'private' : 'group').then((t) => {
-        setMsgs((p) => [...p, { role: 'assistant', companion: c, content: t, ts: Date.now() }]);
-        if (autoSpeak && act.length === 1) speakAs(t, c.voiceIdx);
-      })
-    ));
+    // Reply in turn so each companion can see and react to what the others just
+    // said this turn. A per-companion typing indicator keeps it feeling live.
+    let run = [...nm];
+    for (const c of act) {
+      setTyping(c);
+      const t = await askCompanion(c, profile, run, comps, priv ? 'private' : 'group');
+      const m = { role: 'assistant', companion: c, content: t, ts: Date.now() };
+      run = [...run, m];
+      setMsgs((p) => [...p, m]);
+      if (autoSpeak) speakAs(t, c.voiceIdx);
+    }
+    setTyping(null);
     setLoading(false);
     inputRef.current?.focus();
   }
@@ -347,8 +351,11 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         ))}
         {loading && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 7 }}>
-            <div style={{ width: 24, height: 24, borderRadius: '50%', background: `radial-gradient(circle,${C.glow1},${C.glow1}55)` }} />
-            <div style={{ padding: '8px 12px', borderRadius: '14px 14px 14px 4px', background: C.card, border: `1px solid ${C.border}`, display: 'flex', gap: 3 }}>{[0, 1, 2].map((i) => <div key={i} style={{ width: 5, height: 5, borderRadius: '50%', background: C.textDim, animation: `typewriter 1.4s ${i * 0.15}s infinite` }} />)}</div>
+            <div style={{ width: 24, height: 24, borderRadius: '50%', background: `radial-gradient(circle,${typing?.color?.primary || C.glow1},${(typing?.color?.primary || C.glow1)}55)` }} />
+            <div style={{ padding: '8px 12px', borderRadius: '14px 14px 14px 4px', background: C.card, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 6 }}>
+              {typing && chatMode === 'group' && <span style={{ fontSize: 9, color: typing.color?.primary, fontWeight: 600 }}>{typing.name}</span>}
+              <div style={{ display: 'flex', gap: 3 }}>{[0, 1, 2].map((i) => <div key={i} style={{ width: 5, height: 5, borderRadius: '50%', background: C.textDim, animation: `typewriter 1.4s ${i * 0.15}s infinite` }} />)}</div>
+            </div>
           </div>
         )}
         {!atBottom && (
