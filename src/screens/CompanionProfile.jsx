@@ -3,8 +3,9 @@ import { C } from '../theme.js';
 import { Shell } from '../components/ui.jsx';
 import { ZODIAC, cap } from '../lib/zodiac.js';
 import { trialDaysLeft, COMPANION_PRICE } from '../lib/entitlements.js';
+import { bondInfo } from '../lib/evolution.js';
 
-export default function CompanionProfile({ companion: c, trialStart, onPrivate, onSleepToggle, onDelete, onUnlock, onBack }) {
+export default function CompanionProfile({ companion: c, trialStart, history, onPrivate, onSleepToggle, onDelete, onUnlock, onBack }) {
   const col = c.color.primary;
   const z = ZODIAC[c.zodiac];
   const sleeping = c.status === 'sleeping';
@@ -20,6 +21,7 @@ export default function CompanionProfile({ companion: c, trialStart, onPrivate, 
   const card = { width: '100%', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 16, marginBottom: 10, textAlign: 'left' };
   const label = { fontSize: 10, color: C.textDim, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8 };
   const traits = c.builderTraits ? Object.values(c.builderTraits).flat().filter(Boolean) : [];
+  const bond = bondInfo(history || []);
 
   const action = (text, bg, onClick, { danger, outlined } = {}) => (
     <button onClick={onClick} style={{ width: '100%', padding: '13px', borderRadius: 12, marginBottom: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: "'DM Sans',sans-serif", background: outlined ? 'transparent' : (danger ? `${bg}1f` : bg), color: danger ? bg : (outlined ? C.text : '#fff'), border: `1px solid ${danger ? `${bg}88` : (outlined ? C.border : bg)}` }}>{text}</button>
@@ -43,6 +45,13 @@ export default function CompanionProfile({ companion: c, trialStart, onPrivate, 
           <div style={card}><div style={label}>Trait seeds</div><div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{traits.map((t, i) => <span key={i} style={{ padding: '5px 10px', borderRadius: 20, background: C.surfaceUp, border: `1px solid ${C.border}`, fontSize: 11 }}>{t}</span>)}</div></div>
         )}
         {c.freeText && <div style={card}><div style={label}>Drawn toward</div><div style={{ fontSize: 14 }}>{c.freeText}</div></div>}
+        <div style={card}>
+          <div style={label}>Your bond</div>
+          <div style={{ fontSize: 14, textTransform: 'capitalize' }}>{bond.label}</div>
+          <div style={{ fontSize: 12, color: C.textSoft, marginTop: 2 }}>
+            {bond.messages} message{bond.messages === 1 ? '' : 's'} together{bond.recentMood ? ` · attuned to your recent ${bond.recentMood} streak` : ''}
+          </div>
+        </div>
         <div style={card}><div style={label}>Access</div><div style={{ fontSize: 14 }}>{ownership()}</div></div>
 
         <div style={{ height: 14 }} />

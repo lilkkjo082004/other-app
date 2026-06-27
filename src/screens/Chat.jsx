@@ -7,6 +7,8 @@ import { askCompanion, greetCompanion } from '../lib/ai.js';
 import { isLimited } from '../lib/entitlements.js';
 import { genComp } from '../lib/companions.js';
 import { pickSigns } from '../lib/zodiac.js';
+import { detectMood } from '../lib/evolution.js';
+import { isAuthed as apiAuthed, logMood } from '../lib/api.js';
 import UnlockSheet from '../components/UnlockSheet.jsx';
 import Settings from './Settings.jsx';
 import CompanionProfile from './CompanionProfile.jsx';
@@ -76,6 +78,9 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     const nm = [...msgs, { role: 'user', content: u }];
     setMsgs(nm);
     setLoading(true);
+    // Long-term mood tracking (best-effort; only when signed in to the backend).
+    const mood = detectMood(u);
+    if (mood && apiAuthed()) logMood(mood, { companionId: priv ? priv.id : undefined });
     const responders = priv ? [priv] : active.filter(() => Math.random() > 0.15);
     const act = responders.length ? responders : [active[0]].filter(Boolean);
     let run = [...nm];
@@ -164,7 +169,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     if (pc) {
       return (
         <CompanionProfile
-          companion={pc} trialStart={trialStart}
+          companion={pc} trialStart={trialStart} history={msgs}
           onBack={() => setPanel(null)}
           onPrivate={() => { setChatMode(pc.id); setPanel(null); }}
           onSleepToggle={() => { togSleep(pc.id); setPanel(null); }}

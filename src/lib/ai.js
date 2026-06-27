@@ -6,7 +6,7 @@ const MAX_HISTORY = 24;
 
 // ── Real responses via the Cloudflare Worker proxy ──
 async function viaProxy(comp, profile, msgs, allC, mode) {
-  const system = buildSystemPrompt(comp, profile, allC, mode);
+  const system = buildSystemPrompt(comp, profile, allC, mode, msgs);
   const recent = msgs.length > MAX_HISTORY ? msgs.slice(msgs.length - MAX_HISTORY) : msgs;
   const apiMsgs = recent.map((m) => {
     if (m.role === 'user') {
