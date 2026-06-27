@@ -4,6 +4,7 @@ import { Shell } from '../components/ui.jsx';
 import { cap } from '../lib/zodiac.js';
 import { trialDaysLeft } from '../lib/entitlements.js';
 import { pushConfigured, pushSupported, isSubscribed, enablePush, disablePush } from '../lib/push.js';
+import { locationSupported, locationEnabled, locationLabel, requestLocation, setLabel, clearLocation } from '../lib/location.js';
 import { LegalLink } from './Legal.jsx';
 
 export default function Settings({ profile, comps, autoSpeak, trialStart, cloud, authed, email, onSignIn, onSignOut, onAutoSpeak, onSleepAll, onWakeAll, onReset, onBack }) {
@@ -25,6 +26,31 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
       else { await enablePush(); setPushOn(true); }
     } catch (e) { setPushErr(String(e.message || e)); }
     setPushBusy(false);
+  }
+
+  const [locOn, setLocOn] = useState(locationEnabled());
+  const [locArea, setLocArea] = useState(locationLabel());
+  const [locBusy, setLocBusy] = useState(false);
+  const [locErr, setLocErr] = useState(null);
+  const [locManual, setLocManual] = useState(false);
+  const [locInput, setLocInput] = useState('');
+  async function useMyLocation() {
+    if (locBusy) return;
+    setLocErr(null); setLocBusy(true);
+    try {
+      await requestLocation();
+      setLocOn(true); setLocArea(locationLabel()); setLocManual(false);
+    } catch (e) { setLocErr(String(e.message || e)); }
+    setLocBusy(false);
+  }
+  function saveManual() {
+    if (!locInput.trim()) return;
+    setLabel(locInput.trim());
+    setLocOn(true); setLocArea(locationLabel()); setLocManual(false); setLocInput(''); setLocErr(null);
+  }
+  function turnOffLocation() {
+    clearLocation();
+    setLocOn(false); setLocArea(null); setLocManual(false); setLocErr(null);
   }
 
   const trialLabel = () => {
@@ -94,6 +120,38 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
           <div><div style={{ fontSize: 13 }}>Auto-speak</div><div style={{ fontSize: 11, color: C.textDim }}>Companions read messages aloud</div></div>
           <Toggle on={autoSpeak} onClick={() => onAutoSpeak(!autoSpeak)} />
         </div>
+
+        <div style={{ height: 10 }} />
+        {section('Location')}
+        {locOn ? (
+          <div style={{ ...card }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div><div style={{ fontSize: 13 }}>{locArea || 'Your area'}</div><div style={{ fontSize: 11, color: C.textDim }}>Companions can suggest local ideas</div></div>
+              <button onClick={turnOffLocation} style={{ background: 'none', border: 'none', color: C.danger, fontSize: 12, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>Turn off</button>
+            </div>
+            <div style={{ display: 'flex', gap: 14, marginTop: 10 }}>
+              {locationSupported() && <button onClick={useMyLocation} disabled={locBusy} style={{ background: 'none', border: 'none', color: C.glow1, fontSize: 12, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", padding: 0 }}>{locBusy ? 'Updating…' : 'Update location'}</button>}
+              <button onClick={() => { setLocManual(true); setLocInput(locArea || ''); }} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 12, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", padding: 0 }}>Edit area</button>
+            </div>
+            {locErr && <div style={{ fontSize: 11, color: C.danger, marginTop: 8 }}>{locErr}</div>}
+          </div>
+        ) : (
+          <div style={{ ...card }}>
+            <div style={{ fontSize: 13 }}>Share your location</div>
+            <div style={{ fontSize: 11, color: C.textDim, lineHeight: 1.5, marginTop: 2 }}>Let companions tailor suggestions to where you are. Your precise location stays on this device — only a general area is used.</div>
+            <div style={{ display: 'flex', gap: 14, marginTop: 10 }}>
+              {locationSupported() && <button className="bp" onClick={useMyLocation} disabled={locBusy} style={{ padding: '8px 16px', fontSize: 12 }}>{locBusy ? 'Locating…' : 'Use my location'}</button>}
+              <button onClick={() => { setLocManual(true); setLocInput(''); }} style={{ background: 'none', border: 'none', color: C.glow1, fontSize: 12, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>Enter manually</button>
+            </div>
+            {locErr && <div style={{ fontSize: 11, color: C.danger, marginTop: 8 }}>{locErr}</div>}
+          </div>
+        )}
+        {locManual && (
+          <div style={{ ...card, display: 'flex', gap: 8 }}>
+            <input value={locInput} onChange={(e) => setLocInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveManual()} placeholder="City, region (e.g. Atlanta, GA)" style={{ flex: 1, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '9px 12px', fontSize: 13, color: C.text, outline: 'none' }} />
+            <button onClick={saveManual} style={{ background: C.glow1, border: 'none', borderRadius: 8, color: '#fff', fontSize: 13, padding: '0 14px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>Save</button>
+          </div>
+        )}
 
         <div style={{ height: 10 }} />
         {section('Companions')}

@@ -48,6 +48,7 @@ src/
 │   ├── ai.js                # askCompanion / greetCompanion (proxy + placeholder)
 │   ├── api.js               # backend client: auth, cloud state sync, mood, push
 │   ├── push.js              # Web Push subscribe/unsubscribe (companion check-ins)
+│   ├── location.js          # opt-in location (on-device coords; coarse area → prompt)
 │   ├── evolution.js         # mood/familiarity/bond → system-prompt evolution block
 │   ├── entitlements.js      # trial/ownership rules (trialDaysLeft, isLimited)
 │   ├── purchase.js          # simulated one-time unlock (swap for a real SDK)
@@ -105,10 +106,10 @@ Wire up real AI by deploying `worker/` (see `worker/README.md`) and creating a
 - Companion personality evolution: mood/familiarity/bond derived from history (`lib/evolution.js`) injected into the system prompt; "Your bond" card on the profile; mood logged to the backend
 - Push notifications (Web Push): client subscribe in Settings (`lib/push.js`), SW push/notificationclick handlers, backend subscription storage + RFC 8291/8292 sender, daily cron for companion check-ins
 - In-app legal: Terms of Service (`data/legal.js`) rendered by `screens/Legal.jsx` with a tiny markdown subset; linked from Welcome, Auth (signup), and Settings via `LegalLink`. Privacy Policy slot is wired but awaiting the source document.
+- Location services (opt-in, `lib/location.js`): browser geolocation or manual entry, managed in a Settings "Location" section. Per ToS §12, precise coordinates stay in device-local storage and never reach our servers; only a coarse, user-confirmable area label is injected into the companion system prompt (`locationBlock`) so companions can offer local suggestions.
 
 ### Needs Building (web)
 - Privacy Policy + Disclaimer source documents (drop the markdown into `data/legal.js`; the Terms reference both)
-- Location services
 - Real payment integration (replace `lib/purchase.js`)
 - Store packaging (native wrapper for Google Play)
 
