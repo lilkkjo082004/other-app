@@ -226,9 +226,9 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
           )}
         </div>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          <button onClick={() => setAutoSpeak(!autoSpeak)} style={{ background: autoSpeak ? `${C.glow3}22` : 'none', border: `1px solid ${autoSpeak ? C.glow3 : C.border}`, borderRadius: 7, padding: '5px 8px', color: autoSpeak ? C.glow3 : C.textDim, fontSize: 13, cursor: 'pointer' }}>{autoSpeak ? '🔊' : '🔇'}</button>
-          {voiceCall && <button onClick={startListening} style={{ background: listening ? `${C.danger}22` : 'none', border: `1px solid ${listening ? C.danger : C.border}`, borderRadius: 7, padding: '5px 8px', color: listening ? C.danger : C.textDim, fontSize: 13, cursor: 'pointer', animation: listening ? 'micPulse 1.5s infinite' : 'none' }}>🎤</button>}
-          <button onClick={() => setShowMenu(!showMenu)} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 16, cursor: 'pointer', padding: 4 }}>☰</button>
+          <button aria-label={autoSpeak ? 'Turn off auto-speak' : 'Turn on auto-speak'} aria-pressed={autoSpeak} onClick={() => setAutoSpeak(!autoSpeak)} style={{ background: autoSpeak ? `${C.glow3}22` : 'none', border: `1px solid ${autoSpeak ? C.glow3 : C.border}`, borderRadius: 7, padding: '5px 8px', color: autoSpeak ? C.glow3 : C.textDim, fontSize: 13, cursor: 'pointer' }}>{autoSpeak ? '🔊' : '🔇'}</button>
+          {voiceCall && <button aria-label={listening ? 'Listening — tap to stop' : 'Call a companion by voice'} onClick={startListening} style={{ background: listening ? `${C.danger}22` : 'none', border: `1px solid ${listening ? C.danger : C.border}`, borderRadius: 7, padding: '5px 8px', color: listening ? C.danger : C.textDim, fontSize: 13, cursor: 'pointer', animation: listening ? 'micPulse 1.5s infinite' : 'none' }}>🎤</button>}
+          <button aria-label="Menu" aria-expanded={showMenu} onClick={() => setShowMenu(!showMenu)} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 16, cursor: 'pointer', padding: 4 }}>☰</button>
         </div>
       </div>
 
@@ -303,7 +303,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         ) : (
           <div style={{ display: 'flex', gap: 7, alignItems: 'flex-end' }}>
             <input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && send()} placeholder={priv ? `Message ${priv.name}...` : 'Message everyone...'} style={{ flex: 1, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 50, padding: '10px 14px', fontSize: 13, color: C.text, outline: 'none' }} />
-            <button onClick={send} disabled={!input.trim() || loading} style={{ width: 38, height: 38, borderRadius: '50%', background: input.trim() && !loading ? C.glow1 : C.border, border: 'none', color: '#fff', fontSize: 14, cursor: input.trim() && !loading ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>↑</button>
+            <button aria-label="Send message" onClick={send} disabled={!input.trim() || loading} style={{ width: 38, height: 38, borderRadius: '50%', background: input.trim() && !loading ? C.glow1 : C.border, border: 'none', color: '#fff', fontSize: 14, cursor: input.trim() && !loading ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>↑</button>
           </div>
         )}
       </div>

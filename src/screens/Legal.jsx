@@ -50,7 +50,7 @@ export default function Legal({ docKey = 'tos', onBack }) {
   return (
     <Shell>
       <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: `1px solid ${C.border}` }}>
-        <button onClick={onBack} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 20, cursor: 'pointer' }}>←</button>
+        <button aria-label="Back" onClick={onBack} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 20, cursor: 'pointer' }}>←</button>
         <span style={{ fontSize: 15, fontWeight: 600 }}>{doc.title}</span>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 18px 48px' }}>

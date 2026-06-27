@@ -79,7 +79,7 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
   return (
     <Shell>
       <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: `1px solid ${C.border}` }}>
-        <button onClick={onBack} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 20, cursor: 'pointer' }}>←</button>
+        <button aria-label="Back" onClick={onBack} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 20, cursor: 'pointer' }}>←</button>
         <span style={{ fontSize: 15, fontWeight: 600 }}>Settings</span>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 40px' }}>
@@ -222,9 +222,9 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
   );
 }
 
-function Toggle({ on, onClick }) {
+function Toggle({ on, onClick, label }) {
   return (
-    <button onClick={onClick} style={{ width: 44, height: 26, borderRadius: 50, border: 'none', cursor: 'pointer', background: on ? C.glow1 : C.border, position: 'relative', transition: 'background 0.2s' }}>
+    <button role="switch" aria-checked={!!on} aria-label={label} onClick={onClick} style={{ width: 44, height: 26, borderRadius: 50, border: 'none', cursor: 'pointer', background: on ? C.glow1 : C.border, position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
       <span style={{ position: 'absolute', top: 3, left: on ? 21 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
     </button>
   );

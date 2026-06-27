@@ -32,7 +32,7 @@ export default function CompanionProfile({ companion: c, trialStart, history, co
   return (
     <Shell>
       <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: `1px solid ${C.border}` }}>
-        <button onClick={onBack} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 20, cursor: 'pointer' }}>←</button>
+        <button aria-label="Back" onClick={onBack} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 20, cursor: 'pointer' }}>←</button>
         <span style={{ fontSize: 15, fontWeight: 600 }}>{c.name}</span>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px 40px', textAlign: 'center' }}>

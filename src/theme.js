@@ -4,7 +4,7 @@ export const C = {
   void: '#06060c', bg: '#0b0b14', surface: '#111119', surfaceUp: '#17171f',
   card: '#141420', border: '#222236', borderLit: '#3d3d6a',
   glow1: '#7c5bf5', glow2: '#e84393', glow3: '#00cec9',
-  text: '#eae8f4', textSoft: '#9590b0', textDim: '#5c5878',
+  text: '#eae8f4', textSoft: '#9590b0', textDim: '#716d96',
   white: '#fff', danger: '#ff6b6b',
 };
 
@@ -34,4 +34,6 @@ input,textarea,select{font-family:'DM Sans',sans-serif}input::placeholder,textar
 .bp{background:linear-gradient(135deg,${C.glow1},#9b59f5);color:#fff;border:none;border-radius:50px;padding:14px 40px;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.3s;font-family:'DM Sans',sans-serif}
 .bp:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(124,91,245,0.4)}.bp:disabled{opacity:0.4;cursor:default;transform:none;box-shadow:none}
 .bg2{background:transparent;border:1px solid ${C.border};color:${C.text};border-radius:50px;padding:12px 28px;font-size:14px;font-weight:500;cursor:pointer;transition:all 0.3s;font-family:'DM Sans',sans-serif}
-.bg2:hover{border-color:${C.borderLit};background:${C.surfaceUp}}`;
+.bg2:hover{border-color:${C.borderLit};background:${C.surfaceUp}}
+:focus-visible{outline:2px solid ${C.glow1};outline-offset:2px;border-radius:4px}
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:0.001ms !important;animation-iteration-count:1 !important;transition-duration:0.001ms !important;scroll-behavior:auto !important}}`;
