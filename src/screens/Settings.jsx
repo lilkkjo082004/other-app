@@ -4,7 +4,7 @@ import { Shell } from '../components/ui.jsx';
 import { cap } from '../lib/zodiac.js';
 import { trialDaysLeft } from '../lib/entitlements.js';
 
-export default function Settings({ profile, comps, autoSpeak, trialStart, onAutoSpeak, onSleepAll, onWakeAll, onReset, onBack }) {
+export default function Settings({ profile, comps, autoSpeak, trialStart, cloud, authed, email, onSignIn, onSignOut, onAutoSpeak, onSleepAll, onWakeAll, onReset, onBack }) {
   const living = comps.filter((c) => c.status !== 'deleted');
   const allAwake = living.length > 0 && living.every((c) => c.status === 'awake');
 
@@ -29,6 +29,30 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, onAuto
         <div style={{ ...card, display: 'flex', justifyContent: 'space-between' }}><span style={{ color: C.textSoft, fontSize: 13 }}>Name</span><span style={{ fontSize: 13, fontWeight: 500 }}>{profile.name}</span></div>
         {profile.astrology && <div style={{ ...card, display: 'flex', justifyContent: 'space-between' }}><span style={{ color: C.textSoft, fontSize: 13 }}>Stars</span><span style={{ fontSize: 13, fontWeight: 500 }}>{profile.astrology.westernData.sym} {cap(profile.astrology.western)}</span></div>}
         <div style={{ ...card, display: 'flex', justifyContent: 'space-between' }}><span style={{ color: C.textSoft, fontSize: 13 }}>Mode</span><span style={{ fontSize: 13, fontWeight: 500 }}>{profile.ageGroup === 'under18' ? 'Under 18 (friendship only)' : '18+'}</span></div>
+
+        {cloud && (
+          <>
+            <div style={{ height: 10 }} />
+            {section('Account')}
+            {authed ? (
+              <>
+                <div style={{ ...card, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div><div style={{ fontSize: 13 }}>{email || 'Signed in'}</div><div style={{ fontSize: 11, color: C.textDim }}>Synced across your devices</div></div>
+                  <span style={{ fontSize: 11, color: C.glow3 }}>● Synced</span>
+                </div>
+                <button onClick={onSignOut} style={{ ...card, width: '100%', textAlign: 'left', cursor: 'pointer', color: C.text, fontFamily: "'DM Sans',sans-serif", display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div><div style={{ fontSize: 13 }}>Sign out</div><div style={{ fontSize: 11, color: C.textDim }}>Keeps this device's copy; stops syncing</div></div>
+                  <span style={{ color: C.textDim }}>›</span>
+                </button>
+              </>
+            ) : (
+              <button onClick={onSignIn} style={{ ...card, width: '100%', textAlign: 'left', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", border: `1px solid ${C.glow1}55`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div><div style={{ fontSize: 13, color: C.glow1, fontWeight: 500 }}>Sign in / Create account</div><div style={{ fontSize: 11, color: C.textDim }}>Sync your companions across devices</div></div>
+                <span style={{ color: C.glow1 }}>›</span>
+              </button>
+            )}
+          </>
+        )}
 
         <div style={{ height: 10 }} />
         {section('Voice')}

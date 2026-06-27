@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { C } from '../theme.js';
 import { Shell } from '../components/ui.jsx';
 
-export default function Welcome({ onStart }) {
+export default function Welcome({ onStart, onSignIn }) {
   const [shown, setShown] = useState(false);
   useEffect(() => { const t = setTimeout(() => setShown(true), 150); return () => clearTimeout(t); }, []);
   return (
@@ -13,6 +13,11 @@ export default function Welcome({ onStart }) {
         <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 52, fontWeight: 700, margin: '0 0 16px', letterSpacing: -1 }}>Other</h1>
         <p style={{ color: C.textSoft, fontSize: 16, lineHeight: 1.7, maxWidth: 320, marginBottom: 48 }}>Companions who choose their own names, form their own opinions, and grow alongside you.</p>
         <button className="bp" onClick={onStart} style={{ padding: '16px 52px', fontSize: 16 }}>Begin ✦</button>
+        {onSignIn && (
+          <button onClick={onSignIn} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 13, cursor: 'pointer', marginTop: 22, fontFamily: "'DM Sans',sans-serif" }}>
+            Have an account? <span style={{ color: C.glow1 }}>Sign in</span>
+          </button>
+        )}
       </div>
     </Shell>
   );

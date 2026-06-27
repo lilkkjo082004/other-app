@@ -12,7 +12,7 @@ import Settings from './Settings.jsx';
 import CompanionProfile from './CompanionProfile.jsx';
 import WakingUp from './WakingUp.jsx';
 
-export default function Chat({ companions: init, profile, trialStart, restored, onPersist, onReset }) {
+export default function Chat({ companions: init, profile, trialStart, restored, onPersist, onReset, cloud, authed, email, onSignIn, onSignOut }) {
   const [comps, setComps] = useState(init.map((c) => ({ ...c, status: c.status || 'awake' })));
   const [msgs, setMsgs] = useState(restored ? restored.messages || [] : []);
   const [input, setInput] = useState('');
@@ -150,6 +150,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     return (
       <Settings
         profile={profile} comps={comps} autoSpeak={autoSpeak} trialStart={trialStart}
+        cloud={cloud} authed={authed} email={email} onSignIn={onSignIn} onSignOut={onSignOut}
         onAutoSpeak={setAutoSpeak}
         onSleepAll={() => setComps((p) => p.map((c) => (c.status === 'awake' ? { ...c, status: 'sleeping' } : c)))}
         onWakeAll={() => setComps((p) => p.map((c) => (c.status === 'sleeping' ? { ...c, status: 'awake' } : c)))}

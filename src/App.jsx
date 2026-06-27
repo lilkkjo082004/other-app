@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { getUserAstro, pickSigns } from './lib/zodiac.js';
 import { genComp } from './lib/companions.js';
 import { loadSession, saveSession, clearSession } from './lib/storage.js';
+import { cloudEnabled } from './config.js';
+import * as api from './lib/api.js';
 import Welcome from './screens/Welcome.jsx';
 import Onboarding from './screens/Onboarding.jsx';
 import ZodiacReveal from './screens/ZodiacReveal.jsx';
@@ -9,10 +11,13 @@ import CompanionPreference from './screens/CompanionPreference.jsx';
 import WakingUp from './screens/WakingUp.jsx';
 import CompanionSelect from './screens/CompanionSelect.jsx';
 import Chat from './screens/Chat.jsx';
+import Auth from './screens/Auth.jsx';
 
-// Resume only if there's a saved session with at least one living companion.
+const hasLiving = (s) => s && Array.isArray(s.companions) && s.companions.some((c) => c.status !== 'deleted');
+
+// Resume from local storage if there's a session with at least one living companion.
 const saved = loadSession();
-const resumable = saved && Array.isArray(saved.companions) && saved.companions.some((c) => c.status !== 'deleted');
+const resumable = hasLiving(saved);
 
 export default function App() {
   const [screen, setScreen] = useState(resumable ? 'chat' : 'welcome');
@@ -24,6 +29,28 @@ export default function App() {
   const [restored, setRestored] = useState(
     resumable ? { messages: saved.messages, chatMode: saved.chatMode, autoSpeak: saved.autoSpeak } : null
   );
+  const [authed, setAuthed] = useState(api.isAuthed());
+  const [email, setEmailState] = useState(api.getEmail());
+
+  // Returning authed users: pull the cloud session and resume from it.
+  useEffect(() => {
+    if (!cloudEnabled() || !api.isAuthed()) return;
+    (async () => {
+      try {
+        const s = await api.pullState();
+        if (hasLiving(s)) applyState(s);
+      } catch (e) { /* offline / token expired — stay local */ }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function applyState(s) {
+    setProfile(s.profile);
+    setSelC(s.companions || []);
+    setTrialStart(s.trialStart || null);
+    setRestored({ messages: s.messages || [], chatMode: s.chatMode || 'group', autoSpeak: !!s.autoSpeak });
+    setScreen('chat');
+  }
 
   const handleOB = (a) => {
     const astro = getUserAstro(a.dob);
@@ -48,7 +75,9 @@ export default function App() {
 
   const persist = (chatState) => {
     if (!profile) return;
-    saveSession({ profile, ...chatState });
+    const session = { profile, ...chatState };
+    saveSession(session);
+    if (cloudEnabled() && api.isAuthed()) api.pushState(session).catch(() => {});
   };
 
   const reset = () => {
@@ -61,8 +90,34 @@ export default function App() {
     setScreen('welcome');
   };
 
-  if (screen === 'chat') return <Chat companions={selC} profile={profile} trialStart={trialStart} restored={restored} onPersist={persist} onReset={reset} />;
-  if (screen === 'welcome') return <Welcome onStart={() => setScreen('onboarding')} />;
+  // After a successful sign-in/up: prefer cloud state; else push up the local
+  // session if there is one; else start fresh.
+  function onAuthed(cloudState) {
+    setAuthed(true);
+    setEmailState(api.getEmail());
+    if (hasLiving(cloudState)) { applyState(cloudState); return; }
+    const local = loadSession();
+    if (hasLiving(local)) { api.pushState(local).catch(() => {}); applyState(local); return; }
+    setScreen(profile ? 'chat' : 'welcome');
+  }
+
+  function signOut() {
+    api.logout();
+    setAuthed(false);
+    setEmailState('');
+  }
+
+  const accountProps = {
+    cloud: cloudEnabled(),
+    authed,
+    email,
+    onSignIn: () => setScreen('auth'),
+    onSignOut: signOut,
+  };
+
+  if (screen === 'auth') return <Auth onAuthed={onAuthed} onBack={() => setScreen(profile ? 'chat' : 'welcome')} />;
+  if (screen === 'chat') return <Chat companions={selC} profile={profile} trialStart={trialStart} restored={restored} onPersist={persist} onReset={reset} {...accountProps} />;
+  if (screen === 'welcome') return <Welcome onStart={() => setScreen('onboarding')} onSignIn={cloudEnabled() ? () => setScreen('auth') : undefined} />;
   if (screen === 'onboarding') return <Onboarding onComplete={handleOB} />;
   if (screen === 'zodiac') return <ZodiacReveal profile={profile} onContinue={() => setScreen('preference')} />;
   if (screen === 'preference') return <CompanionPreference onChoice={handlePref} ageGroup={profile?.ageGroup} />;
