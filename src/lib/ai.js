@@ -1,4 +1,5 @@
-import { AI_PROXY, AI_MODEL, aiEnabled } from '../config.js';
+import { AI_MODEL, aiEnabled, aiEndpoint } from '../config.js';
+import { authHeader } from './api.js';
 import { buildSystemPrompt } from './prompt.js';
 
 const MAX_HISTORY = 24;
@@ -22,9 +23,9 @@ async function viaProxy(comp, profile, msgs, allC, mode) {
     apiMsgs.push({ role: 'user', content: `${profile.name || 'User'} just opened the chat. Say hello in your own voice.` });
   }
 
-  const res = await fetch(AI_PROXY, {
+  const res = await fetch(aiEndpoint(), {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...authHeader() },
     body: JSON.stringify({ model: AI_MODEL, max_tokens: 400, system, messages: apiMsgs }),
   });
   if (!res.ok) throw new Error(`proxy ${res.status}`);

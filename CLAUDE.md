@@ -45,6 +45,7 @@ src/
 │   ├── ambient.js           # ambient companion-to-companion threads
 │   ├── prompt.js            # per-companion system prompt builder
 │   ├── ai.js                # askCompanion / greetCompanion (proxy + placeholder)
+│   ├── api.js               # backend client: auth, cloud state sync, mood
 │   ├── entitlements.js      # trial/ownership rules (trialDaysLeft, isLimited)
 │   ├── purchase.js          # simulated one-time unlock (swap for a real SDK)
 │   └── storage.js           # localStorage session save/load/clear
@@ -52,9 +53,22 @@ src/
     ├── Welcome.jsx, Onboarding.jsx, ZodiacReveal.jsx,
     ├── CompanionPreference.jsx, WakingUp.jsx, CompanionSelect.jsx, Chat.jsx,
     ├── Settings.jsx, CompanionProfile.jsx
-worker/                      # Cloudflare Worker AI proxy (see worker/README.md)
+worker/                      # Cloudflare Worker AI proxy (AI-only, see worker/README.md)
+server/                      # Backend API: Cloudflare Worker + D1 (auth, cloud
+                             #   state sync, mood, AI). See server/README.md
 legacy_flutter/              # the old Flutter app + original React prototype
 ```
+
+## Backend (server/)
+
+`server/` is a Cloudflare Worker over D1 (SQLite) providing email+password auth
+(PBKDF2 + HMAC tokens), cross-device session sync (`/state`), long-term mood
+tracking (`/mood`, `/mood/summary`), and the Claude proxy (`/ai`). Handlers are
+pure over a `Store` interface (`store-d1.js` for prod, `store-memory.js` for
+tests), so `cd server && npm test` runs the full auth/state/mood flow in Node
+with no D1 or network. The web client talks to it via `src/lib/api.js` when
+`VITE_API_BASE` is set; otherwise the app stays fully local. The AI-only
+`worker/` remains for deployments that don't want accounts.
 
 ## Running it
 
@@ -86,7 +100,8 @@ Wire up real AI by deploying `worker/` (see `worker/README.md`) and creating a
 - Summon-a-companion in-app (free if you own none, else one-time unlock; roster capped at 3)
 
 ### Needs Building (web)
-- Backend + persistent memory (cross-device, evolution, long-term mood tracking)
+- Wire the backend into the app UI (auth screen + cloud sync of the session; `server/` + `lib/api.js` are built and tested, not yet surfaced in `App.jsx`)
+- Companion personality evolution + surfacing long-term mood (server stores the data; chat doesn't use it yet)
 - Push notifications (PWA install/service-worker foundation is in place)
 - Location services
 - Real payment integration (replace `lib/purchase.js`)

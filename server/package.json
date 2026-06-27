@@ -1,0 +1,9 @@
+{
+  "name": "other-api",
+  "private": true,
+  "type": "module",
+  "description": "Other — backend API (Cloudflare Worker + D1)",
+  "scripts": {
+    "test": "node test/run.mjs"
+  }
+}
