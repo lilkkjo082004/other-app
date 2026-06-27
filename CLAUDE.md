@@ -115,6 +115,7 @@ Wire up real AI by deploying `worker/` (see `worker/README.md`) and creating a
 - Cosmetic customization (ToS §4.1 free tier): an 8-color cosmic palette in `theme.js`; the companion profile's "Appearance" picker recolors a companion live (avatar, chat, badge) and persists it.
 - Companion relationship storylines (ToS §4.1, `lib/relationships.js`): bonds between companion pairs grow as they share ambient moments (persisted in the session as `bonds`); ambient conversations are generated from the pair's personalities + bond stage (just met → close), shown on each open and surfaced on the profile's "Relationships" card.
 - Polish: approximate Vedic astrology (`getVedic` in `lib/zodiac.js`, surfaced on the reveal + system prompt); a "Call by name" toggle and a push-frequency selector (daily/few/off, honored by the cron via the synced session) in Settings; optional natural (ElevenLabs) voices via the backend `/tts` proxy (`VITE_NATURAL_VOICE`), with browser-TTS fallback.
+- UX pass: accessibility (aria-labels on controls, `role="switch"` toggles, `:focus-visible`, `prefers-reduced-motion`, contrast bump); chat quality-of-life (message timestamps + day separators, copy-with-attribution, scroll-to-bottom, multi-line textarea input, in-app delete-confirm modal); resumable + skippable onboarding (draft persisted to `localStorage`); resilience (offline banner via `navigator.onLine`, and group replies fetched concurrently).
 
 ### Needs Building (web)
 - Privacy Policy + Disclaimer source documents (drop the markdown into `data/legal.js`; the Terms reference both)

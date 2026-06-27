@@ -32,6 +32,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const [confirmDel, setConfirmDel] = useState(null);  // companion pending delete confirmation
   const [copiedIdx, setCopiedIdx] = useState(null);
   const [atBottom, setAtBottom] = useState(true);
+  const [online, setOnline] = useState(typeof navigator === 'undefined' || navigator.onLine !== false);
   const [unlock, setUnlock] = useState(null);          // { companion, onResult(ok) }
   const [summonCandidate, setSummonCandidate] = useState(null);
   const scrollRef = useRef(null);
@@ -69,6 +70,14 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       await greet();
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const up = () => setOnline(true);
+    const down = () => setOnline(false);
+    window.addEventListener('online', up);
+    window.addEventListener('offline', down);
+    return () => { window.removeEventListener('online', up); window.removeEventListener('offline', down); };
   }, []);
 
   // Recurring AI disclosure reminder (ToS §13 — required, not user-disableable).
@@ -124,14 +133,15 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     if (mood && apiAuthed()) logMood(mood, { companionId: priv ? priv.id : undefined });
     const responders = priv ? [priv] : active.filter(() => Math.random() > 0.15);
     const act = responders.length ? responders : [active[0]].filter(Boolean);
-    let run = [...nm];
-    for (const c of act) {
-      const t = await askCompanion(c, profile, run, comps, priv ? 'private' : 'group');
-      const m = { role: 'assistant', companion: c, content: t, ts: Date.now() };
-      run = [...run, m];
-      setMsgs((p) => [...p, m]);
-      if (autoSpeak) speakAs(t, c.voiceIdx);
-    }
+    // Ask all responders concurrently and append each as it lands, so group chat
+    // doesn't wait on replies one-by-one. (Auto-speak only when one is replying,
+    // to avoid overlapping audio.)
+    await Promise.allSettled(act.map((c) =>
+      askCompanion(c, profile, nm, comps, priv ? 'private' : 'group').then((t) => {
+        setMsgs((p) => [...p, { role: 'assistant', companion: c, content: t, ts: Date.now() }]);
+        if (autoSpeak && act.length === 1) speakAs(t, c.voiceIdx);
+      })
+    ));
     setLoading(false);
     inputRef.current?.focus();
   }
@@ -262,6 +272,8 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
           <button aria-label="Menu" aria-expanded={showMenu} onClick={() => setShowMenu(!showMenu)} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 16, cursor: 'pointer', padding: 4 }}>☰</button>
         </div>
       </div>
+
+      {!online && <div style={{ background: `${C.danger}15`, borderBottom: `1px solid ${C.danger}33`, padding: '6px 14px', textAlign: 'center', fontSize: 11, color: C.danger }}>You're offline — messages will send once you're back online.</div>}
 
       {listening && <div style={{ background: `${C.danger}15`, borderBottom: `1px solid ${C.danger}33`, padding: '6px 14px', textAlign: 'center', fontSize: 11, color: C.danger }}>🎤 Say a companion's name or speak your message</div>}
 
