@@ -29,6 +29,9 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const [bonds, setBonds] = useState(restored?.bonds || {});
   const [voiceCall, setVoiceCall] = useState(restored?.voiceCall !== false);   // call-by-name on by default
   const [pushFreq, setPushFreq] = useState(restored?.pushFrequency || 'daily');
+  const [confirmDel, setConfirmDel] = useState(null);  // companion pending delete confirmation
+  const [copiedIdx, setCopiedIdx] = useState(null);
+  const [atBottom, setAtBottom] = useState(true);
   const [unlock, setUnlock] = useState(null);          // { companion, onResult(ok) }
   const [summonCandidate, setSummonCandidate] = useState(null);
   const scrollRef = useRef(null);
@@ -73,7 +76,21 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     setMsgs((p) => [...p, { role: 'system', kind: 'disclosure', content: DISCLOSURE_TEXT }]);
   }, []));
 
-  useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); }, [msgs, loading]);
+  // Only auto-scroll if the user is already near the bottom (don't yank them
+  // away while they're reading back).
+  useEffect(() => { if (atBottom) scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); }, [msgs, loading, atBottom]);
+  const onScroll = () => {
+    const el = scrollRef.current;
+    if (el) setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80);
+  };
+  const scrollToBottom = () => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+
+  function copyMsg(m, i) {
+    const text = `"${m.content}" — ${m.companion?.name || 'a companion'}, an AI companion in Other by Extratac LLC`;
+    try { navigator.clipboard?.writeText(text); } catch (e) { /* no clipboard */ }
+    setCopiedIdx(i);
+    setTimeout(() => setCopiedIdx((x) => (x === i ? null : x)), 1500);
+  }
 
   useEffect(() => {
     onPersist?.({ companions: comps, messages: msgs, chatMode, autoSpeak, trialStart, bonds, voiceCall, pushFrequency: pushFreq });
@@ -85,7 +102,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     const cc = priv ? [priv] : active;
     for (const c of cc) {
       const t = await greetCompanion(c, profile, priv ? 'private' : 'group', comps);
-      setMsgs((p) => [...p, { role: 'assistant', companion: c, content: t }]);
+      setMsgs((p) => [...p, { role: 'assistant', companion: c, content: t, ts: Date.now() }]);
       if (autoSpeak) speakAs(t, c.voiceIdx);
     }
     setLoading(false);
@@ -95,7 +112,9 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     if (!input.trim() || loading) return;
     const u = input.trim();
     setInput('');
-    const nm = [...msgs, { role: 'user', content: u }];
+    if (inputRef.current) inputRef.current.style.height = 'auto';
+    setAtBottom(true);
+    const nm = [...msgs, { role: 'user', content: u, ts: Date.now() }];
     setMsgs(nm);
     setLoading(true);
     // Safety: surface crisis resources when self-harm/suicidal ideation appears.
@@ -108,7 +127,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     let run = [...nm];
     for (const c of act) {
       const t = await askCompanion(c, profile, run, comps, priv ? 'private' : 'group');
-      const m = { role: 'assistant', companion: c, content: t };
+      const m = { role: 'assistant', companion: c, content: t, ts: Date.now() };
       run = [...run, m];
       setMsgs((p) => [...p, m]);
       if (autoSpeak) speakAs(t, c.voiceIdx);
@@ -124,13 +143,18 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   }
 
   function delComp(id) {
-    try { if (!window.confirm('This is permanent. Delete this companion?')) return; } catch (e) { /* headless */ }
-    const dl = comps.find((c) => c.id === id);
-    const al = comps.filter((c) => c.id !== id && c.status === 'awake');
-    setComps((p) => p.map((c) => (c.id === id ? { ...c, status: 'deleted' } : c)));
-    if (chatMode === id) setChatMode('group');
     setShowMenu(false);
-    if (al.length && dl) setMsgs((p) => [...p, { role: 'assistant', companion: al[0], content: `...${dl.name} is gone. I'm going to miss ${dl.pronouns.split('/')[1] || 'them'}.` }]);
+    setConfirmDel(comps.find((c) => c.id === id) || null);
+  }
+
+  function doDelete() {
+    const dl = confirmDel;
+    setConfirmDel(null);
+    if (!dl) return;
+    const al = comps.filter((c) => c.id !== dl.id && c.status === 'awake');
+    setComps((p) => p.map((c) => (c.id === dl.id ? { ...c, status: 'deleted' } : c)));
+    if (chatMode === dl.id) setChatMode('group');
+    if (al.length) setMsgs((p) => [...p, { role: 'assistant', companion: al[0], content: `...${dl.name} is gone. I'm going to miss ${dl.pronouns.split('/')[1] || 'them'}.`, ts: Date.now() }]);
   }
 
   function markPurchased(id) {
@@ -208,6 +232,13 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const visible = msgs.filter((m) => m.role === 'system' || chatMode === 'group' || m.role === 'user' || m.companion?.id === chatMode);
   // Ambient catch-up is companion-to-companion, so it only shows in group view.
   const stream = chatMode === 'group' ? [...ambient, ...visible] : visible;
+  // Tag each message with a day-separator label when the calendar day changes.
+  let prevDay = null;
+  const decorated = stream.map((m) => {
+    let dayLabel = null;
+    if (m.ts) { const d = new Date(m.ts).toDateString(); if (d !== prevDay) { dayLabel = fmtDay(m.ts); prevDay = d; } }
+    return { m, dayLabel };
+  });
 
   return (
     <Shell>
@@ -269,30 +300,48 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         </div>
       )}
 
-      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '10px 10px 4px' }}>
-        {stream.map((m, i) => (
-          m.role === 'system' ? (
-            m.kind === 'crisis' ? <CrisisCard key={i} /> : <DisclosureNote key={i} text={m.content} />
-          ) : (
-          <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', marginBottom: 7, animation: 'fadeUp 0.3s both' }}>
-            {m.role === 'assistant' && <div style={{ width: 24, height: 24, borderRadius: '50%', background: `radial-gradient(circle,${m.companion?.color?.primary || C.glow1},${m.companion?.color?.primary || C.glow1}55)`, marginRight: 7, flexShrink: 0, marginTop: chatMode === 'group' ? 14 : 0 }} />}
-            <div style={{ maxWidth: '78%' }}>
-              {m.role === 'assistant' && chatMode === 'group' && <span style={{ fontSize: 9, color: m.companion?.color?.primary, fontWeight: 600, display: 'block', marginBottom: 1 }}>{m.companion?.name}</span>}
-              <div style={{ position: 'relative' }}>
-                <div style={{ padding: '8px 12px', borderRadius: m.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: m.role === 'user' ? C.glow1 : C.card, color: m.role === 'user' ? '#fff' : C.text, fontSize: 13, lineHeight: 1.5, border: m.role === 'user' ? 'none' : `1px solid ${C.border}`, whiteSpace: 'pre-wrap' }}>
-                  {m.isAmbient && <span style={{ fontSize: 8, color: C.textDim, display: 'block', marginBottom: 2, fontStyle: 'italic' }}>earlier...</span>}
-                  {m.content}
+      <div ref={scrollRef} onScroll={onScroll} style={{ flex: 1, overflowY: 'auto', padding: '10px 10px 4px', position: 'relative' }}>
+        {decorated.map(({ m, dayLabel }, i) => (
+          <React.Fragment key={i}>
+            {dayLabel && (
+              <div style={{ display: 'flex', justifyContent: 'center', margin: '10px 0 8px' }}>
+                <span style={{ fontSize: 10, color: C.textDim, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 20, padding: '3px 12px' }}>{dayLabel}</span>
+              </div>
+            )}
+            {m.role === 'system' ? (
+              m.kind === 'crisis' ? <CrisisCard /> : <DisclosureNote text={m.content} />
+            ) : (
+            <div style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', marginBottom: 7, animation: 'fadeUp 0.3s both' }}>
+              {m.role === 'assistant' && <div style={{ width: 24, height: 24, borderRadius: '50%', background: `radial-gradient(circle,${m.companion?.color?.primary || C.glow1},${m.companion?.color?.primary || C.glow1}55)`, marginRight: 7, flexShrink: 0, marginTop: chatMode === 'group' ? 14 : 0 }} />}
+              <div style={{ maxWidth: '78%' }}>
+                {m.role === 'assistant' && chatMode === 'group' && <span style={{ fontSize: 9, color: m.companion?.color?.primary, fontWeight: 600, display: 'block', marginBottom: 1 }}>{m.companion?.name}</span>}
+                <div style={{ position: 'relative' }}>
+                  <div style={{ padding: '8px 12px', borderRadius: m.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: m.role === 'user' ? C.glow1 : C.card, color: m.role === 'user' ? '#fff' : C.text, fontSize: 13, lineHeight: 1.5, border: m.role === 'user' ? 'none' : `1px solid ${C.border}`, whiteSpace: 'pre-wrap' }}>
+                    {m.isAmbient && <span style={{ fontSize: 8, color: C.textDim, display: 'block', marginBottom: 2, fontStyle: 'italic' }}>earlier...</span>}
+                    {m.content}
+                  </div>
+                  {m.role === 'assistant' && !m.isAmbient && (
+                    <div style={{ position: 'absolute', top: 3, right: -46, display: 'flex', gap: 4 }}>
+                      <button aria-label="Read this message aloud" onClick={() => speakAs(m.content, m.companion?.voiceIdx || 0)} style={{ background: 'none', border: 'none', color: C.textDim, fontSize: 12, cursor: 'pointer', opacity: 0.55, padding: 0 }}>🔊</button>
+                      <button aria-label="Copy message with attribution" onClick={() => copyMsg(m, i)} style={{ background: 'none', border: 'none', color: copiedIdx === i ? C.glow3 : C.textDim, fontSize: 11, cursor: 'pointer', opacity: copiedIdx === i ? 1 : 0.55, padding: 0 }}>{copiedIdx === i ? '✓' : '⧉'}</button>
+                    </div>
+                  )}
                 </div>
-                {m.role === 'assistant' && <button onClick={() => speakAs(m.content, m.companion?.voiceIdx || 0)} style={{ position: 'absolute', top: 3, right: -24, background: 'none', border: 'none', color: C.textDim, fontSize: 12, cursor: 'pointer', opacity: 0.5 }}>🔊</button>}
+                {m.ts && <span style={{ fontSize: 8.5, color: C.textDim, display: 'block', marginTop: 2, textAlign: m.role === 'user' ? 'right' : 'left' }}>{fmtTime(m.ts)}</span>}
               </div>
             </div>
-          </div>
-          )
+            )}
+          </React.Fragment>
         ))}
         {loading && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 7 }}>
             <div style={{ width: 24, height: 24, borderRadius: '50%', background: `radial-gradient(circle,${C.glow1},${C.glow1}55)` }} />
             <div style={{ padding: '8px 12px', borderRadius: '14px 14px 14px 4px', background: C.card, border: `1px solid ${C.border}`, display: 'flex', gap: 3 }}>{[0, 1, 2].map((i) => <div key={i} style={{ width: 5, height: 5, borderRadius: '50%', background: C.textDim, animation: `typewriter 1.4s ${i * 0.15}s infinite` }} />)}</div>
+          </div>
+        )}
+        {!atBottom && (
+          <div style={{ position: 'sticky', bottom: 6, display: 'flex', justifyContent: 'flex-end', pointerEvents: 'none' }}>
+            <button aria-label="Scroll to latest" onClick={scrollToBottom} style={{ pointerEvents: 'auto', width: 32, height: 32, borderRadius: '50%', background: C.surfaceUp, border: `1px solid ${C.border}`, color: C.text, fontSize: 14, cursor: 'pointer', boxShadow: '0 4px 14px rgba(0,0,0,0.4)' }}>⌄</button>
           </div>
         )}
       </div>
@@ -302,12 +351,27 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
           <p style={{ textAlign: 'center', color: C.textDim, fontSize: 12, padding: 8 }}>All companions resting 💤</p>
         ) : (
           <div style={{ display: 'flex', gap: 7, alignItems: 'flex-end' }}>
-            <input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && send()} placeholder={priv ? `Message ${priv.name}...` : 'Message everyone...'} style={{ flex: 1, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 50, padding: '10px 14px', fontSize: 13, color: C.text, outline: 'none' }} />
+            <textarea ref={inputRef} value={input} rows={1}
+              onChange={(e) => { setInput(e.target.value); const el = e.target; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px'; }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+              placeholder={priv ? `Message ${priv.name}...` : 'Message everyone...'}
+              style={{ flex: 1, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 18, padding: '10px 14px', fontSize: 13, color: C.text, outline: 'none', resize: 'none', fontFamily: "'DM Sans',sans-serif", lineHeight: 1.4, maxHeight: 120, overflowY: 'auto' }} />
             <button aria-label="Send message" onClick={send} disabled={!input.trim() || loading} style={{ width: 38, height: 38, borderRadius: '50%', background: input.trim() && !loading ? C.glow1 : C.border, border: 'none', color: '#fff', fontSize: 14, cursor: input.trim() && !loading ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>↑</button>
           </div>
         )}
       </div>
 
+      {confirmDel && (
+        <div onClick={() => setConfirmDel(null)} style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, animation: 'fadeIn 0.2s' }}>
+          <div onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" style={{ width: '100%', maxWidth: 320, background: C.card, border: `1px solid ${C.border}`, borderRadius: 18, padding: 22, textAlign: 'center' }}>
+            <div style={{ fontSize: 26, marginBottom: 10 }}>💔</div>
+            <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Delete {confirmDel.name}?</h3>
+            <p style={{ fontSize: 12.5, color: C.textSoft, lineHeight: 1.5, marginBottom: 18 }}>This is permanent. {confirmDel.name}'s memories and your history together will be gone for good.</p>
+            <button onClick={doDelete} style={{ width: '100%', padding: '12px', borderRadius: 12, marginBottom: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: "'DM Sans',sans-serif", background: `${C.danger}1f`, color: C.danger, border: `1px solid ${C.danger}88` }}>Delete forever</button>
+            <button onClick={() => setConfirmDel(null)} style={{ width: '100%', padding: '12px', borderRadius: 12, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: "'DM Sans',sans-serif", background: 'transparent', color: C.text, border: `1px solid ${C.border}` }}>Keep {confirmDel.name}</button>
+          </div>
+        </div>
+      )}
       {summonCandidate && <div style={{ position: 'fixed', inset: 0, zIndex: 40 }}><WakingUp comp={summonCandidate} onDone={onSummonDone} /></div>}
       {unlock && <UnlockSheet companion={unlock.companion} onClose={(ok) => { const f = unlock.onResult; setUnlock(null); f?.(ok); }} />}
     </Shell>
@@ -315,6 +379,19 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
 }
 
 const menuBtn = { background: 'none', border: `1px solid ${C.border}`, borderRadius: 5, padding: '2px 7px', color: C.textSoft, cursor: 'pointer', fontSize: 9, fontFamily: "'DM Sans',sans-serif" };
+
+function fmtTime(ts) {
+  try { return new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); } catch (e) { return ''; }
+}
+function fmtDay(ts) {
+  const d = new Date(ts); const now = new Date();
+  const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate());
+  const diff = Math.round((day(now) - day(d)) / 86400000);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Yesterday';
+  if (diff < 7) return d.toLocaleDateString([], { weekday: 'long' });
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: now.getFullYear() === d.getFullYear() ? undefined : 'numeric' });
+}
 
 function DisclosureNote({ text }) {
   return (
