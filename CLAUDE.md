@@ -12,7 +12,7 @@ Companions are NOT servants, assistants, or chatbots. They are autonomous person
 
 - **Framework**: Flutter (Dart)
 - **Target platforms**: Web (primary), Android/Google Play (secondary)
-- **AI backend**: Claude API (claude-sonnet-4-20250514) — currently using smart placeholder responses, needs backend proxy server for production
+- **AI backend**: Claude API via a Cloudflare Worker proxy (`worker/`). Defaults to `claude-opus-4-8`; configurable. Falls back to built-in placeholder responses when no proxy is configured.
 - **Voice**: flutter_tts for text-to-speech, speech_to_text for mic input
 - **Storage**: shared_preferences for local persistence (to be implemented)
 - **State management**: setState (simple StatefulWidget pattern)
@@ -77,9 +77,10 @@ lib/
 - **Trial timer + ownership** — first companion is free forever; extras run a 14-day trial tracked from selection
 - **Trial degradation** — when the trial lapses, unpurchased companions become "memory limited" (still present, dimmed in the header, flagged in menu/profile, with a banner) until unlocked
 - **Purchase / unlock flow** — simulated one-time unlock (`PurchaseService` + unlock bottom sheet) that permanently restores a companion; clean seam to swap in Play Billing / RevenueCat / Stripe
+- **Real Claude responses** — Cloudflare Worker proxy (`worker/`) + `CompanionApiService` with per-companion system prompts, conversation history, age-gating, and group/private context; graceful fallback to placeholders
+- **Summon a companion** — generate a new compatible companion in-app (waking-up sequence), free if you own none, otherwise a one-time unlock; roster capped at 3
 
 ### Needs Building
-- Backend proxy server for real Claude API calls
 - Location services (food, therapist, activity recommendations)
 - Long-term mood pattern tracking across sessions
 - Companion-initiated private chats
@@ -99,6 +100,17 @@ the first chosen companion is free, extras are trial-gated from `SessionData.tri
 of `unlockCompanion` with a real store SDK; the app only depends on the returned
 `PurchaseResult`. Behavioral degradation is currently surfaced visually (limited badge +
 unlock CTA); deeper memory/adaptation limits land with the real memory system.
+
+## AI Backend
+
+`worker/` is a Cloudflare Worker that proxies the Anthropic Messages API so the API key
+never ships in the client (see `worker/README.md` for deploy steps). `lib/utils/config.dart`
+reads `OTHER_AI_PROXY` and `OTHER_AI_MODEL` via `--dart-define`. `CompanionApiService`
+builds a per-companion system prompt (identity, zodiac, trait seeds, the user's profile,
+age-gating, group vs. private context), replays recent history, and POSTs to the proxy;
+`ChatScreen._respond` uses it when configured and falls back to `CompanionAIService`
+(placeholders) on any error or when no proxy is set. Run with:
+`flutter run -d chrome --dart-define=OTHER_AI_PROXY=https://<name>.workers.dev`.
 
 ## Persistence Architecture
 

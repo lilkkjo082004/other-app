@@ -7,6 +7,7 @@ import '../models/user_profile.dart';
 import '../models/companion.dart';
 import '../models/chat_message.dart';
 import '../services/companion_ai_service.dart';
+import '../services/companion_api_service.dart';
 import '../services/voice_service.dart';
 import '../services/storage_service.dart';
 import '../utils/entitlements.dart';
@@ -287,7 +288,15 @@ class _CompanionPreferenceScreenState extends State<CompanionPreferenceScreen> {
 class WakingUpScreen extends StatefulWidget {
   final UserProfile profile;
   final List<Companion> companions;
-  const WakingUpScreen({super.key, required this.profile, required this.companions});
+  /// When provided, called after the sequence instead of advancing to the
+  /// companion-select screen. Used by the in-app "summon a companion" flow.
+  final void Function(BuildContext context)? onComplete;
+  const WakingUpScreen({
+    super.key,
+    required this.profile,
+    required this.companions,
+    this.onComplete,
+  });
   @override
   State<WakingUpScreen> createState() => _WakingUpScreenState();
 }
@@ -315,6 +324,8 @@ class _WakingUpScreenState extends State<WakingUpScreen> {
       if (_compIdx < widget.companions.length - 1) {
         setState(() { _compIdx++; });
         _startSequence();
+      } else if (widget.onComplete != null) {
+        widget.onComplete!(context);
       } else {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => CompanionSelectScreen(profile: widget.profile, companions: widget.companions)),
@@ -519,6 +530,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _inputCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
   final CompanionAIService _ai = CompanionAIService();
+  final CompanionApiService _api = CompanionApiService();
   final VoiceService _voice = VoiceService();
   String _chatMode = 'group'; // 'group' or companion id
   bool _showMenu = false;
@@ -604,19 +616,96 @@ class _ChatScreenState extends State<ChatScreen> {
       _loading = true;
     });
     _scrollDown();
+    _respond(text);
+  }
 
-    // Simulate delay then respond
-    Future.delayed(const Duration(milliseconds: 800), () {
-      final responders = _priv != null ? [_priv!] : _active;
-      for (final c in responders) {
-        final response = _ai.generateResponse(c, widget.profile, text, _msgs, _comps, _chatMode == 'group');
-        _msgs.add(ChatMessage(role: 'assistant', companion: c, content: response));
-        if (_voice.autoSpeak) _voice.speak(response, c.voiceIdx);
+  Future<void> _respond(String text) async {
+    final isGroup = _chatMode == 'group';
+    final responders = _priv != null ? [_priv!] : _active;
+
+    for (final c in responders) {
+      String response;
+      if (_api.enabled) {
+        try {
+          response = await _api.respond(
+            companion: c,
+            profile: widget.profile,
+            history: _msgs,
+            allCompanions: _comps,
+            isGroup: isGroup,
+          );
+        } catch (_) {
+          // Network/API hiccup — fall back to the local placeholder voice.
+          response = _ai.generateResponse(c, widget.profile, text, _msgs, _comps, isGroup);
+        }
+      } else {
+        // No proxy configured — use the built-in placeholder responses.
+        await Future.delayed(const Duration(milliseconds: 700));
+        response = _ai.generateResponse(c, widget.profile, text, _msgs, _comps, isGroup);
       }
-      setState(() => _loading = false);
+
+      if (!mounted) return;
+      setState(() => _msgs.add(ChatMessage(role: 'assistant', companion: c, content: response)));
+      if (_voice.autoSpeak) _voice.speak(response, c.voiceIdx);
       _scrollDown();
-      _save();
+    }
+
+    if (!mounted) return;
+    setState(() => _loading = false);
+    _scrollDown();
+    _save();
+  }
+
+  Future<void> _summon() async {
+    setState(() => _showMenu = false);
+    final living = _comps.where((c) => c.status != CompanionStatus.deleted).toList();
+    if (living.length >= 3) return;
+
+    final usedNames = _comps.map((c) => c.name).toList();
+    final usedSigns = living.map((c) => c.zodiacKey).toSet();
+    final pool = ZodiacEngine.pickCompanionSigns(widget.profile.astrology!.western);
+    final sign = pool.firstWhere((s) => !usedSigns.contains(s), orElse: () => pool.first);
+
+    final usedColors = living.map((c) => c.colorIdx).toSet();
+    int colorIdx = living.length;
+    for (int i = 0; i < companionColors.length; i++) {
+      if (!usedColors.contains(i)) { colorIdx = i; break; }
+    }
+
+    final candidate = Companion.generate(sign, colorIdx, usedNames);
+
+    // The user's one free companion: available only if they currently own none.
+    final freeAvailable = !living.any((c) => c.purchased);
+
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => WakingUpScreen(
+        profile: widget.profile,
+        companions: [candidate],
+        onComplete: (ctx) => Navigator.of(ctx).pop(),
+      ),
+    ));
+    if (!mounted) return;
+
+    if (freeAvailable) {
+      candidate.purchased = true;
+      _addCompanion(candidate);
+    } else {
+      final ok = await showUnlockSheet(context, candidate);
+      if (!mounted) return;
+      if (ok) {
+        candidate.purchased = true;
+        _addCompanion(candidate);
+      }
+    }
+  }
+
+  void _addCompanion(Companion c) {
+    setState(() {
+      _comps.add(c);
+      _msgs.add(ChatMessage(role: 'assistant', companion: c, content: _ai.generateGreeting(c, widget.profile)));
     });
+    _save();
+    _scrollDown();
   }
 
   void _toggleSleep(String id) {
@@ -1011,6 +1100,16 @@ class _ChatScreenState extends State<ChatScreen> {
                               ),
                             )),
                             const Divider(color: AppColors.border, height: 16),
+                            if (_comps.where((c) => c.status != CompanionStatus.deleted).length < 3)
+                              GestureDetector(
+                                onTap: _summon,
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                  margin: const EdgeInsets.only(bottom: 6),
+                                  child: const Text('✦  Summon a companion', style: TextStyle(fontSize: 12, color: AppColors.glow2)),
+                                ),
+                              ),
                             GestureDetector(
                               onTap: _openSettings,
                               child: Container(
