@@ -8,7 +8,10 @@ import '../models/companion.dart';
 import '../models/chat_message.dart';
 import '../services/companion_ai_service.dart';
 import '../services/voice_service.dart';
+import '../services/storage_service.dart';
 import '../widgets/common_widgets.dart';
+import 'settings_screen.dart';
+import 'companion_profile_screen.dart';
 
 // ═══════════════════════════════════════════════════
 // ZODIAC REVEAL
@@ -466,8 +469,19 @@ class _CompanionSelectScreenState extends State<CompanionSelectScreen> {
               text: _selected.isEmpty ? 'Select at least one' : _selected.length == 1 ? 'Start with this companion' : 'Start with all ${_selected.length}',
               onPressed: _selected.isNotEmpty ? () {
                 final chosen = widget.companions.where((c) => _selected.contains(c.id)).toList();
+                // The first companion is free forever; any extras are on a 14-day trial.
+                for (int i = 0; i < chosen.length; i++) {
+                  chosen[i].purchased = i == 0;
+                }
+                final trialStart = chosen.length > 1 ? DateTime.now() : null;
                 Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (_) => ChatScreen(profile: widget.profile, companions: chosen)),
+                  MaterialPageRoute(
+                    builder: (_) => ChatScreen(
+                      profile: widget.profile,
+                      companions: chosen,
+                      trialStart: trialStart,
+                    ),
+                  ),
                 );
               } : null,
             ),
@@ -484,7 +498,15 @@ class _CompanionSelectScreenState extends State<CompanionSelectScreen> {
 class ChatScreen extends StatefulWidget {
   final UserProfile profile;
   final List<Companion> companions;
-  const ChatScreen({super.key, required this.profile, required this.companions});
+  final SessionData? restored; // non-null when resuming a saved session
+  final DateTime? trialStart;
+  const ChatScreen({
+    super.key,
+    required this.profile,
+    required this.companions,
+    this.restored,
+    this.trialStart,
+  });
   @override
   State<ChatScreen> createState() => _ChatScreenState();
 }
@@ -499,6 +521,8 @@ class _ChatScreenState extends State<ChatScreen> {
   String _chatMode = 'group'; // 'group' or companion id
   bool _showMenu = false;
   bool _loading = false;
+  bool _callByName = true;
+  DateTime? _trialStart;
 
   List<Companion> get _active => _comps.where((c) => c.status == CompanionStatus.awake).toList();
   Companion? get _priv => _chatMode != 'group' ? _comps.firstWhere((c) => c.id == _chatMode, orElse: () => _comps.first) : null;
@@ -508,7 +532,39 @@ class _ChatScreenState extends State<ChatScreen> {
     super.initState();
     _comps = widget.companions;
     _voice.init();
-    _loadInitial();
+
+    final restored = widget.restored;
+    if (restored != null) {
+      // Resume: pull the saved conversation and preferences back in.
+      _msgs.addAll(restored.messages);
+      _chatMode = restored.chatMode;
+      _voice.autoSpeak = restored.autoSpeak;
+      _callByName = restored.callByName;
+      _trialStart = restored.trialStart;
+      // Guard against a stale private-chat target.
+      if (_chatMode != 'group' &&
+          !_comps.any((c) => c.id == _chatMode && c.status == CompanionStatus.awake)) {
+        _chatMode = 'group';
+      }
+      _scrollDown();
+    } else {
+      // Fresh start: greet the user and lay down an ambient thread.
+      _trialStart = widget.trialStart;
+      _loadInitial();
+      _save();
+    }
+  }
+
+  void _save() {
+    StorageService.instance.save(SessionData(
+      profile: widget.profile,
+      companions: _comps,
+      messages: _msgs,
+      chatMode: _chatMode,
+      autoSpeak: _voice.autoSpeak,
+      callByName: _callByName,
+      trialStart: _trialStart,
+    ));
   }
 
   void _loadInitial() {
@@ -554,6 +610,7 @@ class _ChatScreenState extends State<ChatScreen> {
       }
       setState(() => _loading = false);
       _scrollDown();
+      _save();
     });
   }
 
@@ -564,6 +621,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (_chatMode == id) _chatMode = 'group';
       _showMenu = false;
     });
+    _save();
   }
 
   void _deleteComp(String id) {
@@ -577,13 +635,71 @@ class _ChatScreenState extends State<ChatScreen> {
         _msgs.add(ChatMessage(role: 'assistant', companion: alive.first, content: '...${c.name} is gone. I\'m going to miss ${c.pronouns.split("/").last}.'));
       }
     });
+    _save();
+  }
+
+  void _openSettings() {
+    setState(() => _showMenu = false);
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => SettingsScreen(
+        profile: widget.profile,
+        companions: _comps,
+        autoSpeak: _voice.autoSpeak,
+        callByName: _callByName,
+        trialStart: _trialStart,
+        onAutoSpeakChanged: (v) {
+          setState(() => _voice.autoSpeak = v);
+          _save();
+        },
+        onCallByNameChanged: (v) {
+          setState(() => _callByName = v);
+          _save();
+        },
+        onSleepAll: () {
+          setState(() {
+            for (final c in _comps) {
+              if (c.status == CompanionStatus.awake) c.status = CompanionStatus.sleeping;
+            }
+            _chatMode = 'group';
+          });
+          _save();
+        },
+        onWakeAll: () {
+          setState(() {
+            for (final c in _comps) {
+              if (c.status == CompanionStatus.sleeping) c.status = CompanionStatus.awake;
+            }
+          });
+          _save();
+        },
+      ),
+    ));
+  }
+
+  void _openProfile(Companion c) {
+    setState(() => _showMenu = false);
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => CompanionProfileScreen(
+        companion: c,
+        trialStart: _trialStart,
+        onPrivateChat: () {
+          setState(() => _chatMode = c.id);
+          _save();
+        },
+        onSleepToggle: () => _toggleSleep(c.id),
+        onDelete: () => _deleteComp(c.id),
+      ),
+    ));
   }
 
   void _handleVoiceResult(String transcript) {
     final lower = transcript.toLowerCase();
-    final found = _active.where((c) => lower.contains(c.name.toLowerCase())).toList();
+    final found = _callByName
+        ? _active.where((c) => lower.contains(c.name.toLowerCase())).toList()
+        : <Companion>[];
     if (found.isNotEmpty) {
       setState(() { _chatMode = found.first.id; _showMenu = false; });
+      _save();
     } else if (transcript.trim().isNotEmpty) {
       _inputCtrl.text = transcript;
     }
@@ -651,7 +767,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   const Spacer(),
                   // Auto-speak
                   GestureDetector(
-                    onTap: () => setState(() => _voice.autoSpeak = !_voice.autoSpeak),
+                    onTap: () { setState(() => _voice.autoSpeak = !_voice.autoSpeak); _save(); },
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                       decoration: BoxDecoration(
@@ -794,7 +910,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             const Text('CHAT MODE', style: TextStyle(fontSize: 9, color: AppColors.textDim, letterSpacing: 2)),
                             const SizedBox(height: 8),
                             GestureDetector(
-                              onTap: () => setState(() { _chatMode = 'group'; _showMenu = false; }),
+                              onTap: () { setState(() { _chatMode = 'group'; _showMenu = false; }); _save(); },
                               child: Container(
                                 width: double.infinity,
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
@@ -818,18 +934,33 @@ class _ChatScreenState extends State<ChatScreen> {
                                     Text(c.status == CompanionStatus.sleeping ? '💤' : '●', style: const TextStyle(fontSize: 8)),
                                   ]),
                                   const SizedBox(height: 3),
-                                  Row(children: [
-                                    const SizedBox(width: 19),
-                                    if (c.status == CompanionStatus.awake)
-                                      _menuBtn('Private', () => setState(() { _chatMode = c.id; _showMenu = false; })),
-                                    const SizedBox(width: 3),
-                                    _menuBtn(c.status == CompanionStatus.sleeping ? 'Wake' : 'Sleep', () => _toggleSleep(c.id)),
-                                    const SizedBox(width: 3),
-                                    _menuBtn('Delete', () => _deleteComp(c.id), danger: true),
-                                  ]),
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 19),
+                                    child: Wrap(
+                                      spacing: 4,
+                                      runSpacing: 4,
+                                      children: [
+                                        _menuBtn('Profile', () => _openProfile(c)),
+                                        if (c.status == CompanionStatus.awake)
+                                          _menuBtn('Private', () { setState(() { _chatMode = c.id; _showMenu = false; }); _save(); }),
+                                        _menuBtn(c.status == CompanionStatus.sleeping ? 'Wake' : 'Sleep', () => _toggleSleep(c.id)),
+                                        _menuBtn('Delete', () => _deleteComp(c.id), danger: true),
+                                      ],
+                                    ),
+                                  ),
                                 ],
                               ),
                             )),
+                            const Divider(color: AppColors.border, height: 16),
+                            GestureDetector(
+                              onTap: _openSettings,
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                margin: const EdgeInsets.only(bottom: 6),
+                                child: const Text('⚙  Settings', style: TextStyle(fontSize: 12, color: AppColors.text)),
+                              ),
+                            ),
                             GestureDetector(
                               onTap: () => setState(() => _showMenu = false),
                               child: Container(

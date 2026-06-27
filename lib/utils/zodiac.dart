@@ -30,6 +30,23 @@ class UserAstrology {
     required this.lifePath,
     required this.compatible,
   });
+
+  Map<String, dynamic> toJson() => {
+        'western': western,
+        'chinese': chinese,
+        'chineseElement': chineseElement,
+        'lifePath': lifePath,
+        'compatible': compatible,
+      };
+
+  factory UserAstrology.fromJson(Map<String, dynamic> j) => UserAstrology(
+        western: j['western'] as String,
+        westernData: ZodiacEngine.signs[j['western']] ?? ZodiacEngine.signs['aries']!,
+        chinese: j['chinese'] as String? ?? '',
+        chineseElement: j['chineseElement'] as String? ?? '',
+        lifePath: j['lifePath'] as String? ?? '',
+        compatible: (j['compatible'] as List?)?.map((e) => e as String).toList() ?? const [],
+      );
 }
 
 class ZodiacEngine {

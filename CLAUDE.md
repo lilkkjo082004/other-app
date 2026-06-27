@@ -71,20 +71,32 @@ lib/
 - Mood detection (keyword-based) with tone adjustment
 - Age gating (under 18 content filtering)
 - Dark cosmic UI aesthetic
+- **Persistent local storage** — profile, companions, chat history, voice prefs, and trial state survive restarts (`StorageService` + `shared_preferences`); app resumes straight into chat
+- **Settings screen** — voice toggles (auto-speak, call-by-name), sleep/wake all, trial status, full reset
+- **Companion profile screens** — identity, zodiac, trait seeds, status, ownership, manage actions (private/sleep/delete)
+- **Trial timer + ownership** — first companion is free forever; extras run a 14-day trial tracked from selection
 
 ### Needs Building
 - Backend proxy server for real Claude API calls
-- Persistent storage (SharedPreferences for profiles, companion state, chat history)
 - Location services (food, therapist, activity recommendations)
 - Long-term mood pattern tracking across sessions
 - Companion-initiated private chats
 - Push notifications
-- Companion profile screens
-- Settings screen
-- Freemium purchase flow (payment integration)
+- Trial degradation (limit unpurchased companions' adaptation once the trial ends)
+- Freemium purchase flow (payment integration) + replacing/adding companions
 - Subscription management for memory tier
 - Privacy policy and Terms of Service
 - Google Play Store listing and submission
+
+## Persistence Architecture
+
+`lib/services/storage_service.dart` is the single source of truth for saved state. The
+entire session is serialized to one JSON blob (`SessionData`) under one
+`shared_preferences` key, so writes are atomic. Every model has `toJson`/`fromJson`
+(`ChatMessage.fromJson` takes a companion-id lookup map to rehydrate references).
+`main.dart`'s `BootstrapScreen` loads on launch and routes to chat (if any companion is
+alive) or the welcome flow. `ChatScreen` calls `_save()` after every state mutation
+(send, sleep/wake, delete, mode switch, voice toggle).
 
 ## Content Strategy
 

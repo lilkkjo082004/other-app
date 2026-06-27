@@ -44,6 +44,7 @@ class Companion {
   String? freeText;
   int voiceIdx;
   bool selected;
+  bool purchased;
 
   Companion({
     required this.id,
@@ -58,9 +59,51 @@ class Companion {
     this.freeText,
     required this.voiceIdx,
     this.selected = false,
+    this.purchased = true,
   });
 
   ZodiacSign get zodiac => ZodiacEngine.signs[zodiacKey]!;
+
+  int get colorIdx {
+    final i = companionColors.indexOf(color);
+    return i >= 0 ? i : voiceIdx % companionColors.length;
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'pronouns': pronouns,
+        'zodiacKey': zodiacKey,
+        'personality': personality,
+        'quirk': quirk,
+        'colorIdx': colorIdx,
+        'status': status.name,
+        'builderTraits': builderTraits,
+        'freeText': freeText,
+        'voiceIdx': voiceIdx,
+        'selected': selected,
+        'purchased': purchased,
+      };
+
+  factory Companion.fromJson(Map<String, dynamic> j) => Companion(
+        id: j['id'] as String,
+        name: j['name'] as String,
+        pronouns: j['pronouns'] as String,
+        zodiacKey: j['zodiacKey'] as String,
+        personality: j['personality'] as String,
+        quirk: j['quirk'] as String,
+        color: companionColors[(j['colorIdx'] as int? ?? 0) % companionColors.length],
+        status: CompanionStatus.values.firstWhere(
+          (s) => s.name == j['status'],
+          orElse: () => CompanionStatus.awake,
+        ),
+        builderTraits: (j['builderTraits'] as Map?)?.map((k, v) =>
+            MapEntry(k as String, (v as List).map((e) => e as String).toList())),
+        freeText: j['freeText'] as String?,
+        voiceIdx: j['voiceIdx'] as int? ?? 0,
+        selected: j['selected'] as bool? ?? false,
+        purchased: j['purchased'] as bool? ?? true,
+      );
 
   static Companion generate(String zodiacSign, int colorIdx, List<String> usedNames) {
     final rand = Random();
