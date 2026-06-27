@@ -118,6 +118,13 @@ ok(!!a3.headers.get('retry-after'), 'rate-limit response sets retry-after');
 const b1 = await hit('1.1.1.1');
 ok(b1.status === 401, 'a different IP has its own bucket');
 
+console.log('tts proxy');
+r = await call('POST', '/tts', { body: { text: 'hello' } });
+ok(r.status === 503, 'tts is 503 until ELEVENLABS_API_KEY is set');
+const ttsEnv = { store: memoryStore(), SECRET: 'test-secret', ALLOWED_ORIGIN: '*', ELEVENLABS_API_KEY: 'k' };
+const ttsRes = await handle(new Request('http://api/tts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ voiceIdx: 0 }) }), ttsEnv);
+ok(ttsRes.status === 400, 'tts requires text');
+
 r = await call('GET', '/state', { token: 'garbage.token.here' });
 ok(r.status === 401, 'rejects tampered token');
 

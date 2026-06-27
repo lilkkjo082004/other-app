@@ -8,7 +8,7 @@ import { locationSupported, locationEnabled, locationLabel, requestLocation, set
 import { deleteAccount } from '../lib/api.js';
 import { LegalLink } from './Legal.jsx';
 
-export default function Settings({ profile, comps, autoSpeak, trialStart, cloud, authed, email, onSignIn, onSignOut, onAutoSpeak, onSleepAll, onWakeAll, onReset, onBack }) {
+export default function Settings({ profile, comps, autoSpeak, trialStart, cloud, authed, email, onSignIn, onSignOut, onAutoSpeak, voiceCall, onVoiceCall, pushFrequency, onPushFrequency, onSleepAll, onWakeAll, onReset, onBack }) {
   const living = comps.filter((c) => c.status !== 'deleted');
   const allAwake = living.length > 0 && living.every((c) => c.status === 'awake');
 
@@ -129,6 +129,20 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
               </div>
               <Toggle on={pushOn} onClick={togglePush} />
             </div>
+            {pushOn && onPushFrequency && (
+              <div style={{ ...card }}>
+                <div style={{ fontSize: 13, marginBottom: 2 }}>How often</div>
+                <div style={{ fontSize: 11, color: C.textDim, marginBottom: 10 }}>How chatty your companions get</div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {[{ v: 'daily', l: 'Daily' }, { v: 'few', l: 'A few/week' }, { v: 'off', l: 'Off' }].map((o) => {
+                    const on = (pushFrequency || 'daily') === o.v;
+                    return (
+                      <button key={o.v} onClick={() => onPushFrequency(o.v)} style={{ flex: 1, padding: '8px 0', borderRadius: 9, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", fontSize: 12, background: on ? `${C.glow1}22` : 'transparent', border: `1px solid ${on ? C.glow1 : C.border}`, color: on ? C.glow1 : C.textSoft, fontWeight: on ? 600 : 400 }}>{o.l}</button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </>
         )}
 
@@ -138,6 +152,12 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
           <div><div style={{ fontSize: 13 }}>Auto-speak</div><div style={{ fontSize: 11, color: C.textDim }}>Companions read messages aloud</div></div>
           <Toggle on={autoSpeak} onClick={() => onAutoSpeak(!autoSpeak)} />
         </div>
+        {onVoiceCall && (
+          <div style={{ ...card, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ flex: 1, paddingRight: 10 }}><div style={{ fontSize: 13 }}>Call by name</div><div style={{ fontSize: 11, color: C.textDim }}>Tap the mic to open a companion by voice</div></div>
+            <Toggle on={voiceCall !== false} onClick={() => onVoiceCall(!(voiceCall !== false))} />
+          </div>
+        )}
 
         <div style={{ height: 10 }} />
         {section('Location')}

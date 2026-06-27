@@ -19,6 +19,9 @@ export default {
       ALLOWED_ORIGIN: env.ALLOWED_ORIGIN,
       AI_RATE_LIMIT: env.AI_RATE_LIMIT,
       AUTH_RATE_LIMIT: env.AUTH_RATE_LIMIT,
+      ELEVENLABS_API_KEY: env.ELEVENLABS_API_KEY,
+      ELEVEN_VOICE_IDS: env.ELEVEN_VOICE_IDS,
+      ELEVEN_MODEL: env.ELEVEN_MODEL,
     });
   },
 
@@ -30,19 +33,22 @@ export default {
     const vapid = await importVapid(env.VAPID_PRIVATE, env.VAPID_PUBLIC, env.VAPID_SUBJECT);
     const subs = await store.listPushSubs();
     const now = Date.now();
-    const DUE_MS = 20 * 60 * 60 * 1000; // at most ~once/day per device
+    const HOUR = 60 * 60 * 1000;
+    // Per-user cadence from their synced setting: off | few (~3 days) | daily.
+    const dueWindow = (freq) => (freq === 'off' ? Infinity : freq === 'few' ? 68 * HOUR : 20 * HOUR);
 
     for (const s of subs) {
-      if (s.last_notified && now - s.last_notified < DUE_MS) continue;
+      let blob = {};
+      try { blob = JSON.parse((await store.getState(s.user_id))?.blob || '{}'); } catch (e) { /* empty */ }
+      const due = dueWindow(blob.pushFrequency || 'daily');
+      if (!Number.isFinite(due)) continue; // notifications off for this user
+      if (s.last_notified && now - s.last_notified < due) continue;
       let line = 'Your companions are thinking about you ✦';
-      try {
-        const st = await store.getState(s.user_id);
-        const comps = (JSON.parse(st?.blob || '{}').companions || []).filter((c) => c.status === 'awake');
-        if (comps.length) {
-          const c = comps[Math.floor(Math.random() * comps.length)];
-          line = CHECKINS[Math.floor(Math.random() * CHECKINS.length)](c.name);
-        }
-      } catch (e) { /* fall back to the generic line */ }
+      const comps = (blob.companions || []).filter((c) => c.status === 'awake');
+      if (comps.length) {
+        const c = comps[Math.floor(Math.random() * comps.length)];
+        line = CHECKINS[Math.floor(Math.random() * CHECKINS.length)](c.name);
+      }
       try {
         const code = await sendPush(
           { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },

@@ -24,7 +24,7 @@ export function buildSystemPrompt(comp, profile, allC, mode, history) {
 IDENTITY: ${comp.name} | ${comp.pronouns} | ${ZODIAC[comp.zodiac]?.sym} ${comp.zodiac} (${ZODIAC[comp.zodiac]?.el}) | Color: ${comp.colorName}
 Personality: ${comp.personality} | Quirk: ${comp.quirk}${bt}${ft}
 
-ABOUT ${profile.name}: Zodiac: ${ZODIAC[a.western]?.sym || ''} ${a.western || '?'} | Chinese: ${a.chinese || '?'} (${a.chineseElement || '?'}) | Life Path: #${a.lifePath || '?'}
+ABOUT ${profile.name}: Zodiac: ${ZODIAC[a.western]?.sym || ''} ${a.western || '?'} | Chinese: ${a.chinese || '?'} (${a.chineseElement || '?'}) | Life Path: #${a.lifePath || '?'}${a.vedic ? ` | Vedic (approx): ${a.vedic.rashi} rashi, ${a.vedic.nakshatra} nakshatra` : ''}
 Energy: ${fmt(profile.vibe)} | Communication: ${fmt(profile.communication)} | Needs: ${fmt(profile.needs)} | Occupation: ${profile.occupation || '?'} | Relationship: ${fmt(profile.relationship)} | Love language: ${fmt(profile.loveLang)} | Friend says: ${fmt(profile.socialId)}
 Activities: ${fmt(profile.activities)}
 Cuisines loved: ${fmt(profile.cuisineLove)} | NEVER suggest: ${fmt(profile.cuisineDislike)} | Dietary: ${fmt(profile.dietary)}

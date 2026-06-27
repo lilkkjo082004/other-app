@@ -19,6 +19,7 @@ AI-only `../worker/` when you want a full backend.
 | POST   | `/push/unsubscribe` | ✓ | `{endpoint}` — remove a Web Push sub    |
 | DELETE | `/account`      | ✓    | Erase the user + all server data (ToS §10.1) |
 | POST   | `/ai`           | —    | `{model,system,messages}` → `{text}`      |
+| POST   | `/tts`          | —    | `{text,voiceIdx}` → `audio/mpeg` (ElevenLabs) |
 
 Auth is a Bearer token (`Authorization: Bearer <token>`) — a stateless
 HMAC-signed `uid.exp.sig`. Passwords are hashed with PBKDF2-SHA256.
@@ -62,7 +63,14 @@ npm run dev        # local Worker + local D1 (miniflare)
 ```
 
 Secrets (set with `wrangler secret put`): `AUTH_SECRET` (token signing),
-`ANTHROPIC_API_KEY` (enables `/ai`), `VAPID_PRIVATE` (enables push).
+`ANTHROPIC_API_KEY` (enables `/ai`), `VAPID_PRIVATE` (enables push),
+`ELEVENLABS_API_KEY` (enables `/tts` natural voices).
+
+`/tts` proxies ElevenLabs and streams `audio/mpeg` back, keeping the key
+server-side; it's a no-op (`503`) until `ELEVENLABS_API_KEY` is set. The web app
+uses it when `VITE_NATURAL_VOICE=1`, falling back to browser speech synthesis
+otherwise. Optional vars: `ELEVEN_VOICE_IDS` (per-companion voices) and
+`ELEVEN_MODEL`.
 
 Vars in `wrangler.toml` `[vars]`: `ALLOWED_ORIGIN` (lock CORS to your web
 origin), `VAPID_PUBLIC` + `VAPID_SUBJECT` (push), and optional

@@ -11,6 +11,7 @@ export default function ZodiacReveal({ profile, onContinue }) {
     { l: 'Western Zodiac', v: `${a.westernData.sym} ${cap(a.western)}`, s: `${a.westernData.el} · ${a.westernData.trait}` },
     { l: 'Chinese Zodiac', v: a.chinese, s: `${a.chineseElement} element` },
     { l: 'Life Path', v: `#${a.lifePath}`, s: 'Numerology' },
+    ...(a.vedic ? [{ l: 'Vedic (approx.)', v: `${a.vedic.rashiData.sym} ${cap(a.vedic.rashi)}`, s: `${a.vedic.nakshatra} nakshatra` }] : []),
   ];
   return (
     <Shell>

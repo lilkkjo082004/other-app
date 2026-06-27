@@ -27,6 +27,8 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const [panel, setPanel] = useState(null);            // null | 'settings' | { profile: id }
   const [ambient, setAmbient] = useState([]);          // ephemeral "while you were away" thread
   const [bonds, setBonds] = useState(restored?.bonds || {});
+  const [voiceCall, setVoiceCall] = useState(restored?.voiceCall !== false);   // call-by-name on by default
+  const [pushFreq, setPushFreq] = useState(restored?.pushFrequency || 'daily');
   const [unlock, setUnlock] = useState(null);          // { companion, onResult(ok) }
   const [summonCandidate, setSummonCandidate] = useState(null);
   const scrollRef = useRef(null);
@@ -74,9 +76,9 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); }, [msgs, loading]);
 
   useEffect(() => {
-    onPersist?.({ companions: comps, messages: msgs, chatMode, autoSpeak, trialStart, bonds });
+    onPersist?.({ companions: comps, messages: msgs, chatMode, autoSpeak, trialStart, bonds, voiceCall, pushFrequency: pushFreq });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [comps, msgs, chatMode, autoSpeak, bonds]);
+  }, [comps, msgs, chatMode, autoSpeak, bonds, voiceCall, pushFreq]);
 
   async function greet() {
     setLoading(true);
@@ -177,6 +179,8 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         profile={profile} comps={comps} autoSpeak={autoSpeak} trialStart={trialStart}
         cloud={cloud} authed={authed} email={email} onSignIn={onSignIn} onSignOut={onSignOut}
         onAutoSpeak={setAutoSpeak}
+        voiceCall={voiceCall} onVoiceCall={setVoiceCall}
+        pushFrequency={pushFreq} onPushFrequency={setPushFreq}
         onSleepAll={() => setComps((p) => p.map((c) => (c.status === 'awake' ? { ...c, status: 'sleeping' } : c)))}
         onWakeAll={() => setComps((p) => p.map((c) => (c.status === 'sleeping' ? { ...c, status: 'awake' } : c)))}
         onReset={onReset}
@@ -223,7 +227,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         </div>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
           <button onClick={() => setAutoSpeak(!autoSpeak)} style={{ background: autoSpeak ? `${C.glow3}22` : 'none', border: `1px solid ${autoSpeak ? C.glow3 : C.border}`, borderRadius: 7, padding: '5px 8px', color: autoSpeak ? C.glow3 : C.textDim, fontSize: 13, cursor: 'pointer' }}>{autoSpeak ? '🔊' : '🔇'}</button>
-          <button onClick={startListening} style={{ background: listening ? `${C.danger}22` : 'none', border: `1px solid ${listening ? C.danger : C.border}`, borderRadius: 7, padding: '5px 8px', color: listening ? C.danger : C.textDim, fontSize: 13, cursor: 'pointer', animation: listening ? 'micPulse 1.5s infinite' : 'none' }}>🎤</button>
+          {voiceCall && <button onClick={startListening} style={{ background: listening ? `${C.danger}22` : 'none', border: `1px solid ${listening ? C.danger : C.border}`, borderRadius: 7, padding: '5px 8px', color: listening ? C.danger : C.textDim, fontSize: 13, cursor: 'pointer', animation: listening ? 'micPulse 1.5s infinite' : 'none' }}>🎤</button>}
           <button onClick={() => setShowMenu(!showMenu)} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 16, cursor: 'pointer', padding: 4 }}>☰</button>
         </div>
       </div>

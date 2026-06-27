@@ -57,7 +57,7 @@ export async function handle(request, env) {
       const limited = await rateLimited(env, `auth:${clientIp(request)}`, numEnv(env.AUTH_RATE_LIMIT, 20), 60_000);
       if (limited) return limited;
     }
-    if (p === '/ai' && request.method === 'POST') {
+    if ((p === '/ai' || p === '/tts') && request.method === 'POST') {
       const limited = await rateLimited(env, `ai:${clientIp(request)}`, numEnv(env.AI_RATE_LIMIT, 30), 60_000);
       if (limited) return limited;
     }
@@ -66,6 +66,7 @@ export async function handle(request, env) {
     if (p === '/auth/signup' && request.method === 'POST') return signup(request, env);
     if (p === '/auth/login' && request.method === 'POST') return login(request, env);
     if (p === '/ai' && request.method === 'POST') return ai(request, env);
+    if (p === '/tts' && request.method === 'POST') return tts(request, env);
 
     if (p === '/state') {
       const uid = await authUid(request, env);
@@ -129,6 +130,32 @@ export async function handle(request, env) {
   } catch (e) {
     return json({ error: 'server error', detail: String(e) }, 500, env);
   }
+}
+
+// Text-to-speech proxy — natural companion voices via ElevenLabs. Keeps the
+// API key server-side; streams audio/mpeg back. No-op (503) until configured.
+async function tts(request, env) {
+  if (!env.ELEVENLABS_API_KEY) return json({ error: 'tts not configured' }, 503, env);
+  const b = await body(request);
+  const text = (b?.text || '').toString().slice(0, 800);
+  if (!text.trim()) return json({ error: 'text required' }, 400, env);
+  const voices = (env.ELEVEN_VOICE_IDS || '').split(',').map((s) => s.trim()).filter(Boolean);
+  const voiceId = voices.length ? voices[(Number(b.voiceIdx) || 0) % voices.length] : '21m00Tcm4TlvDq8ikWAM';
+  let up;
+  try {
+    up = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+      method: 'POST',
+      headers: { 'xi-api-key': env.ELEVENLABS_API_KEY, 'content-type': 'application/json', accept: 'audio/mpeg' },
+      body: JSON.stringify({ text, model_id: env.ELEVEN_MODEL || 'eleven_turbo_v2_5' }),
+    });
+  } catch (e) {
+    return json({ error: 'tts upstream failed', detail: String(e) }, 502, env);
+  }
+  if (!up.ok) {
+    const d = await up.text().catch(() => '');
+    return json({ error: 'tts error', status: up.status, detail: d.slice(0, 200) }, up.status || 502, env);
+  }
+  return new Response(up.body, { status: 200, headers: { 'content-type': 'audio/mpeg', ...cors(env) } });
 }
 
 async function signup(request, env) {

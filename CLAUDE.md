@@ -34,7 +34,7 @@ src/
 ├── main.jsx                 # React entry
 ├── App.jsx                  # screen router + resume-from-storage + reset
 ├── theme.js                 # design tokens (C), COMP_COLORS, global CSS
-├── config.js                # VITE_AI_PROXY / VITE_AI_MODEL / VITE_API_BASE / VITE_VAPID_PUBLIC
+├── config.js                # VITE_AI_PROXY / VITE_AI_MODEL / VITE_API_BASE / VITE_VAPID_PUBLIC / VITE_NATURAL_VOICE
 ├── components/ui.jsx        # Shell (cosmic bg), Prog, Pills, Checks
 ├── data/onboarding.js       # STEPS, ACTIVITIES, CUISINES, DIETARY, builder cats
 ├── data/legal.js            # in-app Terms of Service + Privacy Policy (markdown)
@@ -94,7 +94,7 @@ Wire up real AI by deploying `worker/` (see `worker/README.md`) and creating a
 
 ### Built
 - Full 17-step onboarding (multi-select, back nav, pre-populated answers)
-- Multi-system astrology (Western, Chinese + element, numerology) + compatibility
+- Multi-system astrology (Western, Chinese + element, numerology, approximate Vedic rashi + nakshatra) + compatibility
 - Surprise Me / Guide Me companion generation with optional free text
 - Companion "waking up" sequence; selection (1 free, all 3 = trial copy)
 - Group + private chat; ambient conversations; sleep / delete with reactions
@@ -114,6 +114,7 @@ Wire up real AI by deploying `worker/` (see `worker/README.md`) and creating a
 - Age verification (ToS §1, `lib/age.js`): the onboarding DOB drives a real gate — under-13 is blocked, 13–17 is locked to friendship-only, 18+ requires explicit confirmation. The age group is derived from and locked to the DOB (a false "18+" claim can't outrank an under-18 birth date), persisted as `ageVerified`, and re-checked on resume/sync. Mature themes are gated to verified adults on the web build only (`matureContentAllowed`), feeding the system prompt.
 - Cosmetic customization (ToS §4.1 free tier): an 8-color cosmic palette in `theme.js`; the companion profile's "Appearance" picker recolors a companion live (avatar, chat, badge) and persists it.
 - Companion relationship storylines (ToS §4.1, `lib/relationships.js`): bonds between companion pairs grow as they share ambient moments (persisted in the session as `bonds`); ambient conversations are generated from the pair's personalities + bond stage (just met → close), shown on each open and surfaced on the profile's "Relationships" card.
+- Polish: approximate Vedic astrology (`getVedic` in `lib/zodiac.js`, surfaced on the reveal + system prompt); a "Call by name" toggle and a push-frequency selector (daily/few/off, honored by the cron via the synced session) in Settings; optional natural (ElevenLabs) voices via the backend `/tts` proxy (`VITE_NATURAL_VOICE`), with browser-TTS fallback.
 
 ### Needs Building (web)
 - Privacy Policy + Disclaimer source documents (drop the markdown into `data/legal.js`; the Terms reference both)

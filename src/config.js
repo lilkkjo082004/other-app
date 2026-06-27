@@ -17,3 +17,10 @@ export const cloudEnabled = () => API_BASE.length > 0;
 // standalone AI proxy.
 export const aiEndpoint = () => (API_BASE ? API_BASE + '/ai' : AI_PROXY);
 export const aiEnabled = () => aiEndpoint().length > 0;
+
+// Natural (AI) companion voices via the backend's /tts proxy (ElevenLabs).
+// Opt-in with VITE_NATURAL_VOICE=1; requires the backend. Falls back to the
+// browser's speech synthesis whenever it's off or the request fails.
+const NATURAL_VOICE = ['1', 'true', 'yes'].includes((import.meta.env.VITE_NATURAL_VOICE || '').toLowerCase());
+export const ttsEndpoint = () => (API_BASE ? API_BASE + '/tts' : '');
+export const naturalVoiceEnabled = () => NATURAL_VOICE && ttsEndpoint().length > 0;

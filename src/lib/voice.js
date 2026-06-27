@@ -1,4 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
+import { naturalVoiceEnabled, ttsEndpoint } from '../config.js';
+import { authHeader } from './api.js';
 
 const VOICE_PROFILES = [
   { pitch: 1.0, rate: 0.95, voiceIdx: 0 },
@@ -10,7 +12,7 @@ function getVoices() {
   return window.speechSynthesis?.getVoices() || [];
 }
 
-export function speakAs(text, profileIdx) {
+function speakBrowser(text, profileIdx) {
   if (!window.speechSynthesis) return;
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
@@ -21,6 +23,34 @@ export function speakAs(text, profileIdx) {
   u.pitch = p.pitch;
   u.rate = p.rate;
   window.speechSynthesis.speak(u);
+}
+
+let currentAudio = null;
+async function speakNatural(text, profileIdx) {
+  const res = await fetch(ttsEndpoint(), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...authHeader() },
+    body: JSON.stringify({ text, voiceIdx: profileIdx }),
+  });
+  if (!res.ok) throw new Error(`tts ${res.status}`);
+  const buf = await res.arrayBuffer();
+  if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+  const url = URL.createObjectURL(new Blob([buf], { type: 'audio/mpeg' }));
+  const audio = new Audio(url);
+  audio.onended = () => URL.revokeObjectURL(url);
+  currentAudio = audio;
+  await audio.play();
+}
+
+// Speak a message. Uses natural (AI) voices when configured; always falls back
+// to the browser's speech synthesis if that's off or fails.
+export function speakAs(text, profileIdx = 0) {
+  if (naturalVoiceEnabled()) {
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    speakNatural(text, profileIdx).catch(() => speakBrowser(text, profileIdx));
+    return;
+  }
+  speakBrowser(text, profileIdx);
 }
 
 try {

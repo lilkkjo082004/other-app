@@ -33,6 +33,30 @@ export const COMPAT = {
 const CNA = ['Rat', 'Ox', 'Tiger', 'Rabbit', 'Dragon', 'Snake', 'Horse', 'Goat', 'Monkey', 'Rooster', 'Dog', 'Pig'];
 const CNE = ['Wood', 'Fire', 'Earth', 'Metal', 'Water'];
 
+// Vedic / sidereal: the 12 rashis (sign keys, Aries-first) and 27 nakshatras.
+const SIGN_KEYS = ['aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo', 'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces'];
+const NAKSHATRAS = [
+  'Ashwini', 'Bharani', 'Krittika', 'Rohini', 'Mrigashira', 'Ardra', 'Punarvasu', 'Pushya', 'Ashlesha',
+  'Magha', 'Purva Phalguni', 'Uttara Phalguni', 'Hasta', 'Chitra', 'Swati', 'Vishakha', 'Anuradha', 'Jyeshtha',
+  'Mula', 'Purva Ashadha', 'Uttara Ashadha', 'Shravana', 'Dhanishta', 'Shatabhisha', 'Purva Bhadrapada', 'Uttara Bhadrapada', 'Revati',
+];
+const SIDEREAL_MONTH = 27.321661; // days for one sidereal lunar orbit
+
+// Approximate Vedic moon sign (rashi) + nakshatra from the date alone. A precise
+// reading needs birth time and place; this is a deterministic mean-moon estimate
+// for flavor, surfaced as "approximate" in the UI.
+export function getVedic(dob) {
+  const t = Date.parse(dob + 'T12:00:00Z');
+  if (Number.isNaN(t)) return null;
+  const days = (t - Date.parse('2000-01-01T12:00:00Z')) / 86400000;
+  // Mean sidereal moon longitude (epoch offset chosen so 2000-01-01 ≈ 211.7°).
+  let lon = (211.7 + (days / SIDEREAL_MONTH) * 360) % 360;
+  if (lon < 0) lon += 360;
+  const rashi = SIGN_KEYS[Math.floor(lon / 30) % 12];
+  const nakshatra = NAKSHATRAS[Math.floor(lon / (360 / 27)) % 27];
+  return { rashi, rashiData: ZODIAC[rashi], nakshatra, approximate: true };
+}
+
 export function getWZ(m, d) {
   if ((m === 3 && d >= 21) || (m === 4 && d <= 19)) return 'aries';
   if ((m === 4 && d >= 20) || (m === 5 && d <= 20)) return 'taurus';
@@ -65,6 +89,7 @@ export function getUserAstro(dob) {
     chineseElement: CNE[Math.floor(((y - 4) % 10) / 2)],
     lifePath,
     compatible: COMPAT[w],
+    vedic: getVedic(dob),
   };
 }
 
