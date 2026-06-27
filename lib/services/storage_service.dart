@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_profile.dart';
 import '../models/companion.dart';
 import '../models/chat_message.dart';
+import '../utils/entitlements.dart';
 
 /// A full snapshot of a user's session — everything needed to resume the app
 /// exactly where they left off.
@@ -27,21 +28,9 @@ class SessionData {
 
   /// Days remaining in the 14-day trial. Null if no trial is active.
   /// Negative/zero values mean the trial has ended.
-  int? get trialDaysLeft {
-    if (trialStart == null) return null;
-    final elapsed = DateTime.now().difference(trialStart!).inDays;
-    return 14 - elapsed;
-  }
-
-  bool get trialActive {
-    final left = trialDaysLeft;
-    return left != null && left > 0;
-  }
-
-  bool get trialExpired {
-    final left = trialDaysLeft;
-    return left != null && left <= 0;
-  }
+  int? get trialDaysLeft => Entitlements.trialDaysLeft(trialStart);
+  bool get trialActive => Entitlements.trialActive(trialStart);
+  bool get trialExpired => Entitlements.trialExpired(trialStart);
 }
 
 /// Local-first persistence backed by [SharedPreferences]. The entire session is

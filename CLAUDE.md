@@ -75,6 +75,8 @@ lib/
 - **Settings screen** — voice toggles (auto-speak, call-by-name), sleep/wake all, trial status, full reset
 - **Companion profile screens** — identity, zodiac, trait seeds, status, ownership, manage actions (private/sleep/delete)
 - **Trial timer + ownership** — first companion is free forever; extras run a 14-day trial tracked from selection
+- **Trial degradation** — when the trial lapses, unpurchased companions become "memory limited" (still present, dimmed in the header, flagged in menu/profile, with a banner) until unlocked
+- **Purchase / unlock flow** — simulated one-time unlock (`PurchaseService` + unlock bottom sheet) that permanently restores a companion; clean seam to swap in Play Billing / RevenueCat / Stripe
 
 ### Needs Building
 - Backend proxy server for real Claude API calls
@@ -82,11 +84,21 @@ lib/
 - Long-term mood pattern tracking across sessions
 - Companion-initiated private chats
 - Push notifications
-- Trial degradation (limit unpurchased companions' adaptation once the trial ends)
-- Freemium purchase flow (payment integration) + replacing/adding companions
+- Real payment integration (replace the simulated `PurchaseService`)
+- Summon/add a new companion (generate + waking-up into an existing roster) and deletion-replacement
 - Subscription management for memory tier
 - Privacy policy and Terms of Service
 - Google Play Store listing and submission
+
+## Monetization / Entitlements
+
+`lib/utils/entitlements.dart` is the single source of truth for trial + ownership rules
+(`trialDaysLeft`, `trialExpired`, `isLimited`). `Companion.purchased` marks ownership;
+the first chosen companion is free, extras are trial-gated from `SessionData.trialStart`.
+`lib/services/purchase_service.dart` is a SIMULATED one-time purchase — replace the body
+of `unlockCompanion` with a real store SDK; the app only depends on the returned
+`PurchaseResult`. Behavioral degradation is currently surfaced visually (limited badge +
+unlock CTA); deeper memory/adaptation limits land with the real memory system.
 
 ## Persistence Architecture
 

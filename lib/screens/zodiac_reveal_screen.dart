@@ -9,7 +9,9 @@ import '../models/chat_message.dart';
 import '../services/companion_ai_service.dart';
 import '../services/voice_service.dart';
 import '../services/storage_service.dart';
+import '../utils/entitlements.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/unlock_sheet.dart';
 import 'settings_screen.dart';
 import 'companion_profile_screen.dart';
 
@@ -526,6 +528,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   List<Companion> get _active => _comps.where((c) => c.status == CompanionStatus.awake).toList();
   Companion? get _priv => _chatMode != 'group' ? _comps.firstWhere((c) => c.id == _chatMode, orElse: () => _comps.first) : null;
+  List<Companion> get _limited => _comps
+      .where((c) => c.status != CompanionStatus.deleted && Entitlements.isLimited(c, _trialStart))
+      .toList();
 
   @override
   void initState() {
@@ -688,8 +693,31 @@ class _ChatScreenState extends State<ChatScreen> {
         },
         onSleepToggle: () => _toggleSleep(c.id),
         onDelete: () => _deleteComp(c.id),
+        onUnlock: () => _unlock(c),
       ),
     ));
+  }
+
+  void _unlock(Companion c) {
+    setState(() {
+      c.purchased = true;
+      _showMenu = false;
+      final others = _active.where((o) => o.id != c.id).toList();
+      if (others.isNotEmpty) {
+        _msgs.add(ChatMessage(
+          role: 'assistant',
+          companion: others.first,
+          content: '${c.name} is staying for good. Honestly? Wouldn\'t be the same without ${c.pronouns.split("/").last}.',
+        ));
+      }
+    });
+    _save();
+  }
+
+  Future<void> _unlockFromChat(Companion c) async {
+    setState(() => _showMenu = false);
+    final ok = await showUnlockSheet(context, c);
+    if (ok && mounted) _unlock(c);
   }
 
   void _handleVoiceResult(String transcript) {
@@ -738,12 +766,15 @@ class _ChatScreenState extends State<ChatScreen> {
                       child: Stack(
                         children: _active.asMap().entries.map((e) => Positioned(
                           left: e.key * 12.0,
-                          child: Container(
-                            width: 26, height: 26,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: RadialGradient(colors: [e.value.color.primary, e.value.color.primary.withOpacity(0.4)]),
-                              border: Border.all(color: AppColors.bg, width: 2),
+                          child: Opacity(
+                            opacity: Entitlements.isLimited(e.value, _trialStart) ? 0.4 : 1.0,
+                            child: Container(
+                              width: 26, height: 26,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: RadialGradient(colors: [e.value.color.primary, e.value.color.primary.withOpacity(0.4)]),
+                                border: Border.all(color: AppColors.bg, width: 2),
+                              ),
                             ),
                           ),
                         )).toList(),
@@ -803,6 +834,32 @@ class _ChatScreenState extends State<ChatScreen> {
                 ],
               ),
             ),
+
+            // Trial-ended / memory-limited banner
+            if (_limited.isNotEmpty)
+              GestureDetector(
+                onTap: () => _unlockFromChat(_limited.first),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  color: AppColors.glow2.withOpacity(0.08),
+                  child: Row(
+                    children: [
+                      const Text('✦', style: TextStyle(fontSize: 12)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _limited.length == 1
+                              ? '${_limited.first.name}\'s memory is limited since the trial ended.'
+                              : '${_limited.length} companions have limited memory since the trial ended.',
+                          style: const TextStyle(fontSize: 11, color: AppColors.textSoft),
+                        ),
+                      ),
+                      const Text('Unlock', style: TextStyle(fontSize: 11, color: AppColors.glow2, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                ),
+              ),
 
             // Listening indicator
             if (_voice.isListening)
@@ -941,6 +998,8 @@ class _ChatScreenState extends State<ChatScreen> {
                                       runSpacing: 4,
                                       children: [
                                         _menuBtn('Profile', () => _openProfile(c)),
+                                        if (!c.purchased && _trialStart != null)
+                                          _menuBtn('Unlock', () => _unlockFromChat(c), accent: true),
                                         if (c.status == CompanionStatus.awake)
                                           _menuBtn('Private', () { setState(() { _chatMode = c.id; _showMenu = false; }); _save(); }),
                                         _menuBtn(c.status == CompanionStatus.sleeping ? 'Wake' : 'Sleep', () => _toggleSleep(c.id)),
@@ -1023,16 +1082,22 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _menuBtn(String text, VoidCallback onTap, {bool danger = false}) {
+  Widget _menuBtn(String text, VoidCallback onTap, {bool danger = false, bool accent = false}) {
+    final color = danger
+        ? AppColors.danger
+        : accent
+            ? AppColors.glow2
+            : AppColors.textSoft;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
         decoration: BoxDecoration(
-          border: Border.all(color: danger ? AppColors.danger.withOpacity(0.3) : AppColors.border),
+          color: accent ? AppColors.glow2.withOpacity(0.1) : null,
+          border: Border.all(color: danger ? AppColors.danger.withOpacity(0.3) : accent ? AppColors.glow2.withOpacity(0.5) : AppColors.border),
           borderRadius: BorderRadius.circular(5),
         ),
-        child: Text(text, style: TextStyle(fontSize: 9, color: danger ? AppColors.danger : AppColors.textSoft)),
+        child: Text(text, style: TextStyle(fontSize: 9, color: color, fontWeight: accent ? FontWeight.w700 : FontWeight.w400)),
       ),
     );
   }

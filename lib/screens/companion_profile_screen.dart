@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/companion.dart';
+import '../utils/entitlements.dart';
 import '../utils/theme.dart';
+import '../widgets/unlock_sheet.dart';
 
 /// Full profile for a single companion — identity, zodiac, trait seeds, status,
 /// and management actions (private chat, sleep/wake, delete).
@@ -11,6 +13,7 @@ class CompanionProfileScreen extends StatelessWidget {
   final VoidCallback onPrivateChat;
   final VoidCallback onSleepToggle;
   final VoidCallback onDelete;
+  final VoidCallback onUnlock;
 
   const CompanionProfileScreen({
     super.key,
@@ -19,14 +22,23 @@ class CompanionProfileScreen extends StatelessWidget {
     required this.onPrivateChat,
     required this.onSleepToggle,
     required this.onDelete,
+    required this.onUnlock,
   });
 
   String _ownershipLabel() {
     if (companion.purchased) return 'Yours · free companion';
     if (trialStart == null) return 'Trial companion';
-    final left = 14 - DateTime.now().difference(trialStart!).inDays;
+    final left = Entitlements.trialDaysLeft(trialStart) ?? 0;
     if (left > 0) return 'Trial · $left ${left == 1 ? 'day' : 'days'} left';
     return 'Trial ended · memory limited';
+  }
+
+  Future<void> _unlock(BuildContext context) async {
+    final ok = await showUnlockSheet(context, companion);
+    if (ok && context.mounted) {
+      onUnlock();
+      Navigator.of(context).pop();
+    }
   }
 
   @override
@@ -102,6 +114,14 @@ class CompanionProfileScreen extends StatelessWidget {
               const SizedBox(height: 24),
 
               if (c.status != CompanionStatus.deleted) ...[
+                if (!c.purchased && trialStart != null) ...[
+                  _actionButton(
+                    'Unlock ${c.name} · ${Entitlements.companionPrice}',
+                    AppColors.glow1,
+                    () => _unlock(context),
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 if (c.status == CompanionStatus.awake)
                   _actionButton(
                     'Open private chat',
@@ -110,6 +130,7 @@ class CompanionProfileScreen extends StatelessWidget {
                       onPrivateChat();
                       Navigator.of(context).pop();
                     },
+                    outlined: !c.purchased && trialStart != null,
                   ),
                 const SizedBox(height: 8),
                 _actionButton(
