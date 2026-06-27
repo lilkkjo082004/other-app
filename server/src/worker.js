@@ -17,6 +17,8 @@ export default {
       SECRET: env.AUTH_SECRET || 'dev-insecure-secret-change-me',
       ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY,
       ALLOWED_ORIGIN: env.ALLOWED_ORIGIN,
+      AI_RATE_LIMIT: env.AI_RATE_LIMIT,
+      AUTH_RATE_LIMIT: env.AUTH_RATE_LIMIT,
     });
   },
 

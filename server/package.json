@@ -4,6 +4,11 @@
   "type": "module",
   "description": "Other — backend API (Cloudflare Worker + D1)",
   "scripts": {
-    "test": "node test/run.mjs"
+    "test": "node test/run.mjs",
+    "dev": "wrangler dev",
+    "migrate:local": "wrangler d1 execute other --local --file=./schema.sql",
+    "migrate": "wrangler d1 execute other --remote --file=./schema.sql",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
   }
 }

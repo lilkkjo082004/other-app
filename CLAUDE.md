@@ -117,7 +117,7 @@ Wire up real AI by deploying `worker/` (see `worker/README.md`) and creating a
 - Privacy Policy + Disclaimer source documents (drop the markdown into `data/legal.js`; the Terms reference both)
 - Real payment integration (replace `lib/purchase.js`) — on hold
 - Store packaging (native wrapper for Google Play); set `window.__OTHER_NATIVE__` in that build so mature content stays web-only
-- Deployment/ops: provision the backend (D1, secrets, VAPID, cron) and add rate limiting on `/ai`
+- Provisioning (needs the owner's Cloudflare account): run `server/deploy.sh` to create D1, apply the schema, set secrets (AUTH_SECRET, ANTHROPIC_API_KEY, VAPID_PRIVATE), and deploy. Rate limiting on `/ai` + auth is built in (`rate_limits` table, `AI_RATE_LIMIT`/`AUTH_RATE_LIMIT` vars).
 
 ## Business Entity
 

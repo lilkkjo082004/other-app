@@ -104,6 +104,20 @@ r = await call('GET', '/state', { token: delTok });
 ok(r.status === 200 && r.data.state === null, 'deleted account has no server state');
 ok((await env.store.listPushSubs()).every((s) => s.endpoint !== 'https://push.example/del'), 'push subs purged on deletion');
 
+console.log('rate limiting');
+const rlEnv = { store: memoryStore(), SECRET: 'test-secret', ALLOWED_ORIGIN: '*', AUTH_RATE_LIMIT: '2' };
+const hit = (ip) => handle(new Request('http://api/auth/login', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json', 'cf-connecting-ip': ip },
+  body: JSON.stringify({ email: 'nobody@other.app', password: 'whatever' }),
+}), rlEnv);
+const a1 = await hit('9.9.9.9'); const a2 = await hit('9.9.9.9'); const a3 = await hit('9.9.9.9');
+ok(a1.status === 401 && a2.status === 401, 'first two attempts pass through (limit 2)');
+ok(a3.status === 429, 'third attempt is rate limited');
+ok(!!a3.headers.get('retry-after'), 'rate-limit response sets retry-after');
+const b1 = await hit('1.1.1.1');
+ok(b1.status === 401, 'a different IP has its own bucket');
+
 r = await call('GET', '/state', { token: 'garbage.token.here' });
 ok(r.status === 401, 'rejects tampered token');
 

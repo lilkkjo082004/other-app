@@ -52,5 +52,23 @@ export function d1Store(DB) {
         DB.prepare('DELETE FROM users WHERE id = ?').bind(uid),
       ]);
     },
+    // Atomic fixed-window counter (upsert resets the window when it has elapsed).
+    async rateLimit(key, limit, windowMs) {
+      const now = Date.now();
+      const row = await DB.prepare(
+        `INSERT INTO rate_limits (key, count, window_start) VALUES (?1, 1, ?2)
+         ON CONFLICT(key) DO UPDATE SET
+           count = CASE WHEN rate_limits.window_start <= ?2 - ?3 THEN 1 ELSE rate_limits.count + 1 END,
+           window_start = CASE WHEN rate_limits.window_start <= ?2 - ?3 THEN ?2 ELSE rate_limits.window_start END
+         RETURNING count, window_start`
+      ).bind(key, now, windowMs).first();
+      const count = row?.count ?? 1;
+      const windowStart = row?.window_start ?? now;
+      return {
+        allowed: count <= limit,
+        remaining: Math.max(0, limit - count),
+        retryAfter: Math.max(1, Math.ceil((windowStart + windowMs - now) / 1000)),
+      };
+    },
   };
 }

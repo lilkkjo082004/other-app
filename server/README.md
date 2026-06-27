@@ -44,23 +44,39 @@ app's `.env` as `VITE_VAPID_PUBLIC`.
 
 ## Deploy
 
+Turnkey path — from `server/`, with `wrangler` logged in (`npx wrangler login`):
+
 ```bash
-cd server
-npm install -g wrangler            # if needed
-wrangler login
-
-wrangler d1 create other           # paste the printed database_id into wrangler.toml
-wrangler d1 execute other --remote --file=./schema.sql
-
-wrangler secret put AUTH_SECRET        # a long random string
-wrangler secret put ANTHROPIC_API_KEY  # sk-ant-... (enables /ai)
-wrangler secret put VAPID_PRIVATE      # optional — enables push check-ins
-
-wrangler deploy                    # prints https://other-api.<you>.workers.dev
+./deploy.sh    # creates D1, applies schema, prompts for secrets, deploys
 ```
 
-Set `ALLOWED_ORIGIN` in `wrangler.toml` to your web app's origin for production
-CORS, then redeploy.
+It's idempotent and re-runnable; the only manual step is pasting the printed
+D1 `database_id` into `wrangler.toml` the first time (the script stops and tells
+you). Or run the steps yourself via the npm scripts:
+
+```bash
+npm run migrate    # wrangler d1 execute other --remote --file=./schema.sql
+npm run deploy     # wrangler deploy
+npm run tail       # stream live logs
+npm run dev        # local Worker + local D1 (miniflare)
+```
+
+Secrets (set with `wrangler secret put`): `AUTH_SECRET` (token signing),
+`ANTHROPIC_API_KEY` (enables `/ai`), `VAPID_PRIVATE` (enables push).
+
+Vars in `wrangler.toml` `[vars]`: `ALLOWED_ORIGIN` (lock CORS to your web
+origin), `VAPID_PUBLIC` + `VAPID_SUBJECT` (push), and optional
+`AI_RATE_LIMIT` / `AUTH_RATE_LIMIT`.
+
+## Rate limiting
+
+`/ai` and the auth endpoints are throttled per client IP (Cloudflare's
+`CF-Connecting-IP`) using a fixed-window counter stored in D1 (`rate_limits`
+table) — over-limit requests get `429` with a `Retry-After` header. Defaults are
+**30/min** for `/ai` (cost control) and **20/min** for `/auth/*` (brute-force
+protection); override with the `AI_RATE_LIMIT` / `AUTH_RATE_LIMIT` vars. The
+limiter is part of the `Store` interface, so it runs in the in-memory test
+harness too.
 
 ## Point the app at it
 

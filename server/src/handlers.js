@@ -25,12 +25,43 @@ async function authUid(request, env) {
 }
 const emailOk = (e) => typeof e === 'string' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
 
+function clientIp(request) {
+  return request.headers.get('cf-connecting-ip')
+    || (request.headers.get('x-forwarded-for') || '').split(',')[0].trim()
+    || 'unknown';
+}
+const numEnv = (v, d) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : d; };
+
+// Returns a 429 Response when the key is over its limit, else null. No-op if the
+// store doesn't implement rateLimit (older stores) or the limit is disabled.
+async function rateLimited(env, key, limit, windowMs) {
+  if (!env.store.rateLimit || !(limit > 0)) return null;
+  const r = await env.store.rateLimit(key, limit, windowMs);
+  if (r && r.allowed === false) {
+    return new Response(JSON.stringify({ error: 'too many requests' }), {
+      status: 429,
+      headers: { 'content-type': 'application/json', 'retry-after': String(r.retryAfter || 60), ...cors(env) },
+    });
+  }
+  return null;
+}
+
 export async function handle(request, env) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(env) });
   const url = new URL(request.url);
   const p = url.pathname.replace(/\/+$/, '') || '/';
 
   try {
+    // Abuse protection: throttle auth (brute force) and AI (cost) by client IP.
+    if ((p === '/auth/signup' || p === '/auth/login') && request.method === 'POST') {
+      const limited = await rateLimited(env, `auth:${clientIp(request)}`, numEnv(env.AUTH_RATE_LIMIT, 20), 60_000);
+      if (limited) return limited;
+    }
+    if (p === '/ai' && request.method === 'POST') {
+      const limited = await rateLimited(env, `ai:${clientIp(request)}`, numEnv(env.AI_RATE_LIMIT, 30), 60_000);
+      if (limited) return limited;
+    }
+
     if (p === '/' || p === '/health') return json({ ok: true, service: 'other-api' }, 200, env);
     if (p === '/auth/signup' && request.method === 'POST') return signup(request, env);
     if (p === '/auth/login' && request.method === 'POST') return login(request, env);

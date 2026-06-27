@@ -16,6 +16,9 @@ database_id = "REPLACE_WITH_D1_DATABASE_ID"
 # expose; it must match VITE_VAPID_PUBLIC in the web app's .env):
 #   VAPID_PUBLIC  = "B..."
 #   VAPID_SUBJECT = "mailto:you@example.com"
+# Rate limits (requests per minute per client IP). Defaults: AI 30, auth 20.
+#   AI_RATE_LIMIT   = "30"
+#   AUTH_RATE_LIMIT = "20"
 
 # Secrets (do NOT put these here) — set with wrangler:
 #   wrangler secret put AUTH_SECRET        # long random string for signing tokens
