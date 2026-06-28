@@ -45,6 +45,25 @@ export async function enablePush() {
   return true;
 }
 
+// Fire a notification directly from the page via the service worker — no push
+// network involved. Isolates "can this browser/OS display a notification at
+// all" from "did the push get delivered." Returns true if it was dispatched.
+export async function localNotify() {
+  if (!pushSupported()) return false;
+  if (Notification.permission !== 'granted') return false;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    await reg.showNotification('Other', {
+      body: 'Local test ✦ shown directly by your browser',
+      icon: './icon-192.png',
+      badge: './icon-192.png',
+      tag: 'other-local-test',
+      data: { url: './' },
+    });
+    return true;
+  } catch (e) { return false; }
+}
+
 // Self-diagnostic: ask the server how many subscriptions it holds for this
 // account, then fire a real test push. Returns a plain-language verdict so the
 // user can confirm check-ins work (and pinpoint the break) without DevTools.

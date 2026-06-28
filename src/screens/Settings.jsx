@@ -3,7 +3,7 @@ import { C } from '../theme.js';
 import { Shell } from '../components/ui.jsx';
 import { cap } from '../lib/zodiac.js';
 import { trialDaysLeft } from '../lib/entitlements.js';
-import { pushConfigured, pushSupported, isSubscribed, enablePush, disablePush, testPush } from '../lib/push.js';
+import { pushConfigured, pushSupported, isSubscribed, enablePush, disablePush, testPush, localNotify } from '../lib/push.js';
 import { locationSupported, locationEnabled, locationLabel, requestLocation, setLabel, clearLocation } from '../lib/location.js';
 import { deleteAccount } from '../lib/api.js';
 import { loadSession, saveSession } from '../lib/storage.js';
@@ -36,8 +36,12 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
   async function runPushTest() {
     if (testBusy) return;
     setPushTest(null); setTestBusy(true);
-    try { setPushTest(await testPush()); }
-    catch (e) { setPushTest({ ok: false, message: String(e.message || e) }); }
+    let local = false;
+    try { local = await localNotify(); } catch (e) { /* ignore */ }
+    let result;
+    try { result = await testPush(); }
+    catch (e) { result = { ok: false, message: String(e.message || e) }; }
+    setPushTest({ ...result, local });
     setTestBusy(false);
   }
 
@@ -185,8 +189,20 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
                   {testBusy ? 'Sending…' : 'Send a test notification'}
                 </button>
                 {pushTest && (
-                  <div style={{ fontSize: 12, lineHeight: 1.5, marginTop: 10, color: pushTest.ok ? C.glow1 : C.danger }}>
-                    {pushTest.ok ? '✓ ' : '⚠ '}{pushTest.message}
+                  <div style={{ fontSize: 12, lineHeight: 1.5, marginTop: 10 }}>
+                    <div style={{ color: pushTest.ok ? C.glow1 : C.danger }}>
+                      {pushTest.ok ? '✓ ' : '⚠ '}{pushTest.message}
+                    </div>
+                    {pushTest.ok && pushTest.local && (
+                      <div style={{ color: C.textDim, marginTop: 6 }}>
+                        Two test notifications were sent — one shown directly by this browser, one through the server. How many actually appeared on your screen?
+                      </div>
+                    )}
+                    {pushTest.ok && !pushTest.local && (
+                      <div style={{ color: C.textDim, marginTop: 6 }}>
+                        (Couldn’t show a direct browser test — notification permission may be off for this site.)
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
