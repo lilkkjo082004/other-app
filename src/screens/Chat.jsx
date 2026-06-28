@@ -3,7 +3,7 @@ import { C, COMP_COLORS } from '../theme.js';
 import { Shell } from '../components/ui.jsx';
 import { speakAs, useSpeechRec } from '../lib/voice.js';
 import { genAmbient, bumpBond } from '../lib/relationships.js';
-import { askCompanion, greetCompanion, proactiveCompanion } from '../lib/ai.js';
+import { askCompanion, greetCompanion, proactiveCompanion, ambientThreadAI } from '../lib/ai.js';
 import { isLimited } from '../lib/entitlements.js';
 import { genComp } from '../lib/companions.js';
 import { pickSigns } from '../lib/zodiac.js';
@@ -63,13 +63,18 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
 
   useEffect(() => {
     (async () => {
-      // Companions catching up with each other while you were away — regenerated
-      // each open (ephemeral, not persisted) and nudges their bond forward.
-      const res = genAmbient(comps, bonds);
-      if (res) {
-        setAmbient(res.thread.map((m) => ({ role: 'assistant', companion: m.from, content: m.text, isAmbient: true })));
-        setBonds((b) => bumpBond(b, res.pair[0], res.pair[1]));
-      }
+      // Companions catching up with each other while you were away — generated
+      // by Claude when AI is on (falls back to templates), ephemeral, and nudges
+      // their bond. Runs without blocking the greeting/disclosure below.
+      (async () => {
+        let res = null;
+        try { res = await ambientThreadAI(comps, profile, bonds); } catch (e) { /* fall back */ }
+        if (!res) res = genAmbient(comps, bonds);
+        if (res) {
+          setAmbient(res.thread.map((m) => ({ role: 'assistant', companion: m.from, content: m.text, isAmbient: true })));
+          setBonds((b) => bumpBond(b, res.pair[0], res.pair[1]));
+        }
+      })();
       // AI disclosure is shown up front, then repeats hourly (see below).
       const disc = { role: 'system', kind: 'disclosure', content: DISCLOSURE_TEXT };
       if (restored) {

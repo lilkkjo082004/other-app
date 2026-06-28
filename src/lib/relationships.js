@@ -89,14 +89,21 @@ const TEMPLATES = {
 
 const adj = (comp) => ((comp.personality || '').split(/[,\s]+/)[0] || 'curious').toLowerCase();
 
-// Generate one ambient thread between two awake companions, weighted by their
-// bond stage. Returns { thread:[{from,text}], pair:[idA,idB] } or null.
-export function genAmbient(comps, bonds = {}) {
+// Pick two awake companions + their current bond stage (shared by the template
+// and AI ambient generators). Returns { a, b, stage } or null.
+export function pickAmbientPair(comps, bonds = {}) {
   const awake = comps.filter((c) => c.status === 'awake');
   if (awake.length < 2) return null;
-  const shuffled = [...awake].sort(() => Math.random() - 0.5);
-  const [a, b] = shuffled;
-  const stage = bondStage(bondLevel(bonds, a.id, b.id));
+  const [a, b] = [...awake].sort(() => Math.random() - 0.5);
+  return { a, b, stage: bondStage(bondLevel(bonds, a.id, b.id)) };
+}
+
+// Template ambient thread (offline fallback), weighted by bond stage.
+// Returns { thread:[{from,text}], pair:[idA,idB] } or null.
+export function genAmbient(comps, bonds = {}) {
+  const pick = pickAmbientPair(comps, bonds);
+  if (!pick) return null;
+  const { a, b, stage } = pick;
   const pool = TEMPLATES[stage.key] || TEMPLATES.new;
   return { thread: rng(pool)(a, b), pair: [a.id, b.id] };
 }

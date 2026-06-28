@@ -2,6 +2,7 @@ import { AI_MODEL, aiEnabled, aiEndpoint } from '../config.js';
 import { authHeader } from './api.js';
 import { buildSystemPrompt } from './prompt.js';
 import { detectCrisis } from './crisis.js';
+import { pickAmbientPair } from './relationships.js';
 
 const MAX_HISTORY = 24;
 
@@ -164,6 +165,42 @@ export async function proactiveCompanion(comp, profile, mode, allC, history, kin
   }
   await delay(400);
   return placeholderProactive(comp, profile, kind);
+}
+
+// Lightweight one-shot completion through the proxy (used for ambient threads).
+async function rawComplete(system, userText) {
+  const res = await fetch(aiEndpoint(), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...authHeader() },
+    body: JSON.stringify({ model: AI_MODEL, max_tokens: 240, system, messages: [{ role: 'user', content: userText }] }),
+  });
+  if (!res.ok) throw new Error(`proxy ${res.status}`);
+  const data = await res.json();
+  return (data.text || '').trim();
+}
+
+/** AI-generated ambient conversation between two awake companions (talking to
+ *  each other, not the user), reflecting their personalities + bond. Returns
+ *  { thread:[{from,text}], pair:[idA,idB] } or null — caller falls back to the
+ *  template generator (lib/relationships.genAmbient) on null. */
+export async function ambientThreadAI(comps, profile, bonds) {
+  const pair = pickAmbientPair(comps, bonds);
+  if (!pair || !aiEnabled()) return null;
+  const { a, b, stage } = pair;
+  const who = (c) => `${c.name} (${c.pronouns || 'they/them'}): ${c.personality}; quirk: ${c.quirk}`;
+  const system = `You write a brief ambient conversation between two AI companions in the app "Other". They talk to EACH OTHER, never to the user. Stay fully in character.\n${who(a)}\n${who(b)}\nTheir bond right now: ${stage.label}. ${profile?.name || 'The user'} will overhear this on opening the app.`;
+  const ask = `Write a short, natural back-and-forth of 3-4 short lines total between ${a.name} and ${b.name} — casual, in-character, reflecting their bond. Don't address the user or narrate. Output ONLY the lines, each exactly as "Name: message".`;
+  let text;
+  try { text = await rawComplete(system, ask); } catch (e) { return null; }
+  const byName = { [a.name.toLowerCase()]: a, [b.name.toLowerCase()]: b };
+  const thread = [];
+  for (const line of text.split('\n')) {
+    const mm = line.match(/^\s*\**([^:*]{1,24}?)\**:\s*(.+)$/);
+    if (!mm) continue;
+    const who2 = byName[mm[1].trim().toLowerCase()];
+    if (who2) thread.push({ from: who2, text: mm[2].trim() });
+  }
+  return thread.length >= 2 ? { thread, pair: [a.id, b.id] } : null;
 }
 
 /** First greeting when a companion comes on screen. */
