@@ -45,6 +45,41 @@ export async function enablePush() {
   return true;
 }
 
+// Self-diagnostic: ask the server how many subscriptions it holds for this
+// account, then fire a real test push. Returns a plain-language verdict so the
+// user can confirm check-ins work (and pinpoint the break) without DevTools.
+export async function testPush() {
+  if (!pushConfigured()) return { ok: false, message: 'Push is not configured.' };
+  const headers = { 'content-type': 'application/json', ...authHeader() };
+  let status;
+  try {
+    status = await (await fetch(API_BASE + '/push/status', { headers })).json();
+  } catch (e) {
+    return { ok: false, message: "Couldn't reach the server. Check your connection and try again." };
+  }
+  if (!status?.vapidConfigured) return { ok: false, message: 'The server is missing its notification keys. (VAPID not configured.)' };
+  if (!status.subscriptions) {
+    return { ok: false, message: 'This device isn’t registered for check-ins yet. Turn the toggle off and on again while signed in, then retry.' };
+  }
+  let res;
+  try {
+    res = await (await fetch(API_BASE + '/push/test', { method: 'POST', headers })).json();
+  } catch (e) {
+    return { ok: false, message: "Couldn't reach the server to send the test." };
+  }
+  const codes = (res?.results || []).map((r) => r.status);
+  if (codes.includes(201)) {
+    return { ok: true, message: 'Sent! A check-in should appear in a moment. If nothing shows, allow notifications for this site in your browser/OS settings.' };
+  }
+  if (codes.some((c) => c === 401 || c === 403)) {
+    return { ok: false, message: 'The notification keys don’t match (push rejected with ' + codes.join(', ') + '). The VAPID key pair needs to be regenerated.' };
+  }
+  if (codes.some((c) => c === 404 || c === 410)) {
+    return { ok: false, message: 'This subscription expired. Turn check-ins off and on again to re-register.' };
+  }
+  return { ok: false, message: 'Push service returned ' + (codes.join(', ') || 'no status') + '. Try again shortly.' };
+}
+
 export async function disablePush() {
   const reg = await navigator.serviceWorker.getRegistration();
   const sub = await reg?.pushManager.getSubscription();

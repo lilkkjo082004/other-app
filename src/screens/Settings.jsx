@@ -3,7 +3,7 @@ import { C } from '../theme.js';
 import { Shell } from '../components/ui.jsx';
 import { cap } from '../lib/zodiac.js';
 import { trialDaysLeft } from '../lib/entitlements.js';
-import { pushConfigured, pushSupported, isSubscribed, enablePush, disablePush } from '../lib/push.js';
+import { pushConfigured, pushSupported, isSubscribed, enablePush, disablePush, testPush } from '../lib/push.js';
 import { locationSupported, locationEnabled, locationLabel, requestLocation, setLabel, clearLocation } from '../lib/location.js';
 import { deleteAccount } from '../lib/api.js';
 import { loadSession, saveSession } from '../lib/storage.js';
@@ -30,6 +30,15 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
       else { await enablePush(); setPushOn(true); }
     } catch (e) { setPushErr(String(e.message || e)); }
     setPushBusy(false);
+  }
+  const [pushTest, setPushTest] = useState(null);
+  const [testBusy, setTestBusy] = useState(false);
+  async function runPushTest() {
+    if (testBusy) return;
+    setPushTest(null); setTestBusy(true);
+    try { setPushTest(await testPush()); }
+    catch (e) { setPushTest({ ok: false, message: String(e.message || e) }); }
+    setTestBusy(false);
   }
 
   const [locOn, setLocOn] = useState(locationEnabled());
@@ -170,6 +179,18 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
               </div>
               <Toggle on={pushOn} onClick={togglePush} />
             </div>
+            {pushOn && (
+              <div style={{ ...card }}>
+                <button onClick={runPushTest} disabled={testBusy} aria-label="Send a test notification" style={{ width: '100%', padding: '10px 0', borderRadius: 9, cursor: testBusy ? 'default' : 'pointer', fontFamily: "'DM Sans',sans-serif", fontSize: 13, background: 'transparent', border: `1px solid ${C.glow1}`, color: C.glow1, fontWeight: 600, opacity: testBusy ? 0.6 : 1 }}>
+                  {testBusy ? 'Sending…' : 'Send a test notification'}
+                </button>
+                {pushTest && (
+                  <div style={{ fontSize: 12, lineHeight: 1.5, marginTop: 10, color: pushTest.ok ? C.glow1 : C.danger }}>
+                    {pushTest.ok ? '✓ ' : '⚠ '}{pushTest.message}
+                  </div>
+                )}
+              </div>
+            )}
             {pushOn && onPushFrequency && (
               <div style={{ ...card }}>
                 <div style={{ fontSize: 13, marginBottom: 2 }}>How often</div>
