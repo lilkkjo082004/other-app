@@ -34,6 +34,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const [copiedIdx, setCopiedIdx] = useState(null);
   const [atBottom, setAtBottom] = useState(true);
   const [online, setOnline] = useState(typeof navigator === 'undefined' || navigator.onLine !== false);
+  const [directTo, setDirectTo] = useState(null);   // in group: aim at one companion
   const [unlock, setUnlock] = useState(null);          // { companion, onResult(ok) }
   const [summonCandidate, setSummonCandidate] = useState(null);
   const scrollRef = useRef(null);
@@ -175,8 +176,21 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     // Long-term mood tracking (best-effort; only when signed in to the backend).
     const mood = detectMood(u);
     if (mood && apiAuthed()) logMood(mood, { companionId: priv ? priv.id : undefined });
-    const responders = priv ? [priv] : active.filter(() => Math.random() > 0.15);
-    const act = responders.length ? responders : [active[0]].filter(Boolean);
+    // Who answers: private → that companion; group → an @mentioned or targeted
+    // companion if any, otherwise a semi-random subset of the room.
+    let act;
+    if (priv) {
+      act = [priv];
+    } else {
+      const mentioned = active.find((c) => u.toLowerCase().includes('@' + c.name.toLowerCase()));
+      const target = mentioned || (directTo ? active.find((c) => c.id === directTo) : null);
+      if (target) {
+        act = [target];
+      } else {
+        const responders = active.filter(() => Math.random() > 0.15);
+        act = responders.length ? responders : [active[0]].filter(Boolean);
+      }
+    }
     // Reply in turn so each companion can see and react to what the others just
     // said this turn. A per-companion typing indicator keeps it feeling live.
     let run = [...nm];
@@ -410,6 +424,21 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       </div>
 
       <div style={{ padding: '7px 10px 16px', borderTop: `1px solid ${C.border}`, background: `${C.bg}ee` }}>
+        {chatMode === 'group' && active.length > 1 && (
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', padding: '0 2px 7px' }}>
+            <span style={{ fontSize: 10, color: C.textDim }}>{directTo ? 'Asking' : 'Ask'}</span>
+            {active.map((c) => {
+              const on = directTo === c.id;
+              return (
+                <button key={c.id} aria-pressed={on} onClick={() => setDirectTo(on ? null : c.id)} style={{ display: 'flex', alignItems: 'center', gap: 5, background: on ? `${c.color.primary}22` : 'transparent', border: `1px solid ${on ? c.color.primary : C.border}`, borderRadius: 50, padding: '3px 10px 3px 4px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>
+                  <span style={{ width: 13, height: 13, borderRadius: '50%', background: c.color.primary }} />
+                  <span style={{ fontSize: 11, color: on ? c.color.primary : C.textSoft }}>{c.name}</span>
+                </button>
+              );
+            })}
+            {directTo && <button onClick={() => setDirectTo(null)} style={{ fontSize: 10, color: C.textDim, background: 'none', border: 'none', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>· everyone</button>}
+          </div>
+        )}
         {!active.length ? (
           <p style={{ textAlign: 'center', color: C.textDim, fontSize: 12, padding: 8 }}>All companions resting 💤</p>
         ) : (
@@ -417,7 +446,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
             <textarea ref={inputRef} value={input} rows={1}
               onChange={(e) => { setInput(e.target.value); const el = e.target; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px'; }}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-              placeholder={priv ? `Message ${priv.name}...` : 'Message everyone...'}
+              placeholder={priv ? `Message ${priv.name}...` : (directTo ? `Message ${active.find((c) => c.id === directTo)?.name || 'everyone'}...` : 'Message everyone...')}
               style={{ flex: 1, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 18, padding: '10px 14px', fontSize: 13, color: C.text, outline: 'none', resize: 'none', fontFamily: "'DM Sans',sans-serif", lineHeight: 1.4, maxHeight: 120, overflowY: 'auto' }} />
             <button aria-label="Send message" onClick={send} disabled={!input.trim() || loading} style={{ width: 38, height: 38, borderRadius: '50%', background: input.trim() && !loading ? C.glow1 : C.border, border: 'none', color: '#fff', fontSize: 14, cursor: input.trim() && !loading ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>↑</button>
           </div>
