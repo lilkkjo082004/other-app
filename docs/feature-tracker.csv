@@ -1,0 +1,124 @@
+Category,Feature,Description,Status,Priority,Notes
+Onboarding,Name input,User enters their name,Built,P0,
+Onboarding,Date of birth,Calculates zodiac and compatibility,Built,P0,
+Onboarding,Age verification,"DOB-driven gate: <13 blocked, 13-17 friendship-only, 18+ confirm",Built,P0,lib/age.js; locks ageGroup to DOB
+Onboarding,Energy/vibe,Multi-select personality energy,Built,P0,
+Onboarding,Communication style,Multi-select how they communicate,Built,P0,
+Onboarding,Occupation,Free text work description,Built,P0,
+Onboarding,Relationship status,Multi-select current situation,Built,P0,
+Onboarding,Love language,Multi-select love languages,Built,P0,
+Onboarding,Emotional needs,What they wish they had more of,Built,P0,
+Onboarding,Social identity,How friends describe them,Built,P0,
+Onboarding,Activities (15 options),Multi-select hobbies and interests,Built,P0,
+Onboarding,Activity subcategories,Drill-down genres/types per activity,Built,P0,Optional
+Onboarding,Cuisines loved,Multi-select favorite food types,Built,P0,
+Onboarding,Cuisines disliked,Multi-select foods to avoid,Built,P0,Companions never suggest these
+Onboarding,Dietary restrictions,Multi-select dietary needs,Built,P0,
+Onboarding,Favorite movies/shows,Free text entertainment preferences,Built,P0,
+Onboarding,Favorite music artists,Free text music preferences,Built,P0,
+Onboarding,Back navigation,Go back to change any answer,Built,P0,Pre-populates previous answers
+Onboarding,Skippable steps,Multi-selects can be skipped (Skip at zero),Built,P0,NEW
+Onboarding,Resumable onboarding,Draft persists across refresh,Built,P1,NEW; localStorage draft
+Onboarding,Edit profile after onboarding,Change name/DOB/prefs without reset,Built,P1,"NEW; Settings > Edit profile, re-derives astrology"
+Zodiac System,Western zodiac,Sun sign from birthdate,Built,P0,
+Zodiac System,Chinese zodiac,Animal + element from birth year,Built,P0,
+Zodiac System,Numerology life path,Life path number calculation,Built,P0,
+Zodiac System,Vedic/sidereal astrology,Approximate moon rashi + nakshatra,Built,P1,"UPDATED Future->Built; approximate, on reveal+prompt"
+Zodiac System,Compatibility matching,Companions get compatible signs,Built,P0,
+Zodiac System,Zodiac reveal screen,Animated profile presentation,Built,P0,
+Companion Gen,Surprise Me path,Pure zodiac-based generation,Built,P0,
+Companion Gen,Guide Me builder,Grouped multi-select trait seeds,Built,P0,2 screens
+Companion Gen,Optional free text,Additional vibe description,Built,P0,
+Companion Gen,Waking up sequence,Companions discover themselves live,Built,P0,
+Companion Gen,Self-naming,Companions choose their own names,Built,P0,
+Companion Gen,Self-pronouns,Companions choose he/she/they,Built,P0,
+Companion Gen,Color identity,Distinct color per companion,Built,P0,8-color palette
+Companion Gen,Companion selection,Choose 1 (free) or all 3 (trial),Built,P0,
+Companion Gen,"undefinedOlderundefined presentation",Companions present as older for 18+,Future,P1,
+Builder Traits,Demeanor / Energy / Humor / Depth / Social,Personality trait seeds,Built,P0,
+Builder Traits,Romantic energy,Slow burn etc.,Built,P0,Filtered for under 18
+Builder Traits,Protectiveness / Communication / Archetype / Interest,Relationship trait seeds,Built,P0,Romantic archetype filtered <18
+Chat System,Group chat,All awake companions participate,Built,P0,
+Chat System,Private one-on-one,Truly private from other companions,Built,P0,
+Chat System,Companion-initiated chat,Returning welcome + unprompted idle thoughts,Built,P1,UPDATED Future->Built; NEW proactive
+Chat System,Companion disagreements,"Companions disagree, own opinions",Built,P0,
+Chat System,Cross-referencing,Companions react to each other in-turn,Built,P0,Sequential w/ typing indicator
+Chat System,Ambient conversations,"Personality + bond-aware, regenerated each open",Built,P0,lib/relationships.js
+Chat System,Directed messages,Aim a message at one companion (@name / tap),Built,P1,NEW
+Chat System,Conversation search,"Search history, highlight matches",Built,P1,NEW
+Chat System,Call by name (voice),Say companion name to open private,Built,P0,+ toggle to disable
+Chat System,Auto-speak mode,Companions speak messages aloud,Built,P0,
+Chat System,Per-companion voice customization,"Pick voice + tone, live preview",Built,P1,NEW; lib/voice.js
+Chat System,Speaker button per message,Tap to hear any message,Built,P0,
+Chat System,Natural (AI) voices,ElevenLabs via /tts proxy,Partial,P1,"UPDATED; wired, needs key (VITE_NATURAL_VOICE)"
+Companion Dynamics,Autonomous personality,"Own likes, dislikes, opinions",Built,P0,
+Companion Dynamics,Personality evolution,Mood/familiarity/bond -> prompt,Built,P0,UPDATED Partial->Built; lib/evolution.js + cloud
+Companion Dynamics,Companion relationships,Bonds + storylines between companions,Built,P1,UPDATED Partial->Built; persisted bonds
+Companion Dynamics,Sleep mode,User puts companions to sleep,Built,P0,
+Companion Dynamics,Status awareness,Companions know who is awake/sleeping,Built,P0,
+Companion Dynamics,Companion deletion,Permanent removal + in-app confirm,Built,P0,Remaining companions mourn
+Companion Dynamics,Companion replacement,Summon a new companion after deletion,Built,P1,UPDATED Future->Built; free if none owned else unlock
+Companion Dynamics,Role adaptation,Shift roles based on needs,Partial,P0,AI detects topics
+Emotional Intel,Mood detection,Detect stress/excitement in messages,Built,P0,Keyword-based
+Emotional Intel,Tone adjustment,Companions shift tone based on mood,Built,P0,
+Emotional Intel,Invisible tracking,User never sees mood data,Built,P0,
+Emotional Intel,Long-term pattern analysis,Track mood across sessions,Built,P1,UPDATED Future->Built; /mood backend + summary
+Emotional Intel,Support escalation,Crisis detection + resources (988),Built,P0,UPDATED Partial->Built; lib/crisis.js
+Emotional Intel,Therapist suggestions,Local mental health providers,Partial,P1,Via location-aware prompt
+Emotional Intel,Support network referral,Suggest talking to friends/family,Future,P1,
+Location,Location access,Opt-in geolocation or manual area,Built,P1,UPDATED Future->Built; precise stays on-device
+Location,Restaurant/activity suggestions,Local ideas via companion prompt,Built,P1,UPDATED; coarse area label only
+Location,Therapist finder,Local mental health providers,Partial,P1,Via prompt
+Location,Proximity alerts,Notice user near favorite spots,Future,P2,On-device only by design
+Location,Preference-aware filtering,Honors cuisines/dislikes,Built,P1,UPDATED; in prompt
+Content/Age,Under 18 mode,"Friendship only, no mature content",Built,P0,
+Content/Age,Over 18 suggestive,Romantic warmth for verified adults,Built,P0,UPDATED Partial->Built; matureContentAllowed
+Content/Age,Over 18 explicit (web),"Mature themes, web build only",Partial,P1,UPDATED; gated to verified adult on web
+Content/Age,AI disclosure reminders,"Required, recurring, not disableable",Built,P0,NEW; ToS 13; open + hourly
+Content/Age,Multi-companion explicit,All together or one-on-one,Future,P1,
+Monetization,Freemium model,One companion free forever,Partial,P0,UI + entitlements; no real payment
+Monetization,Two-week trial,All 3 for 14 days,Built,P0,UPDATED Partial->Built; real timer
+Monetization,Trial degradation,Unpurchased companions lose adaptation,Built,P1,UPDATED Future->Built
+Monetization,One-time companion purchase,Unlock 2nd/3rd companion,Partial,P0,Simulated; needs payment SDK
+Monetization,Deletion repurchase,New companion costs new purchase,Built,P1,UPDATED Future->Built (simulated)
+Monetization,Memory subscription,Persistent memory tier,Future,P1,TBD
+Monetization,Payment integration,Real payments (Stripe/RevenueCat),Future,P0,ON HOLD per owner
+Data/Privacy,Local storage,All data on device by default,Built,P0,UPDATED Partial->Built
+Data/Privacy,Cloud sync / backup,Account sync + JSON export/import,Built,P1,UPDATED Future->Built; NEW export/import
+Data/Privacy,Full data reset,Wipe everything,Built,P1,UPDATED Future->Built
+Data/Privacy,Account & data deletion,DELETE /account erases all server data,Built,P0,NEW; ToS 10.1 / GDPR
+Data/Privacy,In-app Terms of Service,Rendered legal doc + links,Built,P0,NEW; data/legal.js
+Data/Privacy,Privacy Policy + Disclaimer,Source documents,Future,P0,"Slot wired, awaiting documents"
+Visual/UI,Dark cosmic aesthetic,"Abstract, space-inspired",Built,P0,
+Visual/UI,Companion color identity,Abstract color per companion,Built,P0,
+Visual/UI,Cosmetic customization,Recolor a companion (8-color palette),Built,P1,NEW; ToS 4.1 free tier
+Visual/UI,Animated waking sequence,Companion discovers themselves,Built,P0,
+Visual/UI,Smooth transitions,Fade and slide animations,Built,P0,
+Visual/UI,Companion profile screen,"Identity, traits, bond, appearance, voice",Built,P1,UPDATED Future->Built
+Visual/UI,Settings screen,"Voice, notifications, location, legal, data",Built,P1,UPDATED Future->Built
+Visual/UI,Accessibility,"aria-labels, reduced-motion, focus, contrast",Built,P1,NEW
+Visual/UI,Chat quality-of-life,"Timestamps, copy, scroll-to-bottom, multiline",Built,P1,NEW
+Visual/UI,Offline awareness,Banner when offline,Built,P2,NEW
+Visual/UI,Rental Body system,Visual avatar customization (hair/clothes),Future,P2,
+Visual/UI,Photo-based appearance,Upload picture for look,Future,P2,
+Notifications,Companion check-ins,Web Push reach-outs during the day,Built,P1,UPDATED Future->Built; VAPID + cron
+Notifications,Random thoughts,Unprompted idle thoughts,Built,P2,UPDATED Future->Built
+Notifications,Notification frequency control,"Daily/few/off, honored by cron",Built,P1,UPDATED Future->Built
+Notifications,Toggle voice activation,Disable call-by-name,Built,P1,UPDATED Future->Built
+Notifications,Ambient conversation alerts,Notified companions were chatting,Future,P2,
+Notifications,Location-based nudges,Near favorite spot suggestions,Future,P2,
+Platforms,Web app,"Primary platform, full experience",Built,P0,React + Vite (rebuilt from Flutter)
+Platforms,PWA install,Installable + offline app shell,Built,P1,NEW; manifest + service worker
+Platforms,Android (Google Play),TWA/Capacitor wrapper,Partial,P0,Needs store setup + __OTHER_NATIVE__
+Platforms,iOS (App Store),Stricter content policies,Future,P2,
+Platforms,Desktop,Full desktop experience,Future,P2,
+Backend,API proxy server,Cloudflare Worker + D1,Built,P0,UPDATED Future->Built; server/
+Backend,Real AI responses,Claude API integration,Built,P0,UPDATED Future->Built; offline fallback
+Backend,Accounts & auth,Email/password (PBKDF2 + HMAC),Built,P0,NEW
+Backend,Persistent memory,Session blob synced in D1,Built,P1,UPDATED Future->Built
+Backend,Mood tracking database,Long-term emotional storage,Built,P1,UPDATED Future->Built
+Backend,Push notifications infra,"Web Push (VAPID, RFC 8291/8292)",Built,P1,NEW
+Backend,TTS proxy,ElevenLabs natural voices via /tts,Partial,P1,NEW; needs key
+Backend,Rate limiting,Per-IP throttle on /ai + auth,Built,P1,NEW
+Backend,Ambient conversation gen,Auto-generate while away,Partial,P1,Client-side; push cron for check-ins
+Backend,Subscription management,Payment processing,Future,P1,ON HOLD

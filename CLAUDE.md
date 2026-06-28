@@ -123,6 +123,14 @@ Wire up real AI by deploying `worker/` (see `worker/README.md`) and creating a
 - Store packaging (native wrapper for Google Play); set `window.__OTHER_NATIVE__` in that build so mature content stays web-only
 - Provisioning (needs the owner's Cloudflare account): run `server/deploy.sh` to create D1, apply the schema, set secrets (AUTH_SECRET, ANTHROPIC_API_KEY, VAPID_PRIVATE), and deploy. Rate limiting on `/ai` + auth is built in (`rate_limits` table, `AI_RATE_LIMIT`/`AUTH_RATE_LIMIT` vars).
 
+## Feature Tracker
+
+`docs/feature-tracker.csv` is the canonical, up-to-date feature list (Category,
+Feature, Description, Status, Priority, Notes) — it supersedes the stale
+`OTHER_App_Specs.xlsx`. Update it whenever a feature is added or its status
+changes, and re-import it into the owner's Google Sheet (File → Import →
+Replace). Keep statuses honest: Built / Partial / Future.
+
 ## Business Entity
 
 Extratac LLC (Douglasville, GA). Privacy Officer: Krristen Jones.
