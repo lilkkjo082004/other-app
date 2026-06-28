@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { C } from '../theme.js';
 import { Shell } from '../components/ui.jsx';
 import { cap } from '../lib/zodiac.js';
@@ -6,6 +6,7 @@ import { trialDaysLeft } from '../lib/entitlements.js';
 import { pushConfigured, pushSupported, isSubscribed, enablePush, disablePush } from '../lib/push.js';
 import { locationSupported, locationEnabled, locationLabel, requestLocation, setLabel, clearLocation } from '../lib/location.js';
 import { deleteAccount } from '../lib/api.js';
+import { loadSession, saveSession } from '../lib/storage.js';
 import { LegalLink } from './Legal.jsx';
 import ProfileEdit from './ProfileEdit.jsx';
 
@@ -66,6 +67,36 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
       onSignOut?.();   // clear the local token/email
       onReset?.();     // wipe this device and return to the start
     } catch (e) { setDelErr(String(e.message || e)); setDelBusy(false); }
+  }
+
+  const fileRef = useRef(null);
+  const [impErr, setImpErr] = useState(null);
+  function exportData() {
+    setImpErr(null);
+    try {
+      const data = loadSession() || {};
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `other-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) { setImpErr('Export failed'); }
+  }
+  function importData(file) {
+    if (!file) return;
+    setImpErr(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const s = JSON.parse(reader.result);
+        if (!s || !Array.isArray(s.companions)) throw new Error('That doesn’t look like an Other backup.');
+        if (!window.confirm('Restore this backup? It replaces the data on this device.')) return;
+        saveSession(s);
+        window.location.reload();
+      } catch (e) { setImpErr(String(e.message || e)); }
+    };
+    reader.readAsText(file);
   }
 
   const trialLabel = () => {
@@ -221,6 +252,14 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
 
         <div style={{ height: 10 }} />
         {section('Data')}
+        <div style={{ ...card, display: 'flex', gap: 8 }}>
+          <button onClick={exportData} style={{ flex: 1, background: C.surfaceUp, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px', color: C.text, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>⬇ Export backup</button>
+          <button onClick={() => fileRef.current?.click()} style={{ flex: 1, background: C.surfaceUp, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px', color: C.text, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>⬆ Import backup</button>
+          <input ref={fileRef} type="file" accept="application/json" onChange={(e) => importData(e.target.files?.[0])} style={{ display: 'none' }} />
+        </div>
+        {impErr && <div style={{ fontSize: 11, color: C.danger, margin: '0 2px 8px' }}>{impErr}</div>}
+        <p style={{ fontSize: 11, color: C.textDim, lineHeight: 1.5, margin: '0 2px 8px' }}>Download your companions & history as a file, or restore from one. Works without an account.</p>
+
         <button onClick={onReset} style={{ ...card, width: '100%', textAlign: 'left', cursor: 'pointer', border: `1px solid ${C.danger}44`, fontFamily: "'DM Sans',sans-serif", display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div><div style={{ fontSize: 13, color: C.danger, fontWeight: 500 }}>Reset everything</div><div style={{ fontSize: 11, color: C.textDim }}>Wipe your profile, companions, and all history</div></div>
           <span style={{ color: C.danger }}>›</span>

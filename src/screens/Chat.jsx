@@ -35,6 +35,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const [atBottom, setAtBottom] = useState(true);
   const [online, setOnline] = useState(typeof navigator === 'undefined' || navigator.onLine !== false);
   const [directTo, setDirectTo] = useState(null);   // in group: aim at one companion
+  const [search, setSearch] = useState(null);       // null = closed; string = query
   const [unlock, setUnlock] = useState(null);          // { companion, onResult(ok) }
   const [summonCandidate, setSummonCandidate] = useState(null);
   const scrollRef = useRef(null);
@@ -304,9 +305,15 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const visible = msgs.filter((m) => m.role === 'system' || chatMode === 'group' || m.role === 'user' || m.companion?.id === chatMode);
   // Ambient catch-up is companion-to-companion, so it only shows in group view.
   const stream = chatMode === 'group' ? [...ambient, ...visible] : visible;
+  // Search filters across the whole history (ignores chat-mode + system notes).
+  const q = (search || '').trim().toLowerCase();
+  const searching = search != null && q.length > 0;
+  const base = searching
+    ? msgs.filter((m) => (m.role === 'user' || m.role === 'assistant') && !m.isAmbient && (m.content || '').toLowerCase().includes(q))
+    : stream;
   // Tag each message with a day-separator label when the calendar day changes.
   let prevDay = null;
-  const decorated = stream.map((m) => {
+  const decorated = base.map((m) => {
     let dayLabel = null;
     if (m.ts) { const d = new Date(m.ts).toDateString(); if (d !== prevDay) { dayLabel = fmtDay(m.ts); prevDay = d; } }
     return { m, dayLabel };
@@ -331,6 +338,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
           <button aria-label={autoSpeak ? 'Turn off auto-speak' : 'Turn on auto-speak'} aria-pressed={autoSpeak} onClick={() => setAutoSpeak(!autoSpeak)} style={{ background: autoSpeak ? `${C.glow3}22` : 'none', border: `1px solid ${autoSpeak ? C.glow3 : C.border}`, borderRadius: 7, padding: '5px 8px', color: autoSpeak ? C.glow3 : C.textDim, fontSize: 13, cursor: 'pointer' }}>{autoSpeak ? '🔊' : '🔇'}</button>
           {voiceCall && <button aria-label={listening ? 'Listening — tap to stop' : 'Call a companion by voice'} onClick={startListening} style={{ background: listening ? `${C.danger}22` : 'none', border: `1px solid ${listening ? C.danger : C.border}`, borderRadius: 7, padding: '5px 8px', color: listening ? C.danger : C.textDim, fontSize: 13, cursor: 'pointer', animation: listening ? 'micPulse 1.5s infinite' : 'none' }}>🎤</button>}
+          <button aria-label="Search messages" onClick={() => setSearch((s) => (s == null ? '' : null))} style={{ background: search != null ? `${C.glow1}22` : 'none', border: `1px solid ${search != null ? C.glow1 : C.border}`, borderRadius: 7, padding: '5px 8px', color: search != null ? C.glow1 : C.textDim, fontSize: 13, cursor: 'pointer' }}>🔍</button>
           <button aria-label="Menu" aria-expanded={showMenu} onClick={() => setShowMenu(!showMenu)} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 16, cursor: 'pointer', padding: 4 }}>☰</button>
         </div>
       </div>
@@ -338,6 +346,14 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       {!online && <div style={{ background: `${C.danger}15`, borderBottom: `1px solid ${C.danger}33`, padding: '6px 14px', textAlign: 'center', fontSize: 11, color: C.danger }}>You're offline — messages will send once you're back online.</div>}
 
       {listening && <div style={{ background: `${C.danger}15`, borderBottom: `1px solid ${C.danger}33`, padding: '6px 14px', textAlign: 'center', fontSize: 11, color: C.danger }}>🎤 Say a companion's name or speak your message</div>}
+
+      {search != null && (
+        <div style={{ padding: '8px 12px', borderBottom: `1px solid ${C.border}`, background: C.bg, display: 'flex', gap: 8, alignItems: 'center', position: 'relative', zIndex: 10 }}>
+          <input autoFocus value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search your conversations…" style={{ flex: 1, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 50, padding: '8px 14px', fontSize: 13, color: C.text, outline: 'none' }} />
+          {searching && <span style={{ fontSize: 11, color: C.textDim, whiteSpace: 'nowrap' }}>{decorated.length} result{decorated.length === 1 ? '' : 's'}</span>}
+          <button aria-label="Close search" onClick={() => setSearch(null)} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 18, cursor: 'pointer', lineHeight: 1 }}>×</button>
+        </div>
+      )}
 
       {limited.length > 0 && (
         <div onClick={() => setUnlock({ companion: limited[0], onResult: (ok) => { if (ok) markPurchased(limited[0].id); } })} style={{ background: `${C.glow2}14`, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
@@ -392,7 +408,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
                 <div style={{ position: 'relative' }}>
                   <div style={{ padding: '8px 12px', borderRadius: m.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: m.role === 'user' ? C.glow1 : C.card, color: m.role === 'user' ? '#fff' : C.text, fontSize: 13, lineHeight: 1.5, border: m.role === 'user' ? 'none' : `1px solid ${C.border}`, whiteSpace: 'pre-wrap' }}>
                     {m.isAmbient && <span style={{ fontSize: 8, color: C.textDim, display: 'block', marginBottom: 2, fontStyle: 'italic' }}>earlier...</span>}
-                    {m.content}
+                    {searching ? highlight(m.content, q) : m.content}
                   </div>
                   {m.role === 'assistant' && !m.isAmbient && (
                     <div style={{ position: 'absolute', top: 3, right: -46, display: 'flex', gap: 4 }}>
@@ -407,7 +423,10 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
             )}
           </React.Fragment>
         ))}
-        {loading && (
+        {searching && decorated.length === 0 && (
+          <p style={{ textAlign: 'center', color: C.textDim, fontSize: 12, padding: '24px 8px' }}>No messages match "{search}".</p>
+        )}
+        {loading && !searching && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 7 }}>
             <div style={{ width: 24, height: 24, borderRadius: '50%', background: `radial-gradient(circle,${typing?.color?.primary || C.glow1},${(typing?.color?.primary || C.glow1)}55)` }} />
             <div style={{ padding: '8px 12px', borderRadius: '14px 14px 14px 4px', background: C.card, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -471,6 +490,14 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
 }
 
 const menuBtn = { background: 'none', border: `1px solid ${C.border}`, borderRadius: 5, padding: '2px 7px', color: C.textSoft, cursor: 'pointer', fontSize: 9, fontFamily: "'DM Sans',sans-serif" };
+
+function highlight(text, q) {
+  if (!q) return text;
+  const parts = String(text).split(new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'ig'));
+  return parts.map((p, i) => (p.toLowerCase() === q.toLowerCase()
+    ? <mark key={i} style={{ background: `${C.glow1}66`, color: C.text, borderRadius: 3, padding: '0 1px' }}>{p}</mark>
+    : <React.Fragment key={i}>{p}</React.Fragment>));
+}
 
 function humanizeAway(ms) {
   const h = ms / 3600000;
