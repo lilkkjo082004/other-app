@@ -81,6 +81,18 @@ export default function App() {
     if (cloudEnabled() && api.isAuthed()) api.pushState(session).catch(() => {});
   };
 
+  // Edit the profile after onboarding. Re-derives astrology when the birthday
+  // changes, re-locks the age gate, and persists immediately (local + cloud).
+  function updateProfile(updates) {
+    let np = { ...profile, ...updates };
+    if (updates.dob && updates.dob !== profile?.dob) np.astrology = getUserAstro(updates.dob);
+    np = withAgeVerification(np);
+    setProfile(np);
+    const session = { ...(loadSession() || {}), profile: np };
+    saveSession(session);
+    if (cloudEnabled() && api.isAuthed()) api.pushState(session).catch(() => {});
+  }
+
   const reset = () => {
     clearSession();
     setProfile(null);
@@ -117,7 +129,7 @@ export default function App() {
   };
 
   if (screen === 'auth') return <Auth onAuthed={onAuthed} onBack={() => setScreen(profile ? 'chat' : 'welcome')} />;
-  if (screen === 'chat') return <Chat companions={selC} profile={profile} trialStart={trialStart} restored={restored} onPersist={persist} onReset={reset} {...accountProps} />;
+  if (screen === 'chat') return <Chat companions={selC} profile={profile} trialStart={trialStart} restored={restored} onPersist={persist} onReset={reset} onUpdateProfile={updateProfile} {...accountProps} />;
   if (screen === 'welcome') return <Welcome onStart={() => setScreen('onboarding')} onSignIn={cloudEnabled() ? () => setScreen('auth') : undefined} />;
   if (screen === 'onboarding') return <Onboarding onComplete={handleOB} />;
   if (screen === 'zodiac') return <ZodiacReveal profile={profile} onContinue={() => setScreen('preference')} />;

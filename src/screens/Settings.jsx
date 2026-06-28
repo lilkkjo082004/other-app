@@ -7,8 +7,10 @@ import { pushConfigured, pushSupported, isSubscribed, enablePush, disablePush } 
 import { locationSupported, locationEnabled, locationLabel, requestLocation, setLabel, clearLocation } from '../lib/location.js';
 import { deleteAccount } from '../lib/api.js';
 import { LegalLink } from './Legal.jsx';
+import ProfileEdit from './ProfileEdit.jsx';
 
-export default function Settings({ profile, comps, autoSpeak, trialStart, cloud, authed, email, onSignIn, onSignOut, onAutoSpeak, voiceCall, onVoiceCall, pushFrequency, onPushFrequency, onSleepAll, onWakeAll, onReset, onBack }) {
+export default function Settings({ profile, comps, autoSpeak, trialStart, cloud, authed, email, onSignIn, onSignOut, onAutoSpeak, onUpdateProfile, voiceCall, onVoiceCall, pushFrequency, onPushFrequency, onSleepAll, onWakeAll, onReset, onBack }) {
+  const [editing, setEditing] = useState(false);
   const living = comps.filter((c) => c.status !== 'deleted');
   const allAwake = living.length > 0 && living.every((c) => c.status === 'awake');
 
@@ -76,6 +78,8 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
   const section = (t) => <p style={{ fontSize: 10, color: C.textDim, letterSpacing: 2, textTransform: 'uppercase', margin: '0 0 8px' }}>{t}</p>;
   const card = { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 14px', marginBottom: 8 };
 
+  if (editing) return <ProfileEdit profile={profile} onSave={(u) => { onUpdateProfile?.(u); setEditing(false); }} onBack={() => setEditing(false)} />;
+
   return (
     <Shell>
       <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: `1px solid ${C.border}` }}>
@@ -87,6 +91,12 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
         <div style={{ ...card, display: 'flex', justifyContent: 'space-between' }}><span style={{ color: C.textSoft, fontSize: 13 }}>Name</span><span style={{ fontSize: 13, fontWeight: 500 }}>{profile.name}</span></div>
         {profile.astrology && <div style={{ ...card, display: 'flex', justifyContent: 'space-between' }}><span style={{ color: C.textSoft, fontSize: 13 }}>Stars</span><span style={{ fontSize: 13, fontWeight: 500 }}>{profile.astrology.westernData.sym} {cap(profile.astrology.western)}</span></div>}
         <div style={{ ...card, display: 'flex', justifyContent: 'space-between' }}><span style={{ color: C.textSoft, fontSize: 13 }}>Mode</span><span style={{ fontSize: 13, fontWeight: 500 }}>{profile.ageGroup === 'under18' ? 'Under 18 (friendship only)' : (profile.ageVerified ? '18+ · verified' : '18+')}</span></div>
+        {onUpdateProfile && (
+          <button onClick={() => setEditing(true)} style={{ ...card, width: '100%', textAlign: 'left', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", border: `1px solid ${C.glow1}55`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div><div style={{ fontSize: 13, color: C.glow1, fontWeight: 500 }}>Edit profile</div><div style={{ fontSize: 11, color: C.textDim }}>Update your details & preferences anytime</div></div>
+            <span style={{ color: C.glow1 }}>›</span>
+          </button>
+        )}
 
         {cloud && (
           <>

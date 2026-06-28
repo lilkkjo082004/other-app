@@ -4,6 +4,48 @@ export const STEPS = [
   'activitySubs', 'cuisineLove', 'cuisineDislike', 'dietary', 'favMovies', 'favMusic',
 ];
 
+// Single-source option lists (used by both onboarding and the profile editor).
+export const VIBES = [
+  { v: 'calm', label: 'Calm & grounded', em: '🌿' },
+  { v: 'playful', label: 'Playful & witty', em: '⚡' },
+  { v: 'deep', label: 'Deep & introspective', em: '🌙' },
+  { v: 'warm', label: 'Warm & nurturing', em: '☀️' },
+  { v: 'chaotic', label: 'Chaotic & spontaneous', em: '🔥' },
+];
+export const COMMUNICATION = [
+  { v: 'direct', label: 'Direct & honest', em: '🎯' },
+  { v: 'expressive', label: 'Expressive & emotional', em: '💕' },
+  { v: 'chill', label: 'Chill & easygoing', em: '😎' },
+  { v: 'thoughtful', label: 'Thoughtful & considered', em: '📝' },
+];
+export const RELATIONSHIP = [
+  { v: 'single', label: 'Single', em: '🦋' },
+  { v: 'dating', label: 'Dating', em: '💫' },
+  { v: 'partnered', label: 'In a relationship', em: '💕' },
+  { v: 'married', label: 'Married', em: '💍' },
+  { v: 'complicated', label: "It's complicated", em: '🌀' },
+  { v: 'rather_not', label: 'Rather not say', em: '🤐' },
+];
+export const LOVE_LANG = [
+  { v: 'words', label: 'Words of affirmation', em: '💬' },
+  { v: 'quality', label: 'Quality time', em: '⏰' },
+  { v: 'acts', label: 'Acts of service', em: '🤝' },
+  { v: 'touch', label: 'Physical touch', em: '🤗' },
+  { v: 'gifts', label: 'Receiving gifts', em: '🎁' },
+];
+export const NEEDS = [
+  { v: 'encouragement', label: 'Someone who cheers me on', em: '🙌' },
+  { v: 'honesty', label: 'Honest, real talk', em: '💎' },
+  { v: 'fun', label: 'More laughter & fun', em: '😂' },
+  { v: 'perspective', label: 'Fresh perspectives', em: '🔮' },
+];
+export const SOCIAL_ID = [
+  { v: 'listener', label: 'The thoughtful listener', em: '👂' },
+  { v: 'entertainer', label: 'Life of the party', em: '🎭' },
+  { v: 'advisor', label: 'Go-to for advice', em: '🧭' },
+  { v: 'dreamer', label: 'Creative dreamer', em: '💭' },
+];
+
 export const ACTIVITIES = [
   { id: 'movies', label: 'Movies/TV', em: '🎬', subs: ['Action', 'Comedy', 'Horror', 'Drama', 'Romance', 'Sci-Fi', 'Fantasy', 'Thriller', 'Documentary', 'Anime', 'Reality TV', 'K-Drama'] },
   { id: 'gaming', label: 'Gaming', em: '🎮', subs: ['RPGs', 'Shooters', 'Puzzle', 'Strategy', 'Sports', 'Indie', 'Mobile', 'Retro', 'MMOs', 'Battle Royale', 'Simulation'] },
