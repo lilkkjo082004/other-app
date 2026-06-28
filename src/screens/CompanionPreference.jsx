@@ -3,11 +3,23 @@ import { C } from '../theme.js';
 import { Shell, Prog, Pills } from '../components/ui.jsx';
 import { B_PERS, B_REL } from '../data/onboarding.js';
 
+// Quick-pick vibes for the "Surprise Me" path. Romantic ones are filtered for minors.
+const VIBE_SUGGESTIONS = [
+  'Sarcastic humor', 'Protective energy', 'Calm & grounding', 'Adventurous',
+  'Deeply loyal', 'Playfully chaotic', 'Intellectual', 'Mysterious',
+  'Goofy & fun', 'Creative soul', 'Motivating', 'Gentle & soft',
+  'Flirty', 'Romantic',
+];
+const ROMANTIC_VIBES = ['Flirty', 'Romantic'];
+
 export default function CompanionPreference({ onChoice, ageGroup }) {
   const [mode, setMode] = useState(null);
   const [bStep, setBStep] = useState(0);
   const [bT, setBT] = useState({});
   const [ft, setFt] = useState('');
+  const [picks, setPicks] = useState([]);
+  const togglePick = (v) => setPicks((p) => (p.includes(v) ? p.filter((x) => x !== v) : [...p, v]));
+  const combinedFreeText = () => [...picks, ft.trim()].filter(Boolean).join(', ') || null;
 
   const filterCats = (cats) => (ageGroup === 'under18'
     ? cats.map((c) => (c.id === 'romance' ? { ...c, opts: ['None'] } : c.id === 'archetype' ? { ...c, opts: c.opts.filter((o) => o !== 'Romantic interest') } : c))
@@ -39,11 +51,14 @@ export default function CompanionPreference({ onChoice, ageGroup }) {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: 32, animation: 'fadeUp 0.4s both' }}>
           <div style={{ fontSize: 28, marginBottom: 12 }}>💫</div>
           <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 20, fontWeight: 600, marginBottom: 8 }}>Anything else you're drawn to?</h2>
-          <p style={{ color: C.textSoft, fontSize: 12, marginBottom: 16 }}>Optional vibe or trait.</p>
-          <textarea value={ft} onChange={(e) => setFt(e.target.value)} rows={3} placeholder='"sarcastic humor" · "protective energy"' style={taStyle} />
+          <p style={{ color: C.textSoft, fontSize: 12, marginBottom: 14 }}>Tap any that fit — and/or add your own below. All optional.</p>
+          <div style={{ marginBottom: 14 }}>
+            <Pills opts={VIBE_SUGGESTIONS.filter((v) => ageGroup !== 'under18' || !ROMANTIC_VIBES.includes(v))} sel={picks} onTog={togglePick} />
+          </div>
+          <textarea value={ft} onChange={(e) => setFt(e.target.value)} rows={3} placeholder='Or describe it yourself — "an old soul who loves bad puns"' style={taStyle} />
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
             <button className="bg2" onClick={() => setMode(null)}>Back</button>
-            <button className="bp" style={{ flex: 1 }} onClick={() => onChoice({ mode: 'surprise', freeText: ft.trim() || null })}>Generate</button>
+            <button className="bp" style={{ flex: 1 }} onClick={() => onChoice({ mode: 'surprise', freeText: combinedFreeText() })}>Generate</button>
           </div>
         </div>
       </Shell>
