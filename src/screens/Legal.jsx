@@ -53,7 +53,7 @@ export default function Legal({ docKey = 'tos', onBack }) {
         <button aria-label="Back" onClick={onBack} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 20, cursor: 'pointer' }}>←</button>
         <span style={{ fontSize: 15, fontWeight: 600 }}>{doc.title}</span>
       </div>
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 18px 48px' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px 18px 48px' }}>
         <p style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 13, fontWeight: 500, letterSpacing: 3, textTransform: 'uppercase', color: C.glow1, margin: '0 0 4px' }}>Other · AI Companion App</p>
         <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 30, fontWeight: 700, margin: '0 0 4px' }}>{doc.title}</h1>
         {doc.effective && <p style={{ fontSize: 12, color: C.textDim, margin: '0 0 18px' }}>Effective {doc.effective} · Operated by Extratac LLC</p>}
