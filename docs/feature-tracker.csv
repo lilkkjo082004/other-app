@@ -34,7 +34,7 @@ Companion Gen,Self-naming,Companions choose their own names,Built,P0,
 Companion Gen,Self-pronouns,Companions choose he/she/they,Built,P0,
 Companion Gen,Color identity,Distinct color per companion,Built,P0,8-color palette
 Companion Gen,Companion selection,Choose 1 (free) or all 3 (trial),Built,P0,
-Companion Gen,"undefinedOlderundefined presentation",Companions present as older for 18+,Future,P1,
+Companion Gen,"""Older"" presentation",Companions present as older for 18+,Built,P1,UPDATED Future->Built; apparentAge in companions.js
 Builder Traits,Demeanor / Energy / Humor / Depth / Social,Personality trait seeds,Built,P0,
 Builder Traits,Romantic energy,Slow burn etc.,Built,P0,Filtered for under 18
 Builder Traits,Protectiveness / Communication / Archetype / Interest,Relationship trait seeds,Built,P0,Romantic archetype filtered <18
@@ -58,14 +58,14 @@ Companion Dynamics,Sleep mode,User puts companions to sleep,Built,P0,
 Companion Dynamics,Status awareness,Companions know who is awake/sleeping,Built,P0,
 Companion Dynamics,Companion deletion,Permanent removal + in-app confirm,Built,P0,Remaining companions mourn
 Companion Dynamics,Companion replacement,Summon a new companion after deletion,Built,P1,UPDATED Future->Built; free if none owned else unlock
-Companion Dynamics,Role adaptation,Shift roles based on needs,Partial,P0,AI detects topics
+Companion Dynamics,Role adaptation,Shift roles based on needs,Built,P0,UPDATED Partial->Built; role-adaptation in prompt RULES
 Emotional Intel,Mood detection,Detect stress/excitement in messages,Built,P0,Keyword-based
 Emotional Intel,Tone adjustment,Companions shift tone based on mood,Built,P0,
 Emotional Intel,Invisible tracking,User never sees mood data,Built,P0,
 Emotional Intel,Long-term pattern analysis,Track mood across sessions,Built,P1,UPDATED Future->Built; /mood backend + summary
 Emotional Intel,Support escalation,Crisis detection + resources (988),Built,P0,UPDATED Partial->Built; lib/crisis.js
 Emotional Intel,Therapist suggestions,Local mental health providers,Partial,P1,Via location-aware prompt
-Emotional Intel,Support network referral,Suggest talking to friends/family,Future,P1,
+Emotional Intel,Support network referral,Suggest talking to friends/family,Built,P1,UPDATED Future->Built; lib/people.js support-network prompt block
 Location,Location access,Opt-in geolocation or manual area,Built,P1,UPDATED Future->Built; precise stays on-device
 Location,Restaurant/activity suggestions,Local ideas via companion prompt,Built,P1,UPDATED; coarse area label only
 Location,Therapist finder,Local mental health providers,Partial,P1,Via prompt
@@ -103,7 +103,8 @@ Visual/UI,Rental Body system,Visual avatar customization (hair/clothes),Future,P
 Visual/UI,Photo-based appearance,Upload picture for look,Future,P2,
 Notifications,Companion check-ins,Web Push reach-outs during the day,Built,P1,UPDATED Future->Built; VAPID + cron
 Notifications,Random thoughts,Unprompted idle thoughts,Built,P2,UPDATED Future->Built
-Notifications,Notification frequency control,"Daily/few/off, honored by cron",Built,P1,UPDATED Future->Built
+Notifications,Customizable check-in times,"User-set times, multiple per day, timezone-aware",Built,P1,NEW; replaces daily/few preset; worker scheduleDue + Intl tz
+Notifications,Push self-test & diagnostics,In-app test notification + delivery status,Built,P2,"NEW; /push/status, /push/test, local SW notify"
 Notifications,Toggle voice activation,Disable call-by-name,Built,P1,UPDATED Future->Built
 Notifications,Ambient conversation alerts,Notified companions were chatting,Future,P2,
 Notifications,Location-based nudges,Near favorite spot suggestions,Future,P2,
