@@ -195,9 +195,13 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     // Reply in turn so each companion can see and react to what the others just
     // said this turn. A per-companion typing indicator keeps it feeling live.
     let run = [...nm];
+    const usedThisTurn = new Set();
     for (const c of act) {
       setTyping(c);
-      const t = await askCompanion(c, profile, run, comps, priv ? 'private' : 'group');
+      let t = await askCompanion(c, profile, run, comps, priv ? 'private' : 'group');
+      // Don't let two companions echo the same line (mainly the offline voice).
+      if (usedThisTurn.has(t)) t = await askCompanion(c, profile, run, comps, priv ? 'private' : 'group');
+      usedThisTurn.add(t);
       const m = { role: 'assistant', companion: c, content: t, ts: Date.now() };
       run = [...run, m];
       setMsgs((p) => [...p, m]);
