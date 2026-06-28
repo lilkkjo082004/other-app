@@ -3,7 +3,8 @@ import { C, COMP_COLORS } from '../theme.js';
 import { Shell } from '../components/ui.jsx';
 import { speakAs, useSpeechRec } from '../lib/voice.js';
 import { genAmbient, bumpBond } from '../lib/relationships.js';
-import { askCompanion, greetCompanion, proactiveCompanion, ambientThreadAI } from '../lib/ai.js';
+import { askCompanion, greetCompanion, proactiveCompanion, ambientThreadAI, extractMemories } from '../lib/ai.js';
+import { mergeMemories, removeMemory } from '../lib/memory.js';
 import { isLimited } from '../lib/entitlements.js';
 import { genComp } from '../lib/companions.js';
 import { pickSigns } from '../lib/zodiac.js';
@@ -32,6 +33,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const [voiceCall, setVoiceCall] = useState(restored?.voiceCall !== false);   // call-by-name on by default
   const [pushFreq, setPushFreq] = useState(restored?.pushFrequency || 'daily');
   const [pushSched, setPushSched] = useState(restored?.pushSchedule || null);
+  const [memories, setMemories] = useState(restored?.memories || []);
   const [confirmDel, setConfirmDel] = useState(null);  // companion pending delete confirmation
   const [copiedIdx, setCopiedIdx] = useState(null);
   const [atBottom, setAtBottom] = useState(true);
@@ -46,6 +48,26 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const idleRef = useRef(null);
   const stopRef = useRef(false);
   const abortRef = useRef(null);
+  const memBusyRef = useRef(false);
+  const lastMemLenRef = useRef((restored?.messages || []).length);
+
+  // Companions remember durable facts the user shares (job, pets, events…).
+  // Memories ride along on `profile` so every prompt/AI call sees them.
+  const memProfile = { ...profile, memories };
+
+  // After enough new turns, ask the model to extract long-term memories from
+  // recent history and merge them in. Throttled + best-effort + non-blocking.
+  async function maybeExtractMemories(history) {
+    if (!aiEnabled() || memBusyRef.current) return;
+    if (history.length - lastMemLenRef.current < 6) return;
+    memBusyRef.current = true;
+    lastMemLenRef.current = history.length;
+    try {
+      const found = await extractMemories(profile, history);
+      if (found.length) setMemories((prev) => mergeMemories(prev, found));
+    } catch (e) { /* best-effort */ }
+    memBusyRef.current = false;
+  }
   const [hintSeen, setHintSeen] = useState(() => { try { return localStorage.getItem('other_hint_seen') === '1'; } catch (e) { return false; } });
   const dismissHint = () => { setHintSeen(true); try { localStorage.setItem('other_hint_seen', '1'); } catch (e) { /* ignore */ } };
 
@@ -88,7 +110,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
           const c = awake[Math.floor(Math.random() * awake.length)];
           setTyping(c); setLoading(true);
           try {
-            const t = await proactiveCompanion(c, profile, 'group', comps, restored.messages || [], 'return', humanizeAway(awayMs));
+            const t = await proactiveCompanion(c, memProfile, 'group', comps, restored.messages || [], 'return', humanizeAway(awayMs));
             setMsgs((p) => [...p, { role: 'assistant', companion: c, content: t, ts: Date.now() }]);
             if (autoSpeak) speakAs(t, c);
           } catch (e) { /* ignore */ }
@@ -129,7 +151,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       const c = awake[Math.floor(Math.random() * awake.length)];
       setTyping(c); setLoading(true);
       try {
-        const t = await proactiveCompanion(c, profile, 'group', comps, msgsRef.current, 'idle');
+        const t = await proactiveCompanion(c, memProfile, 'group', comps, msgsRef.current, 'idle');
         setMsgs((p) => [...p, { role: 'assistant', companion: c, content: t, ts: Date.now() }]);
         if (autoSpeak) speakAs(t, c);
       } catch (e) { /* ignore */ }
@@ -159,15 +181,15 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   }
 
   useEffect(() => {
-    onPersist?.({ companions: comps, messages: msgs, chatMode, autoSpeak, trialStart, bonds, voiceCall, pushFrequency: pushFreq, pushSchedule: pushSched });
+    onPersist?.({ companions: comps, messages: msgs, chatMode, autoSpeak, trialStart, bonds, voiceCall, pushFrequency: pushFreq, pushSchedule: pushSched, memories });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [comps, msgs, chatMode, autoSpeak, bonds, voiceCall, pushFreq, pushSched]);
+  }, [comps, msgs, chatMode, autoSpeak, bonds, voiceCall, pushFreq, pushSched, memories]);
 
   async function greet() {
     setLoading(true);
     const cc = priv ? [priv] : active;
     for (const c of cc) {
-      const t = await greetCompanion(c, profile, priv ? 'private' : 'group', comps);
+      const t = await greetCompanion(c, memProfile, priv ? 'private' : 'group', comps);
       setMsgs((p) => [...p, { role: 'assistant', companion: c, content: t, ts: Date.now() }]);
       if (autoSpeak) speakAs(t, c);
     }
@@ -215,9 +237,9 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       abortRef.current = controller;
       let t;
       try {
-        t = await askCompanion(c, profile, run, comps, priv ? 'private' : 'group', controller.signal);
+        t = await askCompanion(c, memProfile, run, comps, priv ? 'private' : 'group', controller.signal);
         // Don't let two companions echo the same line (mainly the offline voice).
-        if (usedThisTurn.has(t)) t = await askCompanion(c, profile, run, comps, priv ? 'private' : 'group', controller.signal);
+        if (usedThisTurn.has(t)) t = await askCompanion(c, memProfile, run, comps, priv ? 'private' : 'group', controller.signal);
       } catch (e) { break; } // generation stopped
       if (stopRef.current) break;
       usedThisTurn.add(t);
@@ -231,6 +253,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     setLoading(false);
     inputRef.current?.focus();
     armIdle();
+    maybeExtractMemories(run);
   }
 
   function stopGenerating() {
@@ -252,7 +275,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     stopRef.current = false; setLoading(true); setTyping(comp);
     const controller = new AbortController(); abortRef.current = controller;
     try {
-      const t = await askCompanion(comp, profile, history, comps, priv ? 'private' : 'group', controller.signal);
+      const t = await askCompanion(comp, memProfile, history, comps, priv ? 'private' : 'group', controller.signal);
       if (!stopRef.current) {
         setMsgs((p) => [...p, { role: 'assistant', companion: comp, content: t, ts: Date.now() }]);
         if (autoSpeak) speakAs(t, comp);
@@ -291,7 +314,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
 
   async function addCompanion(c) {
     setComps((p) => [...p, c]);
-    const t = await greetCompanion(c, profile, 'group', [...comps, c]);
+    const t = await greetCompanion(c, memProfile, 'group', [...comps, c]);
     setMsgs((p) => [...p, { role: 'assistant', companion: c, content: t }]);
   }
 
@@ -344,6 +367,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       return (
         <CompanionProfile
           companion={pc} trialStart={trialStart} history={msgs} comps={comps} bonds={bonds}
+          memories={memories} onForgetMemory={(id) => setMemories((m) => removeMemory(m, id))}
           onCustomize={(updates) => setComps((p) => p.map((c) => (c.id === pc.id ? { ...c, ...updates } : c)))}
           onBack={() => setPanel(null)}
           onPrivate={() => { setChatMode(pc.id); setPanel(null); }}

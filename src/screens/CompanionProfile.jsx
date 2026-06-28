@@ -8,7 +8,7 @@ import { relationshipsFor } from '../lib/relationships.js';
 import { naturalVoiceEnabled } from '../config.js';
 import { speakAs, listBrowserVoices, NATURAL_VOICE_PRESETS, VOICE_TONES } from '../lib/voice.js';
 
-export default function CompanionProfile({ companion: c, trialStart, history, comps, bonds, onCustomize, onPrivate, onSleepToggle, onDelete, onUnlock, onBack }) {
+export default function CompanionProfile({ companion: c, trialStart, history, comps, bonds, memories, onForgetMemory, onCustomize, onPrivate, onSleepToggle, onDelete, onUnlock, onBack }) {
   const col = c.color.primary;
   const z = ZODIAC[c.zodiac];
   const sleeping = c.status === 'sleeping';
@@ -128,6 +128,24 @@ export default function CompanionProfile({ companion: c, trialStart, history, co
                 <span style={{ fontSize: 11, color: C.textSoft, textTransform: 'capitalize' }}>{r.label}</span>
               </div>
             ))}
+          </div>
+        )}
+        {Array.isArray(memories) && memories.length > 0 && (
+          <div style={card}>
+            <div style={label}>What {c.name} remembers about you</div>
+            <div style={{ fontSize: 11, color: C.textDim, marginBottom: 10 }}>Picked up from your conversations. Tap × to forget anything.</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+              {memories.slice(0, 30).map((m) => (
+                <div key={m.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: col, marginTop: 7, flexShrink: 0 }} />
+                  <span style={{ fontSize: 13, lineHeight: 1.4, flex: 1, color: C.text }}>{m.text}</span>
+                  {onForgetMemory && (
+                    <button aria-label={`Forget: ${m.text}`} onClick={() => onForgetMemory(m.id)}
+                      style={{ background: 'none', border: 'none', color: C.textDim, cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}>×</button>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
         <div style={card}>

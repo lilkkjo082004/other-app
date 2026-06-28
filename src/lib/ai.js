@@ -167,16 +167,58 @@ export async function proactiveCompanion(comp, profile, mode, allC, history, kin
   return placeholderProactive(comp, profile, kind);
 }
 
-// Lightweight one-shot completion through the proxy (used for ambient threads).
-async function rawComplete(system, userText) {
+// Lightweight one-shot completion through the proxy (used for ambient threads
+// and memory extraction).
+async function rawComplete(system, userText, maxTokens = 240) {
   const res = await fetch(aiEndpoint(), {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...authHeader() },
-    body: JSON.stringify({ model: AI_MODEL, max_tokens: 240, system, messages: [{ role: 'user', content: userText }] }),
+    body: JSON.stringify({ model: AI_MODEL, max_tokens: maxTokens, system, messages: [{ role: 'user', content: userText }] }),
   });
   if (!res.ok) throw new Error(`proxy ${res.status}`);
   const data = await res.json();
   return (data.text || '').trim();
+}
+
+const MEMORY_SYS = `You extract durable, long-term memories about the USER from a chat between them and their AI companion(s). Return ONLY a JSON array, nothing else.
+Each item: {"text": string, "kind": "fact"|"preference"|"event"|"relationship"|"goal"|"emotion", "at": number|null}
+Rules:
+- Capture only things worth remembering weeks from now: their job/studies, pets, family & friends (with names), where they live, meaningful hobbies, important upcoming or past events, goals, strong likes/dislikes, health or major life situations.
+- Write each "text" as a short third-person statement: "Has a dog named Biscuit", "Job interview on Friday", "Training for a half marathon", "Best friend is Sam".
+- "at" applies to events ONLY: an absolute time in UNIX MILLISECONDS when a date is given or clearly implied (use the provided current date to resolve "Friday", "next week", etc.); otherwise null.
+- Do NOT capture small talk, the companion's own statements, or anything already in the profile.
+- Return 0 to 8 items. If nothing durable was shared, return [].`;
+
+function parseMemoryJSON(text) {
+  if (!text) return [];
+  const t = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+  const i = t.indexOf('['), j = t.lastIndexOf(']');
+  if (i === -1 || j === -1 || j < i) return [];
+  let arr;
+  try { arr = JSON.parse(t.slice(i, j + 1)); } catch (e) { return []; }
+  if (!Array.isArray(arr)) return [];
+  return arr
+    .filter((m) => m && typeof m.text === 'string' && m.text.trim())
+    .map((m) => ({ text: m.text.trim(), kind: m.kind, at: Number.isFinite(m.at) ? m.at : null }))
+    .slice(0, 8);
+}
+
+/** Extract long-term memories about the user from recent history. Returns an
+ *  array of {text, kind, at} (possibly empty); never throws. AI-only — returns
+ *  [] when no proxy is configured. */
+export async function extractMemories(profile, messages) {
+  if (!aiEnabled()) return [];
+  const convo = (messages || []).filter((m) => m.role !== 'system');
+  if (convo.length < 2) return [];
+  const recent = convo.slice(-30);
+  const transcript = recent
+    .map((m) => (m.role === 'user' ? `${profile?.name || 'User'}: ${m.content}` : `${m.companion?.name || 'Companion'}: ${m.content}`))
+    .join('\n');
+  const today = new Date().toDateString();
+  const ask = `Current date: ${today}.\nExtract long-term memories about ${profile?.name || 'the user'} from this conversation:\n\n${transcript}`;
+  let text;
+  try { text = await rawComplete(MEMORY_SYS, ask, 500); } catch (e) { return []; }
+  return parseMemoryJSON(text);
 }
 
 /** AI-generated ambient conversation between two awake companions (talking to
