@@ -59,6 +59,7 @@ Companion Dynamics,Status awareness,Companions know who is awake/sleeping,Built,
 Companion Dynamics,Companion deletion,Permanent removal + in-app confirm,Built,P0,Remaining companions mourn
 Companion Dynamics,Companion replacement,Summon a new companion after deletion,Built,P1,UPDATED Future->Built; free if none owned else unlock
 Companion Dynamics,Role adaptation,Shift roles based on needs,Built,P0,UPDATED Partial->Built; role-adaptation in prompt RULES
+Companion Dynamics,Long-term memory,"Remembers facts (job, pets, events) + follows up across sessions",Built,P0,"NEW; lib/memory.js, AI extraction, synced, user-forgettable"
 Emotional Intel,Mood detection,Detect stress/excitement in messages,Built,P0,Keyword-based
 Emotional Intel,Tone adjustment,Companions shift tone based on mood,Built,P0,
 Emotional Intel,Invisible tracking,User never sees mood data,Built,P0,
