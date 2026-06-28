@@ -132,6 +132,38 @@ export async function askCompanion(comp, profile, msgs, allC, mode) {
   return placeholder(comp, profile, lastUser?.content);
 }
 
+function placeholderProactive(comp, profile, kind) {
+  const name = profile.name || 'you';
+  if (kind === 'idle') {
+    return pick([
+      `random thought, ${name} — do you think plants get bored? anyway. what's on your mind?`,
+      `it got quiet so I started thinking. how are you actually doing right now?`,
+      `${name}, something you said a while back has been rattling around my head. we should pick it back up.`,
+    ]);
+  }
+  return pick([
+    `hey ${name} — there you are. I was just wondering how you've been.`,
+    `welcome back, ${name}. ok I have to ask — how did things turn out?`,
+    `${name}! good timing. I've been saving a thought for you.`,
+  ]);
+}
+
+/** A companion-initiated message: a warm welcome-back ('return') or an
+ *  unprompted thought during a lull ('idle'). Falls back to placeholders. */
+export async function proactiveCompanion(comp, profile, mode, allC, history, kind = 'return', awayLabel = '') {
+  if (aiEnabled()) {
+    try {
+      const intent = kind === 'idle'
+        ? `(It's been quiet for a few minutes. As ${comp.name}, share a short unprompted thought or gently check in with ${profile.name} — curious and warm, 1-2 sentences. Don't mention being an AI or the silence itself.)`
+        : `(${profile.name} just reopened the app after being away ${awayLabel}. As ${comp.name}, welcome them back warmly and specifically — reference something real from your past chats if you can. 1-2 sentences.)`;
+      const seed = [...(history || []).filter((m) => m.role !== 'system'), { role: 'user', content: intent }];
+      return await viaProxy(comp, profile, seed, allC, mode);
+    } catch (e) { return placeholderProactive(comp, profile, kind); }
+  }
+  await delay(400);
+  return placeholderProactive(comp, profile, kind);
+}
+
 /** First greeting when a companion comes on screen. */
 export async function greetCompanion(comp, profile, mode, allC) {
   if (aiEnabled()) {

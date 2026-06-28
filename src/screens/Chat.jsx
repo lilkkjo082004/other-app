@@ -3,7 +3,7 @@ import { C, COMP_COLORS } from '../theme.js';
 import { Shell } from '../components/ui.jsx';
 import { speakAs, useSpeechRec } from '../lib/voice.js';
 import { genAmbient, bumpBond } from '../lib/relationships.js';
-import { askCompanion, greetCompanion } from '../lib/ai.js';
+import { askCompanion, greetCompanion, proactiveCompanion } from '../lib/ai.js';
 import { isLimited } from '../lib/entitlements.js';
 import { genComp } from '../lib/companions.js';
 import { pickSigns } from '../lib/zodiac.js';
@@ -38,6 +38,8 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const [summonCandidate, setSummonCandidate] = useState(null);
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
+  const msgsRef = useRef(msgs);
+  const idleRef = useRef(null);
 
   const active = comps.filter((c) => c.status === 'awake');
   const priv = chatMode !== 'group' ? comps.find((c) => c.id === chatMode) : null;
@@ -65,10 +67,26 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       const disc = { role: 'system', kind: 'disclosure', content: DISCLOSURE_TEXT };
       if (restored) {
         setMsgs((p) => (p[p.length - 1]?.kind === 'disclosure' ? p : [...p, disc]));
+        // Returning after a while? A companion welcomes you back, unprompted.
+        const lastTs = Math.max(0, ...((restored.messages || []).map((m) => m.ts || 0)));
+        const awayMs = lastTs ? Date.now() - lastTs : 0;
+        const awake = comps.filter((c) => c.status === 'awake');
+        if (awake.length && awayMs > 2 * 60 * 60 * 1000) {
+          const c = awake[Math.floor(Math.random() * awake.length)];
+          setTyping(c); setLoading(true);
+          try {
+            const t = await proactiveCompanion(c, profile, 'group', comps, restored.messages || [], 'return', humanizeAway(awayMs));
+            setMsgs((p) => [...p, { role: 'assistant', companion: c, content: t, ts: Date.now() }]);
+            if (autoSpeak) speakAs(t, c);
+          } catch (e) { /* ignore */ }
+          setTyping(null); setLoading(false);
+        }
+        armIdle();
         return;
       }
       setMsgs([disc]);
       await greet();
+      armIdle();
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -80,6 +98,31 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     window.addEventListener('offline', down);
     return () => { window.removeEventListener('online', up); window.removeEventListener('offline', down); };
   }, []);
+
+  const loadingRef = useRef(false);
+  useEffect(() => { msgsRef.current = msgs; }, [msgs]);
+  useEffect(() => { loadingRef.current = loading; }, [loading]);
+  useEffect(() => () => clearTimeout(idleRef.current), []);
+
+  // Companion-initiated "unprompted thought" after a few minutes of quiet.
+  // Re-armed on each send; fires once per idle stretch.
+  function armIdle() {
+    clearTimeout(idleRef.current);
+    idleRef.current = setTimeout(async () => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+      if (loadingRef.current) return;
+      const awake = comps.filter((c) => c.status === 'awake');
+      if (!awake.length) return;
+      const c = awake[Math.floor(Math.random() * awake.length)];
+      setTyping(c); setLoading(true);
+      try {
+        const t = await proactiveCompanion(c, profile, 'group', comps, msgsRef.current, 'idle');
+        setMsgs((p) => [...p, { role: 'assistant', companion: c, content: t, ts: Date.now() }]);
+        if (autoSpeak) speakAs(t, c);
+      } catch (e) { /* ignore */ }
+      setTyping(null); setLoading(false);
+    }, 4 * 60 * 1000);
+  }
 
   // Recurring AI disclosure reminder (ToS §13 — required, not user-disableable).
   useDisclosureReminder(useCallback(() => {
@@ -148,6 +191,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     setTyping(null);
     setLoading(false);
     inputRef.current?.focus();
+    armIdle();
   }
 
   function togSleep(id) {
@@ -398,6 +442,14 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
 }
 
 const menuBtn = { background: 'none', border: `1px solid ${C.border}`, borderRadius: 5, padding: '2px 7px', color: C.textSoft, cursor: 'pointer', fontSize: 9, fontFamily: "'DM Sans',sans-serif" };
+
+function humanizeAway(ms) {
+  const h = ms / 3600000;
+  if (h < 2) return 'a little while';
+  if (h < 24) return `${Math.round(h)} hours`;
+  const d = h / 24;
+  return d < 2 ? 'a day' : `${Math.round(d)} days`;
+}
 
 function fmtTime(ts) {
   try { return new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); } catch (e) { return ''; }
