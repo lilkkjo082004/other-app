@@ -31,6 +31,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const [bonds, setBonds] = useState(restored?.bonds || {});
   const [voiceCall, setVoiceCall] = useState(restored?.voiceCall !== false);   // call-by-name on by default
   const [pushFreq, setPushFreq] = useState(restored?.pushFrequency || 'daily');
+  const [pushSched, setPushSched] = useState(restored?.pushSchedule || null);
   const [confirmDel, setConfirmDel] = useState(null);  // companion pending delete confirmation
   const [copiedIdx, setCopiedIdx] = useState(null);
   const [atBottom, setAtBottom] = useState(true);
@@ -158,9 +159,9 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   }
 
   useEffect(() => {
-    onPersist?.({ companions: comps, messages: msgs, chatMode, autoSpeak, trialStart, bonds, voiceCall, pushFrequency: pushFreq });
+    onPersist?.({ companions: comps, messages: msgs, chatMode, autoSpeak, trialStart, bonds, voiceCall, pushFrequency: pushFreq, pushSchedule: pushSched });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [comps, msgs, chatMode, autoSpeak, bonds, voiceCall, pushFreq]);
+  }, [comps, msgs, chatMode, autoSpeak, bonds, voiceCall, pushFreq, pushSched]);
 
   async function greet() {
     setLoading(true);
@@ -329,6 +330,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         onAutoSpeak={setAutoSpeak} onUpdateProfile={onUpdateProfile}
         voiceCall={voiceCall} onVoiceCall={setVoiceCall}
         pushFrequency={pushFreq} onPushFrequency={setPushFreq}
+        pushSchedule={pushSched} onPushSchedule={setPushSched}
         onSleepAll={() => setComps((p) => p.map((c) => (c.status === 'awake' ? { ...c, status: 'sleeping' } : c)))}
         onWakeAll={() => setComps((p) => p.map((c) => (c.status === 'sleeping' ? { ...c, status: 'awake' } : c)))}
         onReset={onReset}

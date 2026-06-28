@@ -10,7 +10,7 @@ import { loadSession, saveSession } from '../lib/storage.js';
 import { LegalLink } from './Legal.jsx';
 import ProfileEdit from './ProfileEdit.jsx';
 
-export default function Settings({ profile, comps, autoSpeak, trialStart, cloud, authed, email, onSignIn, onSignOut, onAutoSpeak, onUpdateProfile, voiceCall, onVoiceCall, pushFrequency, onPushFrequency, onSleepAll, onWakeAll, onReset, onBack }) {
+export default function Settings({ profile, comps, autoSpeak, trialStart, cloud, authed, email, onSignIn, onSignOut, onAutoSpeak, onUpdateProfile, voiceCall, onVoiceCall, pushFrequency, onPushFrequency, pushSchedule, onPushSchedule, onSleepAll, onWakeAll, onReset, onBack }) {
   const [editing, setEditing] = useState(false);
   const living = comps.filter((c) => c.status !== 'deleted');
   const allAwake = living.length > 0 && living.every((c) => c.status === 'awake');
@@ -27,10 +27,19 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
     setPushErr(null); setPushBusy(true);
     try {
       if (pushOn) { await disablePush(); setPushOn(false); }
-      else { await enablePush(); setPushOn(true); }
+      else { await enablePush(); setPushOn(true); if (!pushSchedule) saveTimes(['09:00']); }
     } catch (e) { setPushErr(String(e.message || e)); }
     setPushBusy(false);
   }
+  // Check-in schedule: user-chosen wall-clock times in their own timezone.
+  const localTz = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch (e) { return 'UTC'; } };
+  const times = pushSchedule?.times || [];
+  const [newTime, setNewTime] = useState('09:00');
+  const saveTimes = (next) => onPushSchedule?.({ times: [...new Set(next)].sort(), tz: localTz() });
+  const addTime = () => { if (/^\d{2}:\d{2}$/.test(newTime) && !times.includes(newTime)) saveTimes([...times, newTime]); };
+  const removeTime = (t) => saveTimes(times.filter((x) => x !== t));
+  const fmtTime = (t) => { const [h, m] = t.split(':').map(Number); const ap = h < 12 ? 'AM' : 'PM'; return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${ap}`; };
+
   const [pushTest, setPushTest] = useState(null);
   const [testBusy, setTestBusy] = useState(false);
   async function runPushTest() {
@@ -207,18 +216,28 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
                 )}
               </div>
             )}
-            {pushOn && onPushFrequency && (
+            {pushOn && (
               <div style={{ ...card }}>
-                <div style={{ fontSize: 13, marginBottom: 2 }}>How often</div>
-                <div style={{ fontSize: 11, color: C.textDim, marginBottom: 10 }}>How chatty your companions get</div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  {[{ v: 'daily', l: 'Daily' }, { v: 'few', l: 'A few/week' }, { v: 'off', l: 'Off' }].map((o) => {
-                    const on = (pushFrequency || 'daily') === o.v;
-                    return (
-                      <button key={o.v} onClick={() => onPushFrequency(o.v)} style={{ flex: 1, padding: '8px 0', borderRadius: 9, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", fontSize: 12, background: on ? `${C.glow1}22` : 'transparent', border: `1px solid ${on ? C.glow1 : C.border}`, color: on ? C.glow1 : C.textSoft, fontWeight: on ? 600 : 400 }}>{o.l}</button>
-                    );
-                  })}
+                <div style={{ fontSize: 13, marginBottom: 2 }}>Check-in times</div>
+                <div style={{ fontSize: 11, color: C.textDim, marginBottom: 12 }}>When your companions reach out, in your local time. Add as many as you like.</div>
+                {times.length === 0 ? (
+                  <div style={{ fontSize: 12, color: C.textDim, marginBottom: 12 }}>No times set — your companions will stay quiet until you add one.</div>
+                ) : (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+                    {times.map((t) => (
+                      <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '6px 8px 6px 12px', borderRadius: 999, background: `${C.glow1}1e`, border: `1px solid ${C.glow1}`, color: C.glow1, fontSize: 12.5, fontWeight: 600 }}>
+                        {fmtTime(t)}
+                        <button aria-label={`Remove ${fmtTime(t)}`} onClick={() => removeTime(t)} style={{ background: 'none', border: 'none', color: C.glow1, cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 2px' }}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} aria-label="New check-in time"
+                    style={{ flex: 1, padding: '9px 10px', borderRadius: 9, background: C.surface, border: `1px solid ${C.border}`, color: C.text, fontFamily: "'DM Sans',sans-serif", fontSize: 13, colorScheme: 'dark' }} />
+                  <button onClick={addTime} aria-label="Add check-in time" style={{ padding: '9px 18px', borderRadius: 9, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", fontSize: 13, fontWeight: 600, background: `${C.glow1}22`, border: `1px solid ${C.glow1}`, color: C.glow1 }}>Add</button>
                 </div>
+                <div style={{ fontSize: 11, color: C.textDim, marginTop: 10 }}>Times are checked about every 15 minutes, so a check-in may arrive a few minutes after the time you set.</div>
               </div>
             )}
           </>
