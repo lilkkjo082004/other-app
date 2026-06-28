@@ -304,7 +304,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     const usedColors = new Set(living.map((c) => c.color?.name));
     let ci = living.length % COMP_COLORS.length;
     for (let i = 0; i < COMP_COLORS.length; i++) { if (!usedColors.has(COMP_COLORS[i].name)) { ci = i; break; } }
-    const cand = genComp(sign, ci, usedNames);
+    const cand = genComp(sign, ci, usedNames, { allowOlder: profile.ageGroup !== 'under18' });
     cand.purchased = false; // decided after the waking-up sequence
     setSummonCandidate(cand);
   }

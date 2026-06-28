@@ -62,8 +62,9 @@ export default function App() {
   const handlePref = (r) => {
     const signs = pickSigns(profile.astrology.western);
     const used = [];
+    const allowOlder = profile.ageGroup !== 'under18';
     const cs = signs.map((s, i) => {
-      const c = genComp(s, i, used);
+      const c = genComp(s, i, used, { allowOlder });
       used.push(c.name);
       if (r.mode === 'builder') c.builderTraits = r.builderTraits;
       if (r.freeText) c.freeText = r.freeText;

@@ -23,12 +23,15 @@ const PSEED = [
 
 const PRONOUNS = ['he/him', 'she/her', 'they/them'];
 
-export function genComp(sign, ci, used) {
+export function genComp(sign, ci, used, opts = {}) {
   const el = ZODIAC[sign].el.toLowerCase();
   const pool = NP[el] || NP.fire;
   const available = pool.filter((n) => !used.includes(n));
   const name = available[Math.floor(Math.random() * available.length)] || pool[0];
   const seed = PSEED[Math.floor(Math.random() * PSEED.length)];
+  // For adults, some companions present as a bit older/more grounded (ToS §3.1
+  // autonomous presentation). Minors always get peer-age companions.
+  const apparentAge = opts.allowOlder && Math.random() < 0.4 ? 'older' : 'peer';
   return {
     id: Math.random().toString(36).slice(2, 8),
     name,
@@ -39,6 +42,7 @@ export function genComp(sign, ci, used) {
     color: COMP_COLORS[ci % COMP_COLORS.length],
     colorName: COMP_COLORS[ci % COMP_COLORS.length].name,
     status: 'awake',
+    apparentAge,
     builderTraits: null,
     freeText: null,
     voiceIdx: ci,
