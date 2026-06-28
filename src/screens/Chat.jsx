@@ -11,6 +11,7 @@ import { detectMood } from '../lib/evolution.js';
 import { useDisclosureReminder, DISCLOSURE_TEXT } from '../lib/disclosure.js';
 import { detectCrisis, CRISIS_RESOURCES, CRISIS_INTRO } from '../lib/crisis.js';
 import { isAuthed as apiAuthed, logMood } from '../lib/api.js';
+import { aiEnabled } from '../config.js';
 import UnlockSheet from '../components/UnlockSheet.jsx';
 import Settings from './Settings.jsx';
 import CompanionProfile from './CompanionProfile.jsx';
@@ -42,6 +43,10 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const inputRef = useRef(null);
   const msgsRef = useRef(msgs);
   const idleRef = useRef(null);
+  const stopRef = useRef(false);
+  const abortRef = useRef(null);
+  const [hintSeen, setHintSeen] = useState(() => { try { return localStorage.getItem('other_hint_seen') === '1'; } catch (e) { return false; } });
+  const dismissHint = () => { setHintSeen(true); try { localStorage.setItem('other_hint_seen', '1'); } catch (e) { /* ignore */ } };
 
   const active = comps.filter((c) => c.status === 'awake');
   const priv = chatMode !== 'group' ? comps.find((c) => c.id === chatMode) : null;
@@ -194,23 +199,60 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     }
     // Reply in turn so each companion can see and react to what the others just
     // said this turn. A per-companion typing indicator keeps it feeling live.
+    stopRef.current = false;
     let run = [...nm];
     const usedThisTurn = new Set();
     for (const c of act) {
+      if (stopRef.current) break;
       setTyping(c);
-      let t = await askCompanion(c, profile, run, comps, priv ? 'private' : 'group');
-      // Don't let two companions echo the same line (mainly the offline voice).
-      if (usedThisTurn.has(t)) t = await askCompanion(c, profile, run, comps, priv ? 'private' : 'group');
+      const controller = new AbortController();
+      abortRef.current = controller;
+      let t;
+      try {
+        t = await askCompanion(c, profile, run, comps, priv ? 'private' : 'group', controller.signal);
+        // Don't let two companions echo the same line (mainly the offline voice).
+        if (usedThisTurn.has(t)) t = await askCompanion(c, profile, run, comps, priv ? 'private' : 'group', controller.signal);
+      } catch (e) { break; } // generation stopped
+      if (stopRef.current) break;
       usedThisTurn.add(t);
       const m = { role: 'assistant', companion: c, content: t, ts: Date.now() };
       run = [...run, m];
       setMsgs((p) => [...p, m]);
       if (autoSpeak) speakAs(t, c);
     }
+    abortRef.current = null;
     setTyping(null);
     setLoading(false);
     inputRef.current?.focus();
     armIdle();
+  }
+
+  function stopGenerating() {
+    stopRef.current = true;
+    try { abortRef.current?.abort(); } catch (e) { /* ignore */ }
+    setTyping(null);
+    setLoading(false);
+  }
+
+  // Re-roll the most recent companion reply.
+  async function regenerateLast() {
+    if (loading) return;
+    let idx = -1;
+    for (let i = msgs.length - 1; i >= 0; i--) { if (msgs[i].role === 'assistant' && !msgs[i].isAmbient) { idx = i; break; } }
+    if (idx < 0) return;
+    const comp = comps.find((x) => x.id === msgs[idx].companion?.id) || msgs[idx].companion;
+    const history = msgs.slice(0, idx);
+    setMsgs((p) => p.filter((_, i) => i !== idx));
+    stopRef.current = false; setLoading(true); setTyping(comp);
+    const controller = new AbortController(); abortRef.current = controller;
+    try {
+      const t = await askCompanion(comp, profile, history, comps, priv ? 'private' : 'group', controller.signal);
+      if (!stopRef.current) {
+        setMsgs((p) => [...p, { role: 'assistant', companion: comp, content: t, ts: Date.now() }]);
+        if (autoSpeak) speakAs(t, comp);
+      }
+    } catch (e) { /* stopped */ }
+    abortRef.current = null; setTyping(null); setLoading(false);
   }
 
   function togSleep(id) {
@@ -309,6 +351,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const visible = msgs.filter((m) => m.role === 'system' || chatMode === 'group' || m.role === 'user' || m.companion?.id === chatMode);
   // Ambient catch-up is companion-to-companion, so it only shows in group view.
   const stream = chatMode === 'group' ? [...ambient, ...visible] : visible;
+  const lastAssistant = [...msgs].reverse().find((m) => m.role === 'assistant' && !m.isAmbient);
   // Search filters across the whole history (ignores chat-mode + system notes).
   const q = (search || '').trim().toLowerCase();
   const searching = search != null && q.length > 0;
@@ -340,6 +383,9 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
           )}
         </div>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <span title={aiEnabled() ? 'Live AI responses' : 'Offline placeholder replies'} style={{ fontSize: 9, color: aiEnabled() ? C.glow3 : C.textDim, display: 'flex', alignItems: 'center', gap: 3, marginRight: 2 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: aiEnabled() ? C.glow3 : C.textDim }} />{aiEnabled() ? 'Live' : 'Offline'}
+          </span>
           <button aria-label={autoSpeak ? 'Turn off auto-speak' : 'Turn on auto-speak'} aria-pressed={autoSpeak} onClick={() => setAutoSpeak(!autoSpeak)} style={{ background: autoSpeak ? `${C.glow3}22` : 'none', border: `1px solid ${autoSpeak ? C.glow3 : C.border}`, borderRadius: 7, padding: '5px 8px', color: autoSpeak ? C.glow3 : C.textDim, fontSize: 13, cursor: 'pointer' }}>{autoSpeak ? '🔊' : '🔇'}</button>
           {voiceCall && <button aria-label={listening ? 'Listening — tap to stop' : 'Call a companion by voice'} onClick={startListening} style={{ background: listening ? `${C.danger}22` : 'none', border: `1px solid ${listening ? C.danger : C.border}`, borderRadius: 7, padding: '5px 8px', color: listening ? C.danger : C.textDim, fontSize: 13, cursor: 'pointer', animation: listening ? 'micPulse 1.5s infinite' : 'none' }}>🎤</button>}
           <button aria-label="Search messages" onClick={() => setSearch((s) => (s == null ? '' : null))} style={{ background: search != null ? `${C.glow1}22` : 'none', border: `1px solid ${search != null ? C.glow1 : C.border}`, borderRadius: 7, padding: '5px 8px', color: search != null ? C.glow1 : C.textDim, fontSize: 13, cursor: 'pointer' }}>🔍</button>
@@ -422,6 +468,9 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
                   )}
                 </div>
                 {m.ts && <span style={{ fontSize: 8.5, color: C.textDim, display: 'block', marginTop: 2, textAlign: m.role === 'user' ? 'right' : 'left' }}>{fmtTime(m.ts)}</span>}
+                {m === lastAssistant && !loading && !searching && (
+                  <button onClick={regenerateLast} aria-label="Regenerate this reply" style={{ background: 'none', border: 'none', color: C.textDim, fontSize: 10.5, cursor: 'pointer', padding: '2px 0', fontFamily: "'DM Sans',sans-serif" }}>↻ Regenerate</button>
+                )}
               </div>
             </div>
             )}
@@ -447,6 +496,12 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       </div>
 
       <div style={{ padding: '7px 10px 16px', borderTop: `1px solid ${C.border}`, background: `${C.bg}ee` }}>
+        {!hintSeen && active.length > 0 && !msgs.some((m) => m.role === 'user') && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 2px 8px' }}>
+            <span style={{ flex: 1, fontSize: 11, color: C.textSoft, lineHeight: 1.4 }}>💡 Just talk naturally{active.length > 1 ? ' · tap a name above to ask one companion' : ''} · 🎤 to call by voice</span>
+            <button onClick={dismissHint} aria-label="Dismiss tip" style={{ background: 'none', border: 'none', color: C.textDim, fontSize: 15, cursor: 'pointer', lineHeight: 1 }}>×</button>
+          </div>
+        )}
         {chatMode === 'group' && active.length > 1 && (
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', padding: '0 2px 7px' }}>
             <span style={{ fontSize: 10, color: C.textDim }}>{directTo ? 'Asking' : 'Ask'}</span>
@@ -471,7 +526,11 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
               placeholder={priv ? `Message ${priv.name}...` : (directTo ? `Message ${active.find((c) => c.id === directTo)?.name || 'everyone'}...` : 'Message everyone...')}
               style={{ flex: 1, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 18, padding: '10px 14px', fontSize: 13, color: C.text, outline: 'none', resize: 'none', fontFamily: "'DM Sans',sans-serif", lineHeight: 1.4, maxHeight: 120, overflowY: 'auto' }} />
-            <button aria-label="Send message" onClick={send} disabled={!input.trim() || loading} style={{ width: 38, height: 38, borderRadius: '50%', background: input.trim() && !loading ? C.glow1 : C.border, border: 'none', color: '#fff', fontSize: 14, cursor: input.trim() && !loading ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>↑</button>
+            {loading ? (
+              <button aria-label="Stop generating" onClick={stopGenerating} style={{ width: 38, height: 38, borderRadius: '50%', background: C.danger, border: 'none', color: '#fff', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>■</button>
+            ) : (
+              <button aria-label="Send message" onClick={send} disabled={!input.trim()} style={{ width: 38, height: 38, borderRadius: '50%', background: input.trim() ? C.glow1 : C.border, border: 'none', color: '#fff', fontSize: 14, cursor: input.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>↑</button>
+            )}
           </div>
         )}
       </div>

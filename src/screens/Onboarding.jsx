@@ -77,7 +77,7 @@ export default function Onboarding({ onComplete }) {
 
   if (sid === 'communication') return W(<><Back /><Q icon="◆" q="How do you like to communicate?" sub="Select all that fit." /><Checks opts={COMMUNICATION} sel={sel} onTog={tog} /><button className="bp" onClick={() => save(sel)} style={{ marginTop: 12, width: '100%' }}>{sel.length ? `Continue (${sel.length})` : 'Skip'}</button></>);
 
-  if (sid === 'occupation') return W(<><Back /><Q icon="💼" q="What do you do?" sub="Helps your companions understand your world." /><input autoFocus value={txt} onChange={(e) => setTxt(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && txt.trim() && save(txt.trim())} placeholder="Designer, student, nurse..." style={inputStyle} /><button className="bp" disabled={!txt.trim()} onClick={() => save(txt.trim())} style={{ marginTop: 10, width: '100%' }}>Continue</button></>);
+  if (sid === 'occupation') return W(<><Back /><Q icon="💼" q="What do you do?" sub="Helps your companions understand your world." /><input autoFocus value={txt} onChange={(e) => setTxt(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save(txt.trim())} placeholder="Designer, student, nurse..." style={inputStyle} /><button className="bp" onClick={() => save(txt.trim())} style={{ marginTop: 10, width: '100%' }}>{txt.trim() ? 'Continue' : 'Skip'}</button></>);
 
   if (sid === 'relationship') return W(<><Back /><Q icon="♡" q="Relationship situation?" sub="Pick all that apply." /><Checks opts={RELATIONSHIP} sel={sel} onTog={tog} /><button className="bp" onClick={() => save(sel)} style={{ marginTop: 12, width: '100%' }}>{sel.length ? `Continue (${sel.length})` : 'Skip'}</button></>);
 

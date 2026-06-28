@@ -6,7 +6,7 @@ import { detectCrisis } from './crisis.js';
 const MAX_HISTORY = 24;
 
 // ── Real responses via the Cloudflare Worker proxy ──
-async function viaProxy(comp, profile, msgs, allC, mode) {
+async function viaProxy(comp, profile, msgs, allC, mode, signal) {
   const system = buildSystemPrompt(comp, profile, allC, mode, msgs);
   // Drop in-app system notes (AI disclosures, crisis cards) — they aren't part
   // of the conversation the model should see.
@@ -31,6 +31,7 @@ async function viaProxy(comp, profile, msgs, allC, mode) {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...authHeader() },
     body: JSON.stringify({ model: AI_MODEL, max_tokens: 400, system, messages: apiMsgs }),
+    signal,
   });
   if (!res.ok) throw new Error(`proxy ${res.status}`);
   const data = await res.json();
@@ -119,12 +120,13 @@ const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** Get one companion's reply. Uses the proxy when configured, else the
  *  placeholder voice; always falls back to placeholder on error. */
-export async function askCompanion(comp, profile, msgs, allC, mode) {
+export async function askCompanion(comp, profile, msgs, allC, mode, signal) {
   const lastUser = [...msgs].reverse().find((m) => m.role === 'user');
   if (aiEnabled()) {
     try {
-      return await viaProxy(comp, profile, msgs, allC, mode);
+      return await viaProxy(comp, profile, msgs, allC, mode, signal);
     } catch (e) {
+      if (e?.name === 'AbortError') throw e; // let the caller stop cleanly
       return placeholder(comp, profile, lastUser?.content);
     }
   }
