@@ -41,6 +41,9 @@ export function d1Store(DB) {
     async listPushSubs() {
       return (await DB.prepare('SELECT user_id, endpoint, p256dh, auth, last_notified FROM push_subscriptions').all()).results || [];
     },
+    async listPushSubsForUser(uid) {
+      return (await DB.prepare('SELECT user_id, endpoint, p256dh, auth, last_notified FROM push_subscriptions WHERE user_id = ?').bind(uid).all()).results || [];
+    },
     async setNotified(endpoint, ts) {
       await DB.prepare('UPDATE push_subscriptions SET last_notified = ? WHERE endpoint = ?').bind(ts, endpoint).run();
     },

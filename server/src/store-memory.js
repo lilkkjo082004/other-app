@@ -44,6 +44,9 @@ export function memoryStore() {
     async listPushSubs() {
       return [...pushSubs.values()];
     },
+    async listPushSubsForUser(uid) {
+      return [...pushSubs.values()].filter((s) => s.user_id === uid);
+    },
     async setNotified(endpoint, ts) {
       const s = pushSubs.get(endpoint);
       if (s) s.last_notified = ts;

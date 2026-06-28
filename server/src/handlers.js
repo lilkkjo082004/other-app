@@ -1,4 +1,5 @@
 import { hashPassword, verifyPassword, signToken, verifyToken } from './crypto.js';
+import { importVapid, sendPush } from './webpush.js';
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const ANTHROPIC_VERSION = '2023-06-01';
@@ -24,6 +25,7 @@ async function authUid(request, env) {
   return v ? v.uid : null;
 }
 const emailOk = (e) => typeof e === 'string' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
+const hostOf = (u) => { try { return new URL(u).host; } catch (e) { return 'invalid'; } };
 
 function clientIp(request) {
   return request.headers.get('cf-connecting-ip')
@@ -115,6 +117,43 @@ export async function handle(request, env) {
       if (!b?.endpoint) return json({ error: 'endpoint required' }, 400, env);
       await env.store.deletePushSub(uid, b.endpoint);
       return json({ ok: true }, 200, env);
+    }
+
+    // Push self-diagnostics. /push/status reports how many subscriptions the
+    // server actually holds for this account (catches "browser says subscribed
+    // but the POST never landed"); /push/test sends a real push right now and
+    // returns each push-service status code (201 = accepted, 401/403 = VAPID
+    // mismatch, 404/410 = expired) so delivery can be verified without the cron.
+    if (p === '/push/status' && request.method === 'GET') {
+      const uid = await authUid(request, env);
+      if (!uid) return json({ error: 'unauthorized' }, 401, env);
+      const subs = await env.store.listPushSubsForUser(uid);
+      return json({
+        subscriptions: subs.length,
+        vapidConfigured: !!(env.VAPID_PRIVATE && env.VAPID_PUBLIC),
+        endpoints: subs.map((s) => ({ host: hostOf(s.endpoint), last_notified: s.last_notified || 0 })),
+      }, 200, env);
+    }
+
+    if (p === '/push/test' && request.method === 'POST') {
+      const uid = await authUid(request, env);
+      if (!uid) return json({ error: 'unauthorized' }, 401, env);
+      if (!env.VAPID_PRIVATE || !env.VAPID_PUBLIC) return json({ error: 'VAPID keys not configured on the server' }, 503, env);
+      const subs = await env.store.listPushSubsForUser(uid);
+      if (!subs.length) return json({ error: 'no subscriptions stored for this account', subscriptions: 0 }, 404, env);
+      const vapid = await importVapid(env.VAPID_PRIVATE, env.VAPID_PUBLIC, env.VAPID_SUBJECT);
+      const payload = JSON.stringify({ title: 'Other', body: 'Test check-in ✦ your companions can reach you.', url: env.ALLOWED_ORIGIN || './' });
+      const results = [];
+      for (const s of subs) {
+        try {
+          const status = await sendPush({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, vapid);
+          if (status === 404 || status === 410) await env.store.deletePushSub(uid, s.endpoint);
+          results.push({ host: hostOf(s.endpoint), status });
+        } catch (e) {
+          results.push({ host: hostOf(s.endpoint), error: String(e) });
+        }
+      }
+      return json({ subscriptions: subs.length, results }, 200, env);
     }
 
     // Account deletion (ToS §10.1 / GDPR / CCPA): erase the user and ALL of
