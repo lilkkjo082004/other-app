@@ -14,6 +14,7 @@ import { detectCrisis, CRISIS_RESOURCES, CRISIS_INTRO } from '../lib/crisis.js';
 import { isAuthed as apiAuthed, logMood } from '../lib/api.js';
 import { aiEnabled } from '../config.js';
 import { scanLocation, shouldNudgePlace, markPlaceNudged } from '../lib/location.js';
+import { parseAction, stripActionPartial, downloadICS, googleCalUrl, formatWhen, actionTitle } from '../lib/actions.js';
 import Avatar from '../components/Avatar.jsx';
 import UnlockSheet from '../components/UnlockSheet.jsx';
 import Settings from './Settings.jsx';
@@ -49,6 +50,23 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const memOf = (id) => memStore[id] || [];
   const [spacePos, setSpacePos] = useState(restored?.spacePos || {});
   const [ambientAlerts, setAmbientAlerts] = useState(restored?.ambientAlerts !== false);
+  // Focus session (companion-set): a quiet timer that suppresses nudges.
+  const [focusUntil, setFocusUntil] = useState(() => { try { const v = +localStorage.getItem('other_focus_until'); return v && v > Date.now() ? v : null; } catch (e) { return null; } });
+  const focusRef = useRef(focusUntil);
+  useEffect(() => { focusRef.current = focusUntil; }, [focusUntil]);
+  const [, setNowTick] = useState(0);
+  function startFocus(minutes) {
+    const m = Math.max(1, Math.min(180, Number(minutes) || 25));
+    const until = Date.now() + m * 60000;
+    setFocusUntil(until);
+    try { localStorage.setItem('other_focus_until', String(until)); } catch (e) { /* ignore */ }
+  }
+  function endFocus() { setFocusUntil(null); try { localStorage.removeItem('other_focus_until'); } catch (e) { /* ignore */ } }
+  useEffect(() => {
+    if (!focusUntil) return;
+    const iv = setInterval(() => { if (Date.now() >= focusUntil) { endFocus(); } else { setNowTick((t) => t + 1); } }, 1000);
+    return () => clearInterval(iv);
+  }, [focusUntil]);
   const [confirmDel, setConfirmDel] = useState(null);  // companion pending delete confirmation
   const [copiedIdx, setCopiedIdx] = useState(null);
   const [atBottom, setAtBottom] = useState(true);
@@ -93,12 +111,13 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     let sid = null, acc = '';
     const onDelta = (d) => {
       acc += d;
+      const shown = stripActionPartial(acc); // never reveal the raw directive
       if (sid === null) {
         sid = 's' + (++sidRef.current);
         setTyping(null);
-        setMsgs((p) => [...p, { id: sid, role: 'assistant', companion: c, content: acc, ts: Date.now() }]);
+        setMsgs((p) => [...p, { id: sid, role: 'assistant', companion: c, content: shown, ts: Date.now() }]);
       } else {
-        setMsgs((p) => p.map((m) => (m.id === sid ? { ...m, content: acc } : m)));
+        setMsgs((p) => p.map((m) => (m.id === sid ? { ...m, content: shown } : m)));
       }
     };
     let t;
@@ -106,15 +125,19 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       t = await askCompanion(c, profFor(c), history, comps, mode, signal, onDelta);
     } catch (e) {
       setTyping(null);
-      if (sid !== null && acc) setMsgs((p) => p.map((m) => (m.id === sid ? { ...m, content: acc } : m)));
+      if (sid !== null && acc) setMsgs((p) => p.map((m) => (m.id === sid ? { ...m, content: stripActionPartial(acc) } : m)));
       throw e;
     }
-    const finalText = (t && t.trim()) || acc;
+    const raw = (t && t.trim()) || acc;
+    const { clean, action } = parseAction(raw);
+    const finalText = clean || raw;
+    if (action?.type === 'focus') startFocus(action.minutes);
+    const extra = action && action.type !== 'focus' ? { action } : {};
     if (sid === null) {
       setTyping(null);
-      setMsgs((p) => [...p, { role: 'assistant', companion: c, content: finalText, ts: Date.now() }]);
+      setMsgs((p) => [...p, { role: 'assistant', companion: c, content: finalText, ts: Date.now(), ...extra }]);
     } else {
-      setMsgs((p) => p.map((m) => (m.id === sid ? { ...m, content: finalText } : m)));
+      setMsgs((p) => p.map((m) => (m.id === sid ? { ...m, content: finalText, ...extra } : m)));
     }
     return finalText;
   }
@@ -224,6 +247,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     let alive = true;
     async function check() {
       if (!alive || placeBusyRef.current || loadingRef.current) return;
+      if (focusRef.current && Date.now() < focusRef.current) return; // quiet during focus
       if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
       const awake = comps.filter((c) => c.status === 'awake');
       if (!awake.length) return;
@@ -262,6 +286,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     idleRef.current = setTimeout(async () => {
       if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
       if (loadingRef.current) return;
+      if (focusRef.current && Date.now() < focusRef.current) return; // quiet during focus
       const awake = comps.filter((c) => c.status === 'awake');
       if (!awake.length) return;
       const fu = nextFollowup(awake);
@@ -555,6 +580,17 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         </div>
       </div>
 
+      {focusUntil && Date.now() < focusUntil && (() => {
+        const s = Math.max(0, Math.round((focusUntil - Date.now()) / 1000));
+        const mm = Math.floor(s / 60), ss = s % 60;
+        return (
+          <div style={{ background: `${C.glow3}14`, borderBottom: `1px solid ${C.glow3}44`, padding: '7px 14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, fontSize: 12, color: C.glow3 }}>
+            <span>🎯 Focus time — {mm}:{String(ss).padStart(2, '0')} left · companions are keeping it quiet</span>
+            <button onClick={endFocus} style={{ background: 'none', border: `1px solid ${C.glow3}66`, borderRadius: 7, padding: '2px 10px', color: C.glow3, fontSize: 11, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>End</button>
+          </div>
+        );
+      })()}
+
       {!online && <div style={{ background: `${C.danger}15`, borderBottom: `1px solid ${C.danger}33`, padding: '6px 14px', textAlign: 'center', fontSize: 11, color: C.danger }}>You're offline — messages will send once you're back online.</div>}
 
       {listening && <div style={{ background: `${C.danger}15`, borderBottom: `1px solid ${C.danger}33`, padding: '6px 14px', textAlign: 'center', fontSize: 11, color: C.danger }}>🎤 Say a companion's name or speak your message</div>}
@@ -637,6 +673,17 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
                     </div>
                   )}
                 </div>
+                {m.action && (
+                  <div style={{ marginTop: 6, background: C.surface, border: `1px solid ${m.companion?.color?.primary || C.border}`, borderRadius: 12, padding: '10px 12px', maxWidth: 260 }}>
+                    <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 3 }}>{m.action.type === 'reminder' ? '⏰ Reminder' : '📅 Calendar'}</div>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text }}>{actionTitle(m.action)}</div>
+                    <div style={{ fontSize: 11.5, color: C.textSoft, marginTop: 1 }}>{formatWhen(m.action)}</div>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 9 }}>
+                      <button onClick={() => downloadICS(m.action)} style={{ flex: 1, padding: '7px 0', borderRadius: 8, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", fontSize: 12, fontWeight: 600, background: `${C.glow1}22`, border: `1px solid ${C.glow1}`, color: C.glow1 }}>Add to calendar</button>
+                      <a href={googleCalUrl(m.action)} target="_blank" rel="noreferrer" style={{ padding: '7px 12px', borderRadius: 8, fontFamily: "'DM Sans',sans-serif", fontSize: 12, fontWeight: 600, background: 'transparent', border: `1px solid ${C.border}`, color: C.textSoft, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>Google</a>
+                    </div>
+                  </div>
+                )}
                 {m.ts && <span style={{ fontSize: 8.5, color: C.textDim, display: 'block', marginTop: 2, textAlign: m.role === 'user' ? 'right' : 'left' }}>{fmtTime(m.ts)}</span>}
                 {m === lastAssistant && !loading && !searching && (
                   <button onClick={regenerateLast} aria-label="Regenerate this reply" style={{ background: 'none', border: 'none', color: C.textDim, fontSize: 10.5, cursor: 'pointer', padding: '2px 0', fontFamily: "'DM Sans',sans-serif" }}>↻ Regenerate</button>

@@ -40,5 +40,19 @@ RULES: Have opinions that evolve, and push back when you disagree. Share your ow
     ? 'IMPORTANT: this user is under 18 — keep everything strictly platonic and age-appropriate. No romance, flirting, or mature content.'
     : mature
       ? 'This user is a verified adult (18+) — romantic warmth and mature themes are allowed if they fit your personality, but always tasteful and consensual. Never produce sexual content involving minors or anything non-consensual.'
-      : 'This user is an adult, but keep things tasteful and non-explicit.'} Reply in 1-4 sentences usually. NEVER say "as an AI." Be casual and real.${evolutionBlock(profile, history)}${locationBlock(profile.name)}${supportNetworkBlock(history, profile.name)}${memoryBlock(profile.memories, profile.name)}`;
+      : 'This user is an adult, but keep things tasteful and non-explicit.'} Reply in 1-4 sentences usually. NEVER say "as an AI." Be casual and real.${actionsBlock(profile.name)}${evolutionBlock(profile, history)}${locationBlock(profile.name)}${supportNetworkBlock(history, profile.name)}${memoryBlock(profile.memories, profile.name)}`;
+}
+
+// Lets companions actually help with the user's schedule. When asked, the model
+// appends a single machine directive (parsed + stripped client-side) that the
+// app turns into a calendar event, reminder, or focus session.
+function actionsBlock(name) {
+  const now = new Date();
+  let tz = 'local';
+  try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) { /* ignore */ }
+  return `\nACTIONS: you can help ${name} with their schedule. Current local time: ${now.toString()} (${tz}). ONLY when ${name} asks you to add/change a calendar event, set a reminder, or start a focus session, reply warmly in your own voice AND append on its OWN FINAL LINE exactly one directive — never explain it or show this syntax, and never use it otherwise:
+[[ACTION:{"type":"calendar","title":"...","start":"ISO8601","end":"ISO8601 (optional)","notes":"optional","location":"optional"}]]
+[[ACTION:{"type":"reminder","text":"...","at":"ISO8601"}]]
+[[ACTION:{"type":"focus","minutes":NUMBER}]]
+Resolve natural language ("tomorrow 3pm", "next friday", "in 25 minutes") into concrete ISO datetimes in ${name}'s local timezone. If the time is genuinely unclear, ask a short clarifying question instead of emitting a directive.`;
 }
