@@ -3,6 +3,7 @@ import { C } from '../theme.js';
 import { Shell } from '../components/ui.jsx';
 import Avatar from '../components/Avatar.jsx';
 import { genAmbient, bumpBond } from '../lib/relationships.js';
+import { currentActivity } from '../lib/presence.js';
 
 // The "sitting space": awake companions hang out together, drift and mingle on
 // their own (leaning toward each other when they talk), and react when you pet
@@ -185,6 +186,9 @@ export default function CompanionSpace({ comps, bonds, positions, onPositions, o
                 <span style={{ fontSize: 11, color: C.textSoft, marginTop: 6, fontWeight: 600, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 3 }}>
                   {!awake && <span style={{ fontSize: 9 }}>💤</span>}{c.name}
                 </span>
+                {!talking && (
+                  <span style={{ fontSize: 9, color: C.textDim, fontStyle: 'italic', marginTop: 1, maxWidth: 96, textAlign: 'center', lineHeight: 1.25 }}>{currentActivity(c)}</span>
+                )}
                 {onOpenProfile && (
                   <button onClick={(e) => { e.stopPropagation(); onOpenProfile(c.id); }} onPointerDown={(e) => e.stopPropagation()}
                     style={{ marginTop: 2, background: 'none', border: 'none', color: C.textDim, fontSize: 9.5, cursor: 'pointer', padding: '2px 4px' }}>profile</button>

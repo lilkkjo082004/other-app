@@ -99,6 +99,7 @@ Visual/UI,Generative avatars,Unique cosmic constellation sigil per companion,Bui
 Visual/UI,Companion sitting space,"Avatars hang out, drag to move, tap to pet, mingle on their own",Built,P1,"NEW; screens/CompanionSpace.jsx, positions persist+sync"
 Visual/UI,Space approach animation,Talking companions lean toward each other + trade lines,Built,P2,NEW; pair leans in during ambient exchange
 Visual/UI,Personality pet reactions,Pet response (emoji/word/burst) varies by personality,Built,P2,NEW; petStyle() from personality+traits
+Companion Dynamics,Companion presence,"""Right now"" activity per companion (lives of their own)",Built,P2,"NEW; lib/presence.js, shown in Space + profile, time-bucketed"
 Visual/UI,Lounge decoration,"Customize the Space: background pictures, tiles, patterns/themes",Future,P2,"User request; decorate the sitting space (uploads or preset patterns)"
 Visual/UI,Cosmetic customization,"Recolor a companion: 8-color palette + custom color wheel",Built,P1,"UPDATED; ToS 4.1; <input type=color> any color"
 Visual/UI,Animated waking sequence,Companion discovers themselves,Built,P0,

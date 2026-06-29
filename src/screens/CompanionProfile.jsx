@@ -9,6 +9,7 @@ import { naturalVoiceEnabled } from '../config.js';
 import { speakAs, listBrowserVoices, NATURAL_VOICE_PRESETS, VOICE_TONES } from '../lib/voice.js';
 import { splitMemories } from '../lib/memory.js';
 import Avatar from '../components/Avatar.jsx';
+import { currentActivity } from '../lib/presence.js';
 
 export default function CompanionProfile({ companion: c, trialStart, history, comps, bonds, memories, onForgetMemory, onCustomize, onPrivate, onSleepToggle, onDelete, onUnlock, onBack }) {
   const col = c.color.primary;
@@ -46,6 +47,7 @@ export default function CompanionProfile({ companion: c, trialStart, history, co
         <div style={{ display: 'inline-block', margin: '8px 0 24px', padding: '4px 12px', borderRadius: 20, background: `${col}1f`, border: `1px solid ${col}66`, fontSize: 11, color: col, fontWeight: 600 }}>{sleeping ? '💤 Sleeping' : (c.status === 'deleted' ? 'Gone' : '● Awake')}</div>
 
         <div style={card}><div style={label}>Astrology</div><div style={{ fontSize: 14 }}>{z.sym} {cap(c.zodiac)}</div><div style={{ fontSize: 12, color: C.textSoft }}>{z.el} · {z.trait}</div></div>
+        {c.status !== 'deleted' && <div style={card}><div style={label}>Right now</div><div style={{ fontSize: 14, fontStyle: 'italic' }}>{c.name} is {currentActivity(c)}.</div></div>}
         <div style={card}><div style={label}>Personality</div><div style={{ fontSize: 14, lineHeight: 1.4 }}>{c.personality}</div><div style={{ fontSize: 12, color: C.textSoft, marginTop: 4 }}>Quirk: {c.quirk}</div></div>
         {traits.length > 0 && (
           <div style={card}><div style={label}>Trait seeds</div><div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{traits.map((t, i) => <span key={i} style={{ padding: '5px 10px', borderRadius: 20, background: C.surfaceUp, border: `1px solid ${C.border}`, fontSize: 11 }}>{t}</span>)}</div></div>
