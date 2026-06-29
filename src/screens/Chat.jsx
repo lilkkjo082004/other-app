@@ -3,8 +3,8 @@ import { C, COMP_COLORS } from '../theme.js';
 import { Shell } from '../components/ui.jsx';
 import { speakAs, useSpeechRec } from '../lib/voice.js';
 import { genAmbient, bumpBond } from '../lib/relationships.js';
-import { askCompanion, greetCompanion, proactiveCompanion, ambientThreadAI, extractMemories, generateSelf, generateJournalEntry, generateDream, generateWant, generateShift, generateVulnerableShare } from '../lib/ai.js';
-import { withInteraction, journalDue, addJournal, dreamDue, makeDream, closenessStage, stageRank, milestoneLine, wantDue, shiftDue, shouldOpenUp, makeStamped } from '../lib/innerlife.js';
+import { askCompanion, greetCompanion, proactiveCompanion, ambientThreadAI, extractMemories, generateSelf, generateJournalEntry, generateDream, generateWant, generateShift, generateVulnerableShare, generatePeerViews } from '../lib/ai.js';
+import { withInteraction, journalDue, addJournal, dreamDue, makeDream, closenessStage, stageRank, milestoneLine, wantDue, shiftDue, shouldOpenUp, makeStamped, peerViewsDue } from '../lib/innerlife.js';
 import { mergeMemories, removeMemory, pendingFollowups, markFollowed, gossipPick, absorbOverheard } from '../lib/memory.js';
 import { isLimited } from '../lib/entitlements.js';
 import { genComp } from '../lib/companions.js';
@@ -334,6 +334,16 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         if (!c.self || (c.journal?.length || 0) < 1 || !shiftDue(c)) continue;
         const s = await generateShift(c, profile, hist);
         if (alive && s) setComps((p) => p.map((x) => (x.id === c.id ? { ...x, shift: makeStamped(s) } : x)));
+      }
+      // 5) how each companion feels about the others (distinct peer opinions)
+      for (const c of living) {
+        const others = living.filter((o) => o.id !== c.id);
+        if (!others.length || !peerViewsDue(c)) continue;
+        const map = await generatePeerViews(c, others);
+        if (!alive || !map) continue;
+        const pv = {};
+        for (const o of others) if (map[o.name]) pv[o.id] = { text: map[o.name], ts: Date.now() };
+        if (Object.keys(pv).length) setComps((p) => p.map((x) => (x.id === c.id ? { ...x, peerViews: { ...(x.peerViews || {}), ...pv }, peerViewsAt: Date.now() } : x)));
       }
     })();
     return () => { alive = false; };

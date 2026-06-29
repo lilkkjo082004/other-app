@@ -149,3 +149,5 @@ Companion Dynamics,Vulnerability at depth,Companions open up about a fear/tender
 Notifications,Inner-life check-ins,"Push pings drawn from a companion's want/journal",Built,P2,"NEW; worker innerLine from synced want/journal"
 Companion Dynamics,Temporal memory,"Companions reference WHEN things happened (yesterday, last week)",Built,P2,"NEW; relativeTime in memory block"
 Companion Dynamics,Inter-companion gossip,"Companions share impressions of you with each other (overheard, attributed)",Built,P2,"NEW; gossipPick/absorbOverheard, persona-only, never private facts"
+Companion Dynamics,Peer opinions,"Each companion forms distinct feelings about the others; colors group chat + shown on profile",Built,P2,"NEW; ai.generatePeerViews, peerViewsBlock (group-only)"
+Companion Dynamics,Mood contagion,"The room's collective mood (each companion's state) shapes the group vibe",Built,P2,"NEW; roomMood injected into group prompt"

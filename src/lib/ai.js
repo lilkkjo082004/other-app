@@ -377,6 +377,24 @@ export async function generateVulnerableShare(comp, profile) {
   return (t || '').trim().slice(0, 300) || null;
 }
 
+/** How this companion privately feels about each of the other companions.
+ *  Returns a { name: "impression" } map, or null. */
+export async function generatePeerViews(comp, others) {
+  if (!aiEnabled() || !others?.length) return null;
+  const list = others.map((o) => `${o.name} (${o.personality})`).join('; ');
+  const sys = `You are ${comp.name}: ${comp.personality}. For EACH companion listed, give a short, specific, in-character impression — how you actually feel about them (warmth, friction, admiration, amusement, a little jealousy, whatever fits), like housemates with real history. Return ONLY JSON mapping each name to one short phrase: {"Name":"phrase", ...}. Use the names exactly as given.`;
+  let t;
+  try { t = await rawComplete(sys, `The others: ${list}.`, 280); } catch (e) { return null; }
+  const i = (t || '').indexOf('{'), j = (t || '').lastIndexOf('}');
+  if (i < 0 || j < 0 || j < i) return null;
+  try {
+    const o = JSON.parse(t.slice(i, j + 1));
+    const out = {};
+    for (const k of Object.keys(o)) if (typeof o[k] === 'string' && o[k].trim()) out[k] = o[k].trim().slice(0, 120);
+    return Object.keys(out).length ? out : null;
+  } catch (e) { return null; }
+}
+
 /** First greeting when a companion comes on screen. */
 export async function greetCompanion(comp, profile, mode, allC) {
   if (aiEnabled()) {

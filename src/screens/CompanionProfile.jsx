@@ -175,13 +175,20 @@ export default function CompanionProfile({ companion: c, trialStart, history, co
         {rels.length > 0 && (
           <div style={card}>
             <div style={label}>Relationships</div>
-            {rels.map((r) => (
-              <div key={r.name} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                <span style={{ width: 9, height: 9, borderRadius: '50%', background: r.color || C.glow1, flexShrink: 0 }} />
-                <span style={{ fontSize: 13, flex: 1 }}>{r.name}</span>
-                <span style={{ fontSize: 11, color: C.textSoft, textTransform: 'capitalize' }}>{r.label}</span>
-              </div>
-            ))}
+            {rels.map((r) => {
+              const other = (comps || []).find((o) => o.name === r.name);
+              const view = other && c.peerViews?.[other.id]?.text;
+              return (
+                <div key={r.name} style={{ marginBottom: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ width: 9, height: 9, borderRadius: '50%', background: r.color || C.glow1, flexShrink: 0 }} />
+                    <span style={{ fontSize: 13, flex: 1 }}>{r.name}</span>
+                    <span style={{ fontSize: 11, color: C.textSoft, textTransform: 'capitalize' }}>{r.label}</span>
+                  </div>
+                  {view && <div style={{ fontSize: 11.5, color: C.textDim, fontStyle: 'italic', margin: '2px 0 0 17px' }}>"{view}"</div>}
+                </div>
+              );
+            })}
           </div>
         )}
         {(() => {

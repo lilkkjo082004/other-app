@@ -121,6 +121,30 @@ export function addJournal(comp, text, now = Date.now()) {
   return [{ ts: now, text: String(text || '').slice(0, 400) }, ...(comp?.journal || [])].slice(0, 30);
 }
 
+// How the room feels — a blend of the awake companions' current inner states,
+// so they can pick up on and react to each other's energy (mood contagion).
+export function roomMood(comps, history = [], now = Date.now()) {
+  const awake = (comps || []).filter((c) => c.status === 'awake');
+  if (awake.length < 2) return '';
+  return awake.map((c) => `${c.name} seems ${deriveInner(c, history, now).mood}`).join('; ');
+}
+
+export function peerViewsDue(comp, now = Date.now()) { return now - (comp?.peerViewsAt || 0) > 5 * DAY; }
+
+// Group-only block: how this companion privately feels about the others present
+// — warmth, friction, admiration — so they treat each other like people with
+// history, not interchangeable voices.
+export function peerViewsBlock(comp, allC) {
+  const pv = comp?.peerViews;
+  if (!pv) return '';
+  const lines = [];
+  for (const o of allC || []) {
+    if (o.id === comp.id || o.status !== 'awake') continue;
+    if (pv[o.id]?.text) lines.push(`${o.name}: ${pv[o.id].text}`);
+  }
+  return lines.length ? `\nHOW YOU FEEL ABOUT THE OTHERS HERE: ${lines.join(' · ')}. Let it color how you treat each of them — tease, defer, bristle, admire — like real history between you.` : '';
+}
+
 // System-prompt block: the deep self + how they feel right now + the closeness
 // stage. Phrased so it colors behavior without being recited mechanically.
 export function innerLifeBlock(comp, history, name) {
