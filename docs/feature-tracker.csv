@@ -147,3 +147,5 @@ Companion Dynamics,Personal wants & goals,"Each companion pursues a personal int
 Companion Dynamics,Evolving opinions,"Companions change their mind over time and reference it",Built,P2,"NEW; ai.generateShift, comp.shift in prompt + profile"
 Companion Dynamics,Vulnerability at depth,Companions open up about a fear/tender truth once close,Built,P2,"NEW; shouldOpenUp + generateVulnerableShare, once"
 Notifications,Inner-life check-ins,"Push pings drawn from a companion's want/journal",Built,P2,"NEW; worker innerLine from synced want/journal"
+Companion Dynamics,Temporal memory,"Companions reference WHEN things happened (yesterday, last week)",Built,P2,"NEW; relativeTime in memory block"
+Companion Dynamics,Inter-companion gossip,"Companions share impressions of you with each other (overheard, attributed)",Built,P2,"NEW; gossipPick/absorbOverheard, persona-only, never private facts"

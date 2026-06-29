@@ -24,14 +24,42 @@ const norm = (s) => (s || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/
 const keyOf = (m) => `${m.kind}:${norm(m.text)}`;
 const rid = () => 'm_' + Math.random().toString(36).slice(2, 10);
 
-export function makeMemory({ text, kind = 'fact', at = null, ts } = {}) {
-  return {
+export function makeMemory({ text, kind = 'fact', at = null, ts, source, from } = {}) {
+  const m = {
     id: rid(),
     text: String(text || '').slice(0, 200),
     kind: MEMORY_KINDS.includes(kind) ? kind : 'fact',
     at: Number.isFinite(at) ? at : null,
     ts: ts || nowMs(),
   };
+  if (source) m.source = source;   // e.g. 'overheard'
+  if (from) m.from = from;          // which companion shared it
+  return m;
+}
+
+// Relative "when" for a memory, so companions can reference timing naturally.
+export function relativeTime(ts, now = nowMs()) {
+  if (!ts) return '';
+  const d = Math.floor((now - ts) / 86400000);
+  if (d <= 0) return 'today';
+  if (d === 1) return 'yesterday';
+  if (d < 7) return `${d} days ago`;
+  if (d < 14) return 'last week';
+  if (d < 35) return `${Math.floor(d / 7)} weeks ago`;
+  return 'a while back';
+}
+
+// Impressions a companion will share socially — never private facts/events.
+const SHAREABLE = new Set(['preference', 'trait']);
+export function gossipPick(memories = []) {
+  const c = (memories || []).filter((m) => m && m.text && SHAREABLE.has(m.kind) && m.source !== 'overheard');
+  return c.length ? c[Math.floor(Math.random() * c.length)] : null;
+}
+export function absorbOverheard(toMemories = [], item, fromName) {
+  if (!item) return toMemories;
+  const exists = (toMemories || []).some((m) => m.text && m.text.toLowerCase() === item.text.toLowerCase());
+  if (exists) return toMemories;
+  return mergeMemories(toMemories, [{ text: item.text, kind: item.kind, source: 'overheard', from: fromName }]);
 }
 
 // Date.now() is fine in the browser; guarded so this module is also unit-testable.
@@ -94,15 +122,20 @@ export function memoryBlock(memories = [], name = 'them', now = nowMs()) {
       line += m.at < now
         ? ` (this was around ${fmtDate(m.at)} — if it fits, naturally ask how it went)`
         : ` (coming up around ${fmtDate(m.at)})`;
+    } else {
+      const rel = relativeTime(m.ts, now);
+      if (rel) line += ` (you learned this ${rel})`;
     }
+    if (m.source === 'overheard' && m.from) line += ` (you actually heard this from ${m.from}, not ${name} directly)`;
     return line;
   };
+  const personaLine = (m) => `- ${m.text}${m.source === 'overheard' && m.from ? ` (${m.from} mentioned this about ${name})` : ''}`;
   let out = '';
   if (core.length) {
     out += `\nWHAT YOU REMEMBER ABOUT ${name}: things they've shared before. Weave them in naturally when relevant, like a close friend would — never recite this list or say "my notes say"; just know it.\n${core.slice(0, 24).map(coreLine).join('\n')}`;
   }
   if (persona.length) {
-    out += `\nYOUR SENSE OF WHO ${name} IS: the texture of their personality — humour, interests, communication style, values, moods — picked up from how they talk. Use it to genuinely get them: match their energy, share their references, read between the lines. Don't state these observations back to them.\n${persona.slice(0, 24).map((m) => `- ${m.text}`).join('\n')}`;
+    out += `\nYOUR SENSE OF WHO ${name} IS: the texture of their personality — humour, interests, communication style, values, moods — picked up from how they talk (or overheard from another companion). Use it to genuinely get them: match their energy, share their references, read between the lines. Don't state these observations back to them.\n${persona.slice(0, 24).map(personaLine).join('\n')}`;
   }
   return out;
 }

@@ -5,7 +5,7 @@ import { speakAs, useSpeechRec } from '../lib/voice.js';
 import { genAmbient, bumpBond } from '../lib/relationships.js';
 import { askCompanion, greetCompanion, proactiveCompanion, ambientThreadAI, extractMemories, generateSelf, generateJournalEntry, generateDream, generateWant, generateShift, generateVulnerableShare } from '../lib/ai.js';
 import { withInteraction, journalDue, addJournal, dreamDue, makeDream, closenessStage, stageRank, milestoneLine, wantDue, shiftDue, shouldOpenUp, makeStamped } from '../lib/innerlife.js';
-import { mergeMemories, removeMemory, pendingFollowups, markFollowed } from '../lib/memory.js';
+import { mergeMemories, removeMemory, pendingFollowups, markFollowed, gossipPick, absorbOverheard } from '../lib/memory.js';
 import { isLimited } from '../lib/entitlements.js';
 import { genComp } from '../lib/companions.js';
 import { pickSigns } from '../lib/zodiac.js';
@@ -197,6 +197,21 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         if (res) {
           setAmbient(res.thread.map((m) => ({ role: 'assistant', companion: m.from, content: m.text, isAmbient: true })));
           setBonds((b) => bumpBond(b, res.pair[0], res.pair[1]));
+        }
+        // Gossip: while catching up, companions trade an impression of you, so
+        // one can come to know something you only told another. Impressions
+        // only (personality/preferences) — never private facts.
+        const awakeG = comps.filter((c) => c.status === 'awake');
+        if (awakeG.length >= 2 && Math.random() < 0.5) {
+          const a = awakeG[Math.floor(Math.random() * awakeG.length)];
+          let b = awakeG[Math.floor(Math.random() * awakeG.length)];
+          if (b.id === a.id) b = awakeG[(awakeG.indexOf(a) + 1) % awakeG.length];
+          setMemStore((s) => {
+            const next = { ...s };
+            const ga = gossipPick(s[a.id] || []); if (ga) next[b.id] = absorbOverheard(s[b.id] || [], ga, a.name);
+            const gb = gossipPick(s[b.id] || []); if (gb) next[a.id] = absorbOverheard(s[a.id] || [], gb, b.name);
+            return next;
+          });
         }
       })();
       // In-chat AI reminder: shown at most once per calendar day (the one-time
