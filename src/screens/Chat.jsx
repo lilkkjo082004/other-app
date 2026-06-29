@@ -59,6 +59,8 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const abortRef = useRef(null);
   const memBusyRef = useRef(false);
   const lastMemLenRef = useRef((restored?.messages || []).length);
+  const streamingRef = useRef(false);
+  const sidRef = useRef(0);
 
   // A companion's own memory rides along on `profile` so its prompt/AI call
   // sees only what *it* remembers about the user.
@@ -77,6 +79,39 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   }
   const consumeFollowup = (compId, id) =>
     setMemStore((s) => ({ ...s, [compId]: markFollowed(s[compId] || [], id) }));
+
+  // Stream one companion's reply into the transcript: shows the typing indicator
+  // until the first token, then grows the message live. Returns the final text.
+  async function streamReply(c, history, mode, signal) {
+    setTyping(c);
+    let sid = null, acc = '';
+    const onDelta = (d) => {
+      acc += d;
+      if (sid === null) {
+        sid = 's' + (++sidRef.current);
+        setTyping(null);
+        setMsgs((p) => [...p, { id: sid, role: 'assistant', companion: c, content: acc, ts: Date.now() }]);
+      } else {
+        setMsgs((p) => p.map((m) => (m.id === sid ? { ...m, content: acc } : m)));
+      }
+    };
+    let t;
+    try {
+      t = await askCompanion(c, profFor(c), history, comps, mode, signal, onDelta);
+    } catch (e) {
+      setTyping(null);
+      if (sid !== null && acc) setMsgs((p) => p.map((m) => (m.id === sid ? { ...m, content: acc } : m)));
+      throw e;
+    }
+    const finalText = (t && t.trim()) || acc;
+    if (sid === null) {
+      setTyping(null);
+      setMsgs((p) => [...p, { role: 'assistant', companion: c, content: finalText, ts: Date.now() }]);
+    } else {
+      setMsgs((p) => p.map((m) => (m.id === sid ? { ...m, content: finalText } : m)));
+    }
+    return finalText;
+  }
 
   // After enough new turns, extract long-term memories from recent history and
   // file them under the companion(s) who were present: the one companion in a
@@ -219,6 +254,9 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   }
 
   useEffect(() => {
+    // Don't persist on every streamed token — the final setMsgs (after
+    // streamingRef flips false) saves the completed turn once.
+    if (streamingRef.current) return;
     onPersist?.({ companions: comps, messages: msgs, chatMode, autoSpeak, trialStart, bonds, voiceCall, pushFrequency: pushFreq, pushSchedule: pushSched, memories: memStore });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comps, msgs, chatMode, autoSpeak, bonds, voiceCall, pushFreq, pushSched, memStore]);
@@ -266,26 +304,21 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     // Reply in turn so each companion can see and react to what the others just
     // said this turn. A per-companion typing indicator keeps it feeling live.
     stopRef.current = false;
+    streamingRef.current = true;
     let run = [...nm];
-    const usedThisTurn = new Set();
     for (const c of act) {
       if (stopRef.current) break;
-      setTyping(c);
       const controller = new AbortController();
       abortRef.current = controller;
-      let t;
+      let finalText;
       try {
-        t = await askCompanion(c, profFor(c), run, comps, priv ? 'private' : 'group', controller.signal);
-        // Don't let two companions echo the same line (mainly the offline voice).
-        if (usedThisTurn.has(t)) t = await askCompanion(c, profFor(c), run, comps, priv ? 'private' : 'group', controller.signal);
+        finalText = await streamReply(c, run, priv ? 'private' : 'group', controller.signal);
       } catch (e) { break; } // generation stopped
+      run = [...run, { role: 'assistant', companion: c, content: finalText, ts: Date.now() }];
+      if (autoSpeak) speakAs(finalText, c);
       if (stopRef.current) break;
-      usedThisTurn.add(t);
-      const m = { role: 'assistant', companion: c, content: t, ts: Date.now() };
-      run = [...run, m];
-      setMsgs((p) => [...p, m]);
-      if (autoSpeak) speakAs(t, c);
     }
+    streamingRef.current = false;
     abortRef.current = null;
     setTyping(null);
     setLoading(false);
@@ -310,16 +343,13 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     const comp = comps.find((x) => x.id === msgs[idx].companion?.id) || msgs[idx].companion;
     const history = msgs.slice(0, idx);
     setMsgs((p) => p.filter((_, i) => i !== idx));
-    stopRef.current = false; setLoading(true); setTyping(comp);
+    stopRef.current = false; setLoading(true); streamingRef.current = true;
     const controller = new AbortController(); abortRef.current = controller;
     try {
-      const t = await askCompanion(comp, profFor(comp), history, comps, priv ? 'private' : 'group', controller.signal);
-      if (!stopRef.current) {
-        setMsgs((p) => [...p, { role: 'assistant', companion: comp, content: t, ts: Date.now() }]);
-        if (autoSpeak) speakAs(t, comp);
-      }
+      const t = await streamReply(comp, history, priv ? 'private' : 'group', controller.signal);
+      if (autoSpeak) speakAs(t, comp);
     } catch (e) { /* stopped */ }
-    abortRef.current = null; setTyping(null); setLoading(false);
+    streamingRef.current = false; abortRef.current = null; setTyping(null); setLoading(false);
   }
 
   function togSleep(id) {

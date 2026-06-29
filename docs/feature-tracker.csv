@@ -46,6 +46,7 @@ Chat System,While-you-were-away recap,Labeled ambient catch-up divider on open,B
 Chat System,Companion disagreements,"Companions disagree, own opinions",Built,P0,
 Chat System,Cross-referencing,Companions react to each other in-turn,Built,P0,Sequential w/ typing indicator
 Chat System,Ambient conversations,"Personality + bond-aware, regenerated each open",Built,P0,lib/relationships.js
+Chat System,Streaming replies,Companion messages render token-by-token as generated,Built,P1,"NEW; worker SSE -> plain-text stream, graceful non-stream fallback"
 Chat System,Directed messages,Aim a message at one companion (@name / tap),Built,P1,NEW
 Chat System,Conversation search,"Search history, highlight matches",Built,P1,NEW
 Chat System,Call by name (voice),Say companion name to open private,Built,P0,+ toggle to disable

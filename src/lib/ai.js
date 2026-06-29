@@ -7,7 +7,8 @@ import { pickAmbientPair } from './relationships.js';
 const MAX_HISTORY = 24;
 
 // ── Real responses via the Cloudflare Worker proxy ──
-async function viaProxy(comp, profile, msgs, allC, mode, signal) {
+// Build the {system, messages} request for one companion from the transcript.
+function buildRequest(comp, profile, msgs, allC, mode) {
   const system = buildSystemPrompt(comp, profile, allC, mode, msgs);
   // Drop in-app system notes (AI disclosures, crisis cards) — they aren't part
   // of the conversation the model should see.
@@ -27,11 +28,15 @@ async function viaProxy(comp, profile, msgs, allC, mode, signal) {
   if (!apiMsgs.length) {
     apiMsgs.push({ role: 'user', content: `${profile.name || 'User'} just opened the chat. Say hello in your own voice.` });
   }
+  return { system, messages: apiMsgs };
+}
 
+async function viaProxy(comp, profile, msgs, allC, mode, signal) {
+  const { system, messages } = buildRequest(comp, profile, msgs, allC, mode);
   const res = await fetch(aiEndpoint(), {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...authHeader() },
-    body: JSON.stringify({ model: AI_MODEL, max_tokens: 400, system, messages: apiMsgs }),
+    body: JSON.stringify({ model: AI_MODEL, max_tokens: 400, system, messages }),
     signal,
   });
   if (!res.ok) throw new Error(`proxy ${res.status}`);
@@ -42,6 +47,40 @@ async function viaProxy(comp, profile, msgs, allC, mode, signal) {
     if (t) return t;
   }
   throw new Error('empty response');
+}
+
+// Streaming variant: POSTs with stream:true and calls onDelta(textChunk) as
+// tokens arrive, returning the full text. Gracefully handles a non-streaming
+// (older) worker that still returns JSON — it emits the whole reply once.
+async function viaProxyStream(comp, profile, msgs, allC, mode, signal, onDelta) {
+  const { system, messages } = buildRequest(comp, profile, msgs, allC, mode);
+  const res = await fetch(aiEndpoint(), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...authHeader() },
+    body: JSON.stringify({ model: AI_MODEL, max_tokens: 400, system, messages, stream: true }),
+    signal,
+  });
+  if (!res.ok) throw new Error(`proxy ${res.status}`);
+  const ct = res.headers.get('content-type') || '';
+  if (!res.body || ct.includes('application/json')) {
+    const data = await res.json().catch(() => null);
+    const text = data && typeof data.text === 'string' ? data.text.trim() : '';
+    if (!text) throw new Error('empty response');
+    onDelta?.(text);
+    return text;
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let full = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const chunk = decoder.decode(value, { stream: true });
+    if (chunk) { full += chunk; onDelta?.(chunk); }
+  }
+  full = full.trim();
+  if (!full) throw new Error('empty response');
+  return full;
 }
 
 // ── Offline placeholder voice (keyword-based, but characterful) ──
@@ -121,11 +160,13 @@ const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** Get one companion's reply. Uses the proxy when configured, else the
  *  placeholder voice; always falls back to placeholder on error. */
-export async function askCompanion(comp, profile, msgs, allC, mode, signal) {
+export async function askCompanion(comp, profile, msgs, allC, mode, signal, onDelta) {
   const lastUser = [...msgs].reverse().find((m) => m.role === 'user');
   if (aiEnabled()) {
     try {
-      return await viaProxy(comp, profile, msgs, allC, mode, signal);
+      return onDelta
+        ? await viaProxyStream(comp, profile, msgs, allC, mode, signal, onDelta)
+        : await viaProxy(comp, profile, msgs, allC, mode, signal);
     } catch (e) {
       if (e?.name === 'AbortError') throw e; // let the caller stop cleanly
       return placeholder(comp, profile, lastUser?.content);

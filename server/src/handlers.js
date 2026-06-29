@@ -199,6 +199,53 @@ async function tts(request, env) {
   return new Response(up.body, { status: 200, headers: { 'content-type': 'audio/mpeg', ...cors(env) } });
 }
 
+// Stream Anthropic's SSE and re-emit only the text deltas as a plain UTF-8
+// stream (content-type text/plain). On upstream error, falls back to a JSON
+// error the client can detect by content-type.
+async function aiStream(payload, env) {
+  let upstream;
+  try {
+    upstream = await fetch(ANTHROPIC_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-api-key': env.ANTHROPIC_API_KEY, 'anthropic-version': ANTHROPIC_VERSION },
+      body: JSON.stringify({ ...payload, stream: true }),
+    });
+  } catch (e) {
+    return json({ error: 'upstream request failed', detail: String(e) }, 502, env);
+  }
+  if (!upstream.ok || !upstream.body) {
+    const d = await upstream.text().catch(() => '');
+    return json({ error: 'anthropic error', status: upstream.status, detail: d.slice(0, 200) }, upstream.status || 502, env);
+  }
+  const reader = upstream.body.getReader();
+  const decoder = new TextDecoder();
+  const encoder = new TextEncoder();
+  let buf = '';
+  const stream = new ReadableStream({
+    async pull(controller) {
+      const { done, value } = await reader.read();
+      if (done) { controller.close(); return; }
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop() || '';
+      for (const line of lines) {
+        const t = line.trim();
+        if (!t.startsWith('data:')) continue;
+        const data = t.slice(5).trim();
+        if (!data || data === '[DONE]') continue;
+        try {
+          const evt = JSON.parse(data);
+          if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta' && evt.delta.text) {
+            controller.enqueue(encoder.encode(evt.delta.text));
+          }
+        } catch (e) { /* keepalive / partial line */ }
+      }
+    },
+    cancel() { try { reader.cancel(); } catch (e) { /* ignore */ } },
+  });
+  return new Response(stream, { status: 200, headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-cache', ...cors(env) } });
+}
+
 async function signup(request, env) {
   const b = await body(request);
   const email = (b?.email || '').trim().toLowerCase();
@@ -235,6 +282,10 @@ async function ai(request, env) {
     messages: b.messages,
   };
   if (typeof b.system === 'string' && b.system) payload.system = b.system;
+
+  // Streaming path: ask Anthropic to stream and re-emit just the text deltas as
+  // a plain-text stream the client can append token-by-token.
+  if (b.stream) return aiStream(payload, env);
 
   let upstream;
   try {
