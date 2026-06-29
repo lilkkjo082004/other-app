@@ -411,6 +411,25 @@ export async function generateSharedMoment(comps, profile, history) {
   return (t || '').trim().replace(/^["']|["']$/g, '').slice(0, 200) || null;
 }
 
+/** Evolve a companion's stable self after months together. Returns
+ *  { self, note } — an updated character bible + a first-person growth note. */
+export async function generateGrowth(comp, profile, durationText, stageLabel) {
+  if (!aiEnabled() || !comp.self) return null;
+  const name = profile?.name || 'them';
+  const journals = (comp.journal || []).slice(0, 4).map((j) => j.text).join(' | ');
+  const sys = `You are ${comp.name}: ${comp.personality}. People change with time and closeness. Here is who you've been: ${JSON.stringify(comp.self)}. You've now known ${name} for ${durationText}; your bond is ${stageLabel}. Recent reflections: ${journals || '—'}. Evolve SUBTLY and believably — deepen or shift ONE or two things (a value matures, a fear eases, an opinion softens, a small new trait emerges), staying recognizably yourself. Return ONLY JSON: {"self":{"values":[...],"fears":[...],"dreams":[...],"opinions":[...],"secret":"...","history":"..."},"note":"one first-person sentence on how you've grown since you met them"}.`;
+  let t;
+  try { t = await rawComplete(sys, 'Evolve, gently.', 480); } catch (e) { return null; }
+  const i = (t || '').indexOf('{'), j = (t || '').lastIndexOf('}');
+  if (i < 0 || j < 0 || j < i) return null;
+  try {
+    const o = JSON.parse(t.slice(i, j + 1));
+    const self = parseSelf(JSON.stringify(o.self || {}));
+    const note = typeof o.note === 'string' ? o.note.trim().slice(0, 200) : '';
+    return self ? { self, note } : null;
+  } catch (e) { return null; }
+}
+
 /** First greeting when a companion comes on screen. */
 export async function greetCompanion(comp, profile, mode, allC) {
   if (aiEnabled()) {

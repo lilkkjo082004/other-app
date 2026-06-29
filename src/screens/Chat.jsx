@@ -3,8 +3,8 @@ import { C, COMP_COLORS } from '../theme.js';
 import { Shell } from '../components/ui.jsx';
 import { speakAs, useSpeechRec } from '../lib/voice.js';
 import { genAmbient, bumpBond } from '../lib/relationships.js';
-import { askCompanion, greetCompanion, proactiveCompanion, ambientThreadAI, extractMemories, generateSelf, generateJournalEntry, generateDream, generateWant, generateShift, generateVulnerableShare, generatePeerViews, generateSharedMoment } from '../lib/ai.js';
-import { withInteraction, journalDue, addJournal, dreamDue, makeDream, closenessStage, stageRank, milestoneLine, wantDue, shiftDue, shouldOpenUp, makeStamped, peerViewsDue, loreDue, addLore } from '../lib/innerlife.js';
+import { askCompanion, greetCompanion, proactiveCompanion, ambientThreadAI, extractMemories, generateSelf, generateJournalEntry, generateDream, generateWant, generateShift, generateVulnerableShare, generatePeerViews, generateSharedMoment, generateGrowth } from '../lib/ai.js';
+import { withInteraction, journalDue, addJournal, dreamDue, makeDream, closenessStage, stageRank, milestoneLine, wantDue, shiftDue, shouldOpenUp, makeStamped, peerViewsDue, loreDue, addLore, growthDue, addGrowth, knownDuration } from '../lib/innerlife.js';
 import { mergeMemories, removeMemory, pendingFollowups, markFollowed, gossipPick, absorbOverheard } from '../lib/memory.js';
 import { isLimited } from '../lib/entitlements.js';
 import { genComp } from '../lib/companions.js';
@@ -311,6 +311,9 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     (async () => {
       if (!aiEnabled()) return;
       const living = comps.filter((c) => c.status !== 'deleted');
+      // Seed "known since" for age/growth tracking (earliest message, or now).
+      const born = restored?.messages?.length ? Math.min(...restored.messages.map((m) => m.ts || Date.now())) : Date.now();
+      if (living.some((c) => !c.bornAt)) setComps((p) => p.map((x) => (x.bornAt ? x : { ...x, bornAt: born })));
       for (const c of living) {
         if (c.self) continue;
         const self = await generateSelf(c);
@@ -353,6 +356,12 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       if (loreDue(lore, hist)) {
         const moment = await generateSharedMoment(living, profile, hist);
         if (alive && moment) setLore((l) => addLore(l, moment));
+      }
+      // 7) long-term growth — after months together, the self slowly evolves
+      for (const c of living) {
+        if (!growthDue(c)) continue;
+        const g = await generateGrowth(c, profile, knownDuration(c), closenessStage(c).label);
+        if (alive && g?.self) setComps((p) => p.map((x) => (x.id === c.id ? { ...x, self: g.self, grownAt: Date.now(), growth: addGrowth(x, g.note || 'I’ve changed a little since we met.') } : x)));
       }
     })();
     return () => { alive = false; };

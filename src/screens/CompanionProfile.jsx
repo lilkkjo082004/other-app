@@ -10,7 +10,7 @@ import { speakAs, listBrowserVoices, NATURAL_VOICE_PRESETS, VOICE_TONES } from '
 import { splitMemories } from '../lib/memory.js';
 import Avatar from '../components/Avatar.jsx';
 import { currentActivity } from '../lib/presence.js';
-import { closenessStage } from '../lib/innerlife.js';
+import { closenessStage, knownDuration } from '../lib/innerlife.js';
 
 export default function CompanionProfile({ companion: c, trialStart, history, comps, bonds, memories, onForgetMemory, onCustomize, onPrivate, onSleepToggle, onDelete, onUnlock, onBack }) {
   const col = c.color.primary;
@@ -59,6 +59,20 @@ export default function CompanionProfile({ companion: c, trialStart, history, co
             {c.self.opinions?.length > 0 && <div style={{ fontSize: 13 }}><span style={{ color: C.textDim }}>Will argue:</span> {c.self.opinions[0]}</div>}
             {c.want?.text && <div style={{ fontSize: 13, marginTop: 4 }}><span style={{ color: C.textDim }}>Wants:</span> {c.want.text}</div>}
             {c.shift?.text && <div style={{ fontSize: 13, marginTop: 4 }}><span style={{ color: C.textDim }}>Changing their mind:</span> {c.shift.text}</div>}
+          </div>
+        )}
+        {c.growth?.length > 0 && (
+          <div style={card}>
+            <div style={label}>How {c.name} has grown</div>
+            {c.bornAt && <div style={{ fontSize: 11, color: C.textDim, marginBottom: 8 }}>You've known each other {knownDuration(c)}.</div>}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+              {c.growth.slice(0, 6).map((g, i) => (
+                <div key={i}>
+                  <div style={{ fontSize: 10, color: C.textDim, marginBottom: 2 }}>{(() => { try { return new Date(g.ts).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }); } catch (x) { return ''; } })()}</div>
+                  <div style={{ fontSize: 13, lineHeight: 1.5, fontStyle: 'italic', color: C.text }}>"{g.text}"</div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
         {c.status !== 'deleted' && (() => {

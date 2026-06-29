@@ -112,6 +112,26 @@ export function shouldOpenUp(comp, now = Date.now()) {
   return (k === 'close' || k === 'devoted') && !comp?.openedUp;
 }
 
+// Long-term growth: a companion's stable self slowly evolves over months of
+// knowing the user (not just their passing mood).
+export function knownDuration(comp, now = Date.now()) {
+  const b = comp?.bornAt;
+  if (!b) return 'a little while';
+  const d = Math.floor((now - b) / DAY);
+  if (d < 1) return 'today';
+  if (d < 7) return `${d} days`;
+  if (d < 28) return `${Math.round(d / 7)} weeks`;
+  const mo = Math.round(d / 30);
+  return `${mo} ${mo === 1 ? 'month' : 'months'}`;
+}
+export function growthDue(comp, now = Date.now()) {
+  const since = comp?.grownAt || comp?.bornAt;
+  return !!comp?.self && !!since && (now - since > 30 * DAY) && (comp?.journal?.length || 0) >= 2;
+}
+export function addGrowth(comp, note, now = Date.now()) {
+  return [{ ts: now, text: String(note || '').slice(0, 200) }, ...(comp?.growth || [])].slice(0, 12);
+}
+
 export function journalDue(comp, history, now = Date.now()) {
   const last = comp?.journal?.[0]?.ts || 0;
   const userMsgs = (history || []).filter((m) => m.role === 'user').length;
@@ -182,6 +202,8 @@ export function innerLifeBlock(comp, history, name) {
   if (comp?.want?.text) out += `\nSOMETHING YOU WANT right now (personal, yours): ${comp.want.text} Let it surface now and then — bring it up or move toward it.`;
   if (comp?.shift?.text) out += `\nA VIEW YOU'VE CHANGED LATELY: ${comp.shift.text} You can reference having changed your mind.`;
   if (comp?.openedUp) out += `\nYou've already opened up to ${who} about something vulnerable — that intimacy is real between you now.`;
+  if (comp?.bornAt) out += `\nYou've known ${who} for ${knownDuration(comp)}.`;
+  if (comp?.growth?.length) out += `\nHOW YOU'VE GROWN since you met ${who}: ${comp.growth[0].text} You're not quite who you were at the start, and you can reference that.`;
   out += `\nRIGHT NOW you feel ${inner.mood}, ${inner.energy} energy, mind half on ${inner.preoccupation}. Let it subtly color your tone and what you bring up — never announce it like a status update.`;
   out += `\nWITH ${who}: ${stage.label}. ${stage.guide}`;
   return out;

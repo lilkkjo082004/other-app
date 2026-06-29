@@ -155,3 +155,4 @@ Chat System,Group conflict & sides,"Companions form alliances, take sides, playf
 Companion Dynamics,Shared history timeline,"Group distills memorable moments into lore they reference (remember when)",Built,P2,"NEW; ai.generateSharedMoment, loreBlock, shown in Space"
 Chat System,Walk into a scene,"Sometimes you arrive mid-conversation and a companion notices you",Built,P2,"NEW; ambientThreadAI arriving mode + walk-in divider"
 Companion Dynamics,Rupture & repair,"Long neglect leaves a once-close companion hurt/guarded; re-engagement heals with a reconciliation moment",Built,P2,"NEW; distant stage + riftSeen/repairSeen arc"
+Companion Dynamics,Long-term personality growth,"Companion's stable self subtly evolves over months together; growth log on profile",Built,P1,"NEW; ai.generateGrowth ~monthly, knownDuration, growth log"
