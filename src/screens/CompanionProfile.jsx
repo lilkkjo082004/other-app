@@ -8,7 +8,7 @@ import { relationshipsFor } from '../lib/relationships.js';
 import { naturalVoiceEnabled } from '../config.js';
 import { speakAs, listBrowserVoices, NATURAL_VOICE_PRESETS, VOICE_TONES } from '../lib/voice.js';
 import { splitMemories } from '../lib/memory.js';
-import Avatar from '../components/Avatar.jsx';
+import SquishyBlob from '../components/SquishyBlob.jsx';
 import { currentActivity } from '../lib/presence.js';
 import { closenessStage, knownDuration, vitality } from '../lib/innerlife.js';
 
@@ -42,7 +42,10 @@ export default function CompanionProfile({ companion: c, trialStart, history, co
         <span style={{ fontSize: 15, fontWeight: 600 }}>{c.name}</span>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px 40px', textAlign: 'center' }}>
-        <div style={{ width: 110, margin: '8px auto 0' }}><Avatar comp={c} size={110} vitality={sleeping ? 0.3 : vitality(c, history || [])} /></div>
+        <div style={{ width: 132, height: 132, margin: '8px auto 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <SquishyBlob comp={c} size={120} interactive vitality={sleeping ? 0.3 : vitality(c, history || [])} softness={typeof c.blob === 'number' ? c.blob : null} />
+        </div>
+        <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 2 }}>Touch and drag {c.name} — they're squishy ✦</div>
         <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 30, fontWeight: 700, margin: '18px 0 0' }}>{c.name}</h1>
         <p style={{ fontSize: 13, color: C.textSoft }}>{c.pronouns}</p>
         <div style={{ display: 'inline-block', margin: '8px 0 24px', padding: '4px 12px', borderRadius: 20, background: `${col}1f`, border: `1px solid ${col}66`, fontSize: 11, color: col, fontWeight: 600 }}>{sleeping ? '💤 Sleeping' : (c.status === 'deleted' ? 'Gone' : '● Awake')}</div>
@@ -123,7 +126,7 @@ export default function CompanionProfile({ companion: c, trialStart, history, co
           <div style={card}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={label}>Appearance</span>
-              <Avatar comp={c} size={40} />
+              <SquishyBlob comp={c} size={40} glow={false} softness={typeof c.blob === 'number' ? c.blob : null} />
             </div>
             <div style={{ fontSize: 12, color: C.textSoft, margin: '6px 0 12px' }}>{c.colorName}</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
@@ -143,6 +146,15 @@ export default function CompanionProfile({ companion: c, trialStart, history, co
               </label>
             </div>
             <div style={{ fontSize: 11, color: C.textDim, marginTop: 10 }}>Tap a swatch or the wheel to pick any colour — {c.name}'s avatar and chat recolour instantly.</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 14 }}>
+              <span style={{ fontSize: 11, color: C.textSoft, whiteSpace: 'nowrap' }}>Firm</span>
+              <input type="range" min="0" max="1" step="0.05" aria-label="How squishy this companion is"
+                value={typeof c.blob === 'number' ? c.blob : 0.55}
+                onChange={(e) => onCustomize({ blob: parseFloat(e.target.value) })}
+                style={{ flex: 1, accentColor: col, cursor: 'pointer' }} />
+              <span style={{ fontSize: 11, color: C.textSoft, whiteSpace: 'nowrap' }}>Squishy</span>
+            </div>
+            <div style={{ fontSize: 11, color: C.textDim, marginTop: 6 }}>How bouncy {c.name}'s goop feels when you touch it.</div>
           </div>
         )}
         {onCustomize && c.status !== 'deleted' && (() => {

@@ -97,6 +97,7 @@ Data/Privacy,Privacy Policy + Disclaimer,"Full Privacy Policy (local-first, on-d
 Visual/UI,Dark cosmic aesthetic,"Abstract, space-inspired",Built,P0,
 Visual/UI,Companion color identity,Abstract color per companion,Built,P0,
 Visual/UI,Generative avatars,Unique cosmic constellation sigil per companion,Built,P1,"NEW; components/Avatar.jsx, deterministic SVG, recolors live"
+Visual/UI,Squishy gel avatars,"Companions render as a deformable blob of goop you poke, drag and smear with thumb or Apple Pencil (pressure-aware); spring physics + neighbour cohesion + idle wobble + pet boing; bounciness is personality-derived and user-adjustable",Built,P1,"NEW; components/SquishyBlob.jsx; interactive in profile playground + The Space; Firm<->Squishy slider persists as comp.blob"
 Visual/UI,Companion sitting space,"Avatars hang out, drag to move, tap to pet, mingle on their own",Built,P1,"NEW; screens/CompanionSpace.jsx, positions persist+sync"
 Visual/UI,Space approach animation,Talking companions lean toward each other + trade lines,Built,P2,NEW; pair leans in during ambient exchange
 Visual/UI,Personality pet reactions,Pet response (emoji/word/burst) varies by personality,Built,P2,NEW; petStyle() from personality+traits

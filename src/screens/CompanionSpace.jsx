@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { C } from '../theme.js';
 import { Shell } from '../components/ui.jsx';
-import Avatar from '../components/Avatar.jsx';
+import SquishyBlob from '../components/SquishyBlob.jsx';
 import { genAmbient, bumpBond } from '../lib/relationships.js';
 import { currentActivity } from '../lib/presence.js';
 import { vitality } from '../lib/innerlife.js';
@@ -53,6 +53,7 @@ export default function CompanionSpace({ comps, bonds, positions, onPositions, o
   useEffect(() => { bondsRef.current = bonds; }, [bonds]);
 
   const [dragId, setDragId] = useState(null);
+  const [poke, setPoke] = useState(null);      // {id, x, y, pressure} — squishes the touched blob
   const [pets, setPets] = useState({});        // id -> bump counter (restarts pop)
   const [hearts, setHearts] = useState([]);    // {key, compId, dx, emoji}
   const [reaction, setReaction] = useState(null); // {compId, word}
@@ -106,13 +107,25 @@ export default function CompanionSpace({ comps, bonds, positions, onPositions, o
     timersRef.current.push(setTimeout(() => setReaction((r) => (r && r.word === word && r.compId === c.id ? null : r)), 1100));
   }
 
+  // Pointer position relative to a blob's centre, in its 120-unit viewBox, so
+  // the goop can stretch toward the finger / pen wherever you touch it.
+  function localPoke(e, id) {
+    const rect = containerRef.current?.getBoundingClientRect();
+    const bp = posRef.current[id];
+    if (!rect || !bp) return null;
+    const cxp = rect.left + bp.x * rect.width;
+    const cyp = rect.top + bp.y * rect.height;
+    return { id, x: (e.clientX - cxp) / SIZE * 120 + 60, y: (e.clientY - cyp) / SIZE * 120 + 60, pressure: e.pressure > 0 ? e.pressure : 0.5 };
+  }
   function onPointerDown(e, c) {
     e.currentTarget.setPointerCapture?.(e.pointerId);
     dragRef.current = { id: c.id, moved: false, sx: e.clientX, sy: e.clientY };
+    setPoke(localPoke(e, c.id));
   }
   function onPointerMove(e) {
     const d = dragRef.current;
     if (!d) return;
+    setPoke(localPoke(e, d.id));
     if (!d.moved && (Math.abs(e.clientX - d.sx) > 4 || Math.abs(e.clientY - d.sy) > 4)) { d.moved = true; setDragId(d.id); }
     if (!d.moved) return;
     const rect = containerRef.current?.getBoundingClientRect();
@@ -124,6 +137,7 @@ export default function CompanionSpace({ comps, bonds, positions, onPositions, o
   function onPointerUp(e, c) {
     const d = dragRef.current;
     dragRef.current = null;
+    setPoke(null);
     if (!d) return;
     if (!d.moved) { pet(c); }
     else { setDragId(null); onPositions?.(posRef.current); }
@@ -146,7 +160,7 @@ export default function CompanionSpace({ comps, bonds, positions, onPositions, o
         <button aria-label="Back" onClick={onBack} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 20, cursor: 'pointer' }}>←</button>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 15, fontWeight: 600 }}>The Space</div>
-          <div style={{ fontSize: 10.5, color: C.textDim }}>Drag to rearrange · tap to pet · they mingle on their own</div>
+          <div style={{ fontSize: 10.5, color: C.textDim }}>Touch to squish · drag to move · tap to pet · they mingle on their own</div>
         </div>
       </div>
 
@@ -189,7 +203,7 @@ export default function CompanionSpace({ comps, bonds, positions, onPositions, o
                 <span key={h.key} style={{ position: 'absolute', left: '50%', top: 6, marginLeft: h.dx, fontSize: 16, pointerEvents: 'none', animation: 'heartRise 1.1s ease-out forwards' }}>{h.emoji}</span>
               ))}
               <div key={`pop-${pets[c.id] || 0}`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', animation: pets[c.id] ? 'petPop 0.5s ease' : 'none', filter: talking ? `drop-shadow(0 0 10px ${c.color?.glow || 'rgba(124,91,245,0.5)'})` : 'none' }}>
-                <Avatar comp={c} size={SIZE} glow vitality={vit} />
+                <SquishyBlob comp={c} size={SIZE} glow vitality={vit} softness={typeof c.blob === 'number' ? c.blob : null} bump={pets[c.id] || 0} grabbed={dragging} poke={poke && poke.id === c.id ? poke : null} />
                 <span style={{ fontSize: 11, color: C.textSoft, marginTop: 6, fontWeight: 600, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 3 }}>
                   {!awake && <span style={{ fontSize: 9 }}>💤</span>}{c.name}
                 </span>
