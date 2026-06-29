@@ -52,6 +52,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const [spacePos, setSpacePos] = useState(restored?.spacePos || {});
   const [ambientAlerts, setAmbientAlerts] = useState(restored?.ambientAlerts !== false);
   const [lore, setLore] = useState(restored?.lore || []);
+  const [ambientArriving, setAmbientArriving] = useState(false);
   // Focus session (companion-set): a quiet timer that suppresses nudges.
   const [focusUntil, setFocusUntil] = useState(() => { try { const v = +localStorage.getItem('other_focus_until'); return v && v > Date.now() ? v : null; } catch (e) { return null; } });
   const focusRef = useRef(focusUntil);
@@ -192,9 +193,11 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       // by Claude when AI is on (falls back to templates), ephemeral, and nudges
       // their bond. Runs without blocking the greeting/disclosure below.
       (async () => {
+        const arriving = Math.random() < 0.5;
         let res = null;
-        try { res = await ambientThreadAI(comps, profile, bonds); } catch (e) { /* fall back */ }
+        try { res = await ambientThreadAI(comps, profile, bonds, arriving); } catch (e) { /* fall back */ }
         if (!res) res = genAmbient(comps, bonds);
+        else setAmbientArriving(arriving);
         if (res) {
           setAmbient(res.thread.map((m) => ({ role: 'assistant', companion: m.from, content: m.text, isAmbient: true })));
           setBonds((b) => bumpBond(b, res.pair[0], res.pair[1]));
@@ -392,6 +395,35 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       if (alive && share) setMsgs((p) => [...p, { role: 'assistant', companion: c, content: share, ts: Date.now() }]);
     })();
     return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comps]);
+
+  // Rupture & repair: a long silence can leave a once-close companion hurt and
+  // guarded; sustained re-engagement heals it, with a reconciliation moment.
+  const riftRef = useRef(false);
+  useEffect(() => {
+    if (riftRef.current || loadingRef.current) return;
+    const name = profile?.name || 'you';
+    for (const c of comps) {
+      if (c.status !== 'awake') continue;
+      const st = closenessStage(c);
+      if (st.key === 'distant' && !c.riftSeen) {
+        const line = [`…oh. hey, ${name}. it's been a while.`, `hey, stranger. honestly wasn't sure you'd come back.`, `you're here. I—yeah. it's been a minute, ${name}.`][Math.floor(Math.random() * 3)];
+        riftRef.current = true;
+        setComps((p) => p.map((x) => (x.id === c.id ? { ...x, riftSeen: true, repairSeen: false } : x)));
+        setMsgs((p) => [...p, { role: 'assistant', companion: c, content: line, ts: Date.now() }]);
+        setTimeout(() => { riftRef.current = false; }, 1500);
+        break;
+      }
+      if (st.key !== 'distant' && c.riftSeen && !c.repairSeen) {
+        const line = [`I'm really glad you came back. I missed this — missed you.`, `okay, I'll admit it: it's good to have you around again, ${name}.`, `we're okay. I'm just glad you're here.`][Math.floor(Math.random() * 3)];
+        riftRef.current = true;
+        setComps((p) => p.map((x) => (x.id === c.id ? { ...x, repairSeen: true, riftSeen: false } : x)));
+        setMsgs((p) => [...p, { role: 'assistant', companion: c, content: line, ts: Date.now() }]);
+        setTimeout(() => { riftRef.current = false; }, 1500);
+        break;
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comps]);
 
@@ -771,7 +803,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
             {ambientHead && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '4px 0 10px' }}>
                 <div style={{ flex: 1, height: 1, background: C.border }} />
-                <span style={{ fontSize: 10, color: C.textSoft, letterSpacing: 1, whiteSpace: 'nowrap' }}>✦ while you were away</span>
+                <span style={{ fontSize: 10, color: C.textSoft, letterSpacing: 1, whiteSpace: 'nowrap' }}>{ambientArriving ? '✦ you walk in on them…' : '✦ while you were away'}</span>
                 <div style={{ flex: 1, height: 1, background: C.border }} />
               </div>
             )}

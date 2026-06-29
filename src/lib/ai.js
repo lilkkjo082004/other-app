@@ -281,13 +281,16 @@ export async function extractMemories(profile, messages) {
  *  each other, not the user), reflecting their personalities + bond. Returns
  *  { thread:[{from,text}], pair:[idA,idB] } or null — caller falls back to the
  *  template generator (lib/relationships.genAmbient) on null. */
-export async function ambientThreadAI(comps, profile, bonds) {
+export async function ambientThreadAI(comps, profile, bonds, arriving = false) {
   const pair = pickAmbientPair(comps, bonds);
   if (!pair || !aiEnabled()) return null;
   const { a, b, stage } = pair;
+  const name = profile?.name || 'the user';
   const who = (c) => `${c.name} (${c.pronouns || 'they/them'}): ${c.personality}; quirk: ${c.quirk}`;
-  const system = `You write a brief ambient conversation between two AI companions in the app "Other". They talk to EACH OTHER, never to the user. Stay fully in character.\n${who(a)}\n${who(b)}\nTheir bond right now: ${stage.label}. ${profile?.name || 'The user'} will overhear this on opening the app.`;
-  const ask = `Write a short, natural back-and-forth of 3-4 short lines total between ${a.name} and ${b.name} — casual, in-character, reflecting their bond. Don't address the user or narrate. Output ONLY the lines, each exactly as "Name: message".`;
+  const system = `You write a brief ambient conversation between two AI companions in the app "Other". They talk to EACH OTHER. Stay fully in character.\n${who(a)}\n${who(b)}\nTheir bond right now: ${stage.label}.${arriving ? ` ${name} is JUST now walking in mid-conversation.` : ` ${name} will overhear this on opening the app.`}`;
+  const ask = arriving
+    ? `Write a short in-progress exchange of 3-4 short lines between ${a.name} and ${b.name} — they're mid-conversation when ${name} walks in, and in the LAST line one of them notices and greets ${name}. Casual, in-character. Output ONLY the lines, each exactly as "Name: message".`
+    : `Write a short, natural back-and-forth of 3-4 short lines total between ${a.name} and ${b.name} — casual, in-character, reflecting their bond. Don't address the user or narrate. Output ONLY the lines, each exactly as "Name: message".`;
   let text;
   try { text = await rawComplete(system, ask); } catch (e) { return null; }
   const byName = { [a.name.toLowerCase()]: a, [b.name.toLowerCase()]: b };

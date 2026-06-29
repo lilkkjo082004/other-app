@@ -153,3 +153,5 @@ Companion Dynamics,Peer opinions,"Each companion forms distinct feelings about t
 Companion Dynamics,Mood contagion,"The room's collective mood (each companion's state) shapes the group vibe",Built,P2,"NEW; roomMood injected into group prompt"
 Chat System,Group conflict & sides,"Companions form alliances, take sides, playfully spar in group chat",Built,P2,NEW; group MODE guidance + peer opinions
 Companion Dynamics,Shared history timeline,"Group distills memorable moments into lore they reference (remember when)",Built,P2,"NEW; ai.generateSharedMoment, loreBlock, shown in Space"
+Chat System,Walk into a scene,"Sometimes you arrive mid-conversation and a companion notices you",Built,P2,"NEW; ambientThreadAI arriving mode + walk-in divider"
+Companion Dynamics,Rupture & repair,"Long neglect leaves a once-close companion hurt/guarded; re-engagement heals with a reconciliation moment",Built,P2,"NEW; distant stage + riftSeen/repairSeen arc"
