@@ -121,7 +121,7 @@ export function memoryBlock(memories = [], name = 'them', now = nowMs()) {
     if (m.kind === 'event' && m.at) {
       line += m.at < now
         ? ` (this was around ${fmtDate(m.at)} — if it fits, naturally ask how it went)`
-        : ` (coming up around ${fmtDate(m.at)})`;
+        : ` (coming up around ${fmtDate(m.at)} — you're a little excited for them, count it down if it fits)`;
     } else {
       const rel = relativeTime(m.ts, now);
       if (rel) line += ` (you learned this ${rel})`;

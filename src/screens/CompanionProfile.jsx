@@ -61,6 +61,19 @@ export default function CompanionProfile({ companion: c, trialStart, history, co
             {c.shift?.text && <div style={{ fontSize: 13, marginTop: 4 }}><span style={{ color: C.textDim }}>Changing their mind:</span> {c.shift.text}</div>}
           </div>
         )}
+        {c.letters?.length > 0 && (
+          <div style={card}>
+            <div style={label}>Letters from {c.name}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
+              {c.letters.slice(0, 5).map((l, i) => (
+                <div key={i} style={{ borderLeft: `2px solid ${col}`, paddingLeft: 10 }}>
+                  <div style={{ fontSize: 10, color: C.textDim, marginBottom: 3 }}>{(() => { try { return new Date(l.ts).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }); } catch (x) { return ''; } })()}</div>
+                  <div style={{ fontSize: 13, lineHeight: 1.55, color: C.text, whiteSpace: 'pre-wrap' }}>{l.text}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         {c.growth?.length > 0 && (
           <div style={card}>
             <div style={label}>How {c.name} has grown</div>

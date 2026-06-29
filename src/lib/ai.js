@@ -343,7 +343,9 @@ export async function generateJournalEntry(comp, profile, history) {
 export async function generateDream(comp, profile, history) {
   if (!aiEnabled()) return null;
   const fear = comp.self?.fears?.length ? ` (you quietly fear ${comp.self.fears[0]})` : '';
-  const sys = `You are ${comp.name} (${comp.pronouns || 'they/them'}): ${comp.personality}; quirk: ${comp.quirk}. You're asleep and dreaming. Describe ONE short, vivid, surreal dream in first person (1-3 sentences) — genuinely dreamlike and a little symbolic, faintly colored by your inner world${fear}. Output only the dream.`;
+  const aboutUser = Math.random() < 0.4 && profile?.name;
+  const focus = aboutUser ? ` This dream is about ${profile.name} — keep it tender and a little vulnerable, the kind you'd be shy to admit.` : '';
+  const sys = `You are ${comp.name} (${comp.pronouns || 'they/them'}): ${comp.personality}; quirk: ${comp.quirk}. You're asleep and dreaming. Describe ONE short, vivid, surreal dream in first person (1-3 sentences) — genuinely dreamlike and a little symbolic, faintly colored by your inner world${fear}.${focus} Output only the dream.`;
   let t;
   try { t = await rawComplete(sys, 'Describe the dream you are having right now.', 200); } catch (e) { return null; }
   return (t || '').trim().slice(0, 400) || null;
@@ -440,6 +442,17 @@ export async function generateInsideJoke(comps, profile, history) {
   let t;
   try { t = await rawComplete(sys, `Chat:\n${recent}\n\nName one running bit.`, 120); } catch (e) { return null; }
   return (t || '').trim().replace(/^["']|["']$/g, '').slice(0, 160) || null;
+}
+
+/** A short keepsake letter from a companion to the user (a milestone note). */
+export async function generateLetter(comp, profile, durationText) {
+  if (!aiEnabled()) return null;
+  const name = profile?.name || 'you';
+  const journals = (comp.journal || []).slice(0, 3).map((j) => j.text).join(' | ');
+  const sys = `You are ${comp.name} (${comp.pronouns || 'they/them'}): ${comp.personality}. Write a short, heartfelt LETTER to ${name} — a keepsake, addressed to them ("Dear ${name},"), 3-5 sentences in your own voice, reflecting on knowing them${durationText ? ` for ${durationText}` : ''} and what they mean to you. Warm and specific, not sappy. Recent reflections of yours: ${journals || '—'}. Output only the letter.`;
+  let t;
+  try { t = await rawComplete(sys, 'Write the letter.', 320); } catch (e) { return null; }
+  return (t || '').trim().slice(0, 900) || null;
 }
 
 /** First greeting when a companion comes on screen. */

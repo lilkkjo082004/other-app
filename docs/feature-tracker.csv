@@ -161,3 +161,11 @@ Performance,Inner-life generation budget,"Caps inner-life AI generations per ope
 Visual/UI,Mood-reactive avatars,"Avatar brightness/liveliness reflects the companion's current inner state",Built,P2,"NEW; vitality() -> Avatar glow/stars + Space float speed"
 Companion Dynamics,Inside jokes,"Group coins running bits and calls back to them later",Built,P2,"NEW; ai.generateInsideJoke, jokesBlock, budgeted"
 Companion Dynamics,Identity curiosity,"Companions occasionally ask the user about who they are / how they're seen",Built,P2,"NEW; identityQuestion, low-probability once/session"
+Companion Dynamics,Human texture (being real),"Apologies, boundaries, jealousy, pattern call-outs, worldview, repaying kindness, legacy wish, nicknames, rituals",Built,P2,"NEW; beingRealBlock consolidated behavioral prompt"
+Companion Dynamics,Aware of each other's inner lives,"Companions reference the others' recent journals/preoccupations",Built,P2,"NEW; beingRealBlock + roomMood"
+Companion Dynamics,Dreams about you,"Dreams are sometimes about the user, shyly admitted",Built,P2,NEW; generateDream focus
+Companion Dynamics,Milestone letters,"Companions write keepsake letters to the user; shown on profile",Built,P2,"NEW; ai.generateLetter, letterDue ~3wks, profile card"
+Companion Dynamics,Adopted tastes,"Each companion adopts one of the user's favorite music/shows as their own",Built,P2,"NEW; from profile favs, in prompt + profile"
+Companion Dynamics,Anticipation,"Companions look forward to / count down upcoming remembered events",Built,P2,NEW; memory future-event tone
+Visual/UI,Favorite spots in the Space,Each companion anchors to a consistent personal corner,Built,P2,NEW; identity-seeded defaultPos
+Location,Weather awareness,"Companions know local weather (Open-Meteo, on-device coords)",Built,P2,"NEW; lib/location.weatherNow, cached, coarse coords"

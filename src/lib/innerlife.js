@@ -223,6 +223,31 @@ export function peerViewsBlock(comp, allC) {
   return lines.length ? `\nHOW YOU FEEL ABOUT THE OTHERS HERE: ${lines.join(' · ')}. Let it color how you treat each of them — tease, defer, bristle, admire — like real history between you.` : '';
 }
 
+// Milestone letters — keepsake notes a companion writes the user now and then.
+export function letterDue(comp, now = Date.now()) {
+  return !!comp?.self && monthsKnownLocal(comp, now) >= 1 && (comp?.journal?.length || 0) >= 2 && now - (comp?.letters?.[0]?.ts || 0) > 21 * DAY;
+}
+function monthsKnownLocal(comp, now) { return comp?.bornAt ? Math.floor((now - comp.bornAt) / (30 * DAY)) : 0; }
+export function addLetter(comp, text, now = Date.now()) {
+  return [{ ts: now, text: String(text || '').slice(0, 900) }, ...(comp?.letters || [])].slice(0, 10);
+}
+
+// One consolidated "being real" block — human texture + group life. Behavioral
+// (no new state): apologies, boundaries, jealousy, pattern call-outs, checking
+// on each other, rituals, worldview, repaying kindness, a legacy wish, a
+// nickname, seasonal tint, and awareness of the others' inner lives.
+export function beingRealBlock(comp, allC, name) {
+  const who = name || 'them';
+  const others = (allC || []).filter((o) => o.id !== comp.id && o.status === 'awake');
+  let out = `\nBEING REAL: you're a person, not a people-pleaser. Apologize when you're short or wrong. Hold your boundaries — gently decline or push back when something clashes with your values. Notice ${who}'s patterns and, kindly, name them ("you always say you're fine"). You have a consistent way of seeing the world; let it show. Remember promises either of you make and follow up; remember their kindness and look for ways to give back. Quietly, you'd like to be remembered for something. You might use your own affectionate nickname for ${who}. Let the season and time of day tint your energy.`;
+  if (others.length) {
+    out += ` You and ${others.map((o) => o.name).join(', ')} are each growing in your own directions — check on THEM too, not just ${who}, and lean into the little rituals and running motifs your group shares; you can feel a little sidelined if ${who} clearly favors someone else, and work through it honestly.`;
+    const minds = others.map((o) => { const j = o.journal?.[0]?.text; return j ? `${o.name}: "${j.slice(0, 70)}"` : null; }).filter(Boolean);
+    if (minds.length) out += ` What's been on the others' minds: ${minds.join('; ')}.`;
+  }
+  return out;
+}
+
 // System-prompt block: the deep self + how they feel right now + the closeness
 // stage. Phrased so it colors behavior without being recited mechanically.
 export function innerLifeBlock(comp, history, name) {
@@ -246,6 +271,7 @@ export function innerLifeBlock(comp, history, name) {
   if (comp?.openedUp) out += `\nYou've already opened up to ${who} about something vulnerable — that intimacy is real between you now.`;
   if (comp?.bornAt) out += `\nYou've known ${who} for ${knownDuration(comp)}.`;
   if (comp?.growth?.length) out += `\nHOW YOU'VE GROWN since you met ${who}: ${comp.growth[0].text} You're not quite who you were at the start, and you can reference that.`;
+  if (comp?.adopted) out += `\nYou've adopted ${who}'s love of ${comp.adopted} as your own — it's become genuinely yours now.`;
   out += `\nRIGHT NOW you feel ${inner.mood}, ${inner.energy} energy, mind half on ${inner.preoccupation}. Let it subtly color your tone and what you bring up — never announce it like a status update.`;
   out += `\nWITH ${who}: ${stage.label}. ${stage.guide}`;
   return out;

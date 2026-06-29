@@ -13,10 +13,14 @@ const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const FLOATS = ['floatA', 'floatB', 'floatC'];
 const SIZE = 78;
 
-function defaultPos(i, n) {
+function defaultPos(i, n, comp) {
   if (n <= 1) return { x: 0.5, y: 0.46 };
-  const ang = (i / n) * Math.PI * 2 - Math.PI / 2;
-  return { x: 0.5 + Math.cos(ang) * 0.27, y: 0.46 + Math.sin(ang) * 0.24 };
+  // Anchor each companion to a consistent personal "corner" seeded by identity.
+  let h = 0; const s = comp?.id || comp?.name || String(i);
+  for (let k = 0; k < s.length; k++) h = (h * 31 + s.charCodeAt(k)) >>> 0;
+  const ang = (i / n) * Math.PI * 2 - Math.PI / 2 + ((h % 24) - 12) * 0.02;
+  const rad = 0.24 + (h % 7) * 0.012;
+  return { x: 0.5 + Math.cos(ang) * (rad + 0.03), y: 0.46 + Math.sin(ang) * rad };
 }
 
 // Pet reactions vary by personality — derived from the companion's personality,
@@ -40,7 +44,7 @@ export default function CompanionSpace({ comps, bonds, positions, onPositions, o
   const dragRef = useRef(null);
   const [pos, setPos] = useState(() => {
     const p = { ...(positions || {}) };
-    living.forEach((c, i) => { if (!p[c.id]) p[c.id] = defaultPos(i, living.length); });
+    living.forEach((c, i) => { if (!p[c.id]) p[c.id] = defaultPos(i, living.length, c); });
     return p;
   });
   const posRef = useRef(pos);
@@ -152,7 +156,7 @@ export default function CompanionSpace({ comps, bonds, positions, onPositions, o
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.textDim, fontSize: 13 }}>No companions here yet.</div>
         )}
         {living.map((c, i) => {
-          const base = pos[c.id] || defaultPos(i, living.length);
+          const base = pos[c.id] || defaultPos(i, living.length, c);
           const p = leanPos(c, base);
           const awake = c.status === 'awake';
           const dragging = dragId === c.id;

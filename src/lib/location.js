@@ -175,6 +175,36 @@ export async function scanLocation(nearThresholdM = 250) {
   return { near, auto };
 }
 
+// Best-effort current weather via Open-Meteo (no key). Sends only coarsened
+// (~city-level) coordinates to the weather service; cached ~2h. Returns a short
+// phrase like "around 14°C and overcast", or null. Our servers never see this.
+const WX_KEY = 'other_weather_v1';
+const WX_CODES = {
+  0: 'clear', 1: 'mostly clear', 2: 'partly cloudy', 3: 'overcast', 45: 'foggy', 48: 'foggy',
+  51: 'drizzly', 53: 'drizzly', 55: 'drizzly', 61: 'rainy', 63: 'rainy', 65: 'pouring',
+  71: 'snowy', 73: 'snowy', 75: 'snowy', 80: 'showery', 81: 'showery', 82: 'stormy showers',
+  95: 'thunderstorms', 96: 'thunderstorms', 99: 'thunderstorms',
+};
+export async function weatherNow() {
+  const loc = getLocation();
+  if (!loc || !loc.enabled || typeof loc.lat !== 'number') return null;
+  try {
+    const cached = JSON.parse(localStorage.getItem(WX_KEY) || 'null');
+    if (cached && Date.now() - cached.ts < 2 * 60 * 60 * 1000) return cached.text;
+  } catch (e) { /* ignore */ }
+  const clat = Math.round(loc.lat * 10) / 10, clon = Math.round(loc.lon * 10) / 10;
+  try {
+    const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${clat}&longitude=${clon}&current=temperature_2m,weather_code`);
+    if (!r.ok) return null;
+    const d = await r.json();
+    const t = d?.current?.temperature_2m, code = d?.current?.weather_code;
+    if (typeof t !== 'number') return null;
+    const text = `around ${Math.round(t)}°C and ${WX_CODES[code] || 'mild'}`;
+    try { localStorage.setItem(WX_KEY, JSON.stringify({ ts: Date.now(), text })); } catch (e) { /* ignore */ }
+    return text;
+  } catch (e) { return null; }
+}
+
 // Current coords for centering a maps search, or null if location is off. The
 // coords are used only to build an external maps link the user chooses to open.
 export async function mapsCoords() {

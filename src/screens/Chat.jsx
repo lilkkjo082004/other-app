@@ -3,8 +3,8 @@ import { C, COMP_COLORS } from '../theme.js';
 import { Shell } from '../components/ui.jsx';
 import { speakAs, useSpeechRec } from '../lib/voice.js';
 import { genAmbient, bumpBond } from '../lib/relationships.js';
-import { askCompanion, greetCompanion, proactiveCompanion, ambientThreadAI, extractMemories, generateSelf, generateJournalEntry, generateDream, generateWant, generateShift, generateVulnerableShare, generatePeerViews, generateSharedMoment, generateGrowth, generateInsideJoke } from '../lib/ai.js';
-import { withInteraction, journalDue, addJournal, dreamDue, makeDream, closenessStage, stageRank, milestoneLine, wantDue, shiftDue, shouldOpenUp, makeStamped, peerViewsDue, loreDue, addLore, growthDue, addGrowth, knownDuration, jokesDue, addJoke, identityQuestion } from '../lib/innerlife.js';
+import { askCompanion, greetCompanion, proactiveCompanion, ambientThreadAI, extractMemories, generateSelf, generateJournalEntry, generateDream, generateWant, generateShift, generateVulnerableShare, generatePeerViews, generateSharedMoment, generateGrowth, generateInsideJoke, generateLetter } from '../lib/ai.js';
+import { withInteraction, journalDue, addJournal, dreamDue, makeDream, closenessStage, stageRank, milestoneLine, wantDue, shiftDue, shouldOpenUp, makeStamped, peerViewsDue, loreDue, addLore, growthDue, addGrowth, knownDuration, jokesDue, addJoke, identityQuestion, letterDue, addLetter } from '../lib/innerlife.js';
 import { mergeMemories, removeMemory, pendingFollowups, markFollowed, gossipPick, absorbOverheard } from '../lib/memory.js';
 import { isLimited } from '../lib/entitlements.js';
 import { genComp } from '../lib/companions.js';
@@ -14,7 +14,7 @@ import { DISCLOSURE_TEXT, isAcknowledged, acknowledgeDisclosure, consumeDailyRem
 import { detectCrisis, CRISIS_RESOURCES, CRISIS_INTRO } from '../lib/crisis.js';
 import { isAuthed as apiAuthed, logMood } from '../lib/api.js';
 import { aiEnabled } from '../config.js';
-import { scanLocation, shouldNudgePlace, markPlaceNudged } from '../lib/location.js';
+import { scanLocation, shouldNudgePlace, markPlaceNudged, weatherNow } from '../lib/location.js';
 import { parseAction, stripActionPartial, downloadICS, googleCalUrl, formatWhen, actionTitle } from '../lib/actions.js';
 import { birthdayStatus, monthsKnown } from '../lib/occasion.js';
 import Avatar from '../components/Avatar.jsx';
@@ -54,6 +54,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const [ambientAlerts, setAmbientAlerts] = useState(restored?.ambientAlerts !== false);
   const [lore, setLore] = useState(restored?.lore || []);
   const [jokes, setJokes] = useState(restored?.jokes || []);
+  const [weather, setWeather] = useState('');
   const [ambientArriving, setAmbientArriving] = useState(false);
   // Focus session (companion-set): a quiet timer that suppresses nudges.
   const [focusUntil, setFocusUntil] = useState(() => { try { const v = +localStorage.getItem('other_focus_until'); return v && v > Date.now() ? v : null; } catch (e) { return null; } });
@@ -93,7 +94,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
 
   // A companion's own memory rides along on `profile` so its prompt/AI call
   // sees only what *it* remembers about the user.
-  const profFor = (c) => ({ ...profile, memories: memOf(c.id), lore, jokes });
+  const profFor = (c) => ({ ...profile, memories: memOf(c.id), lore, jokes, weather });
 
   // Find a companion sitting on a past event they haven't followed up on yet,
   // so they can proactively ask how it went. Picks the most recent such event.
@@ -306,6 +307,13 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comps]);
 
+  // Best-effort local weather (on-device coords -> Open-Meteo) for grounding.
+  useEffect(() => {
+    let alive = true;
+    (async () => { try { const w = await weatherNow(); if (alive && w) setWeather(w); } catch (e) { /* ignore */ } })();
+    return () => { alive = false; };
+  }, []);
+
   // Inner life (once on open): give each companion a stable self if missing, and
   // let them write a journal entry when due. Sequential to avoid an AI burst.
   useEffect(() => {
@@ -316,6 +324,11 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       // Seed "known since" for age/growth tracking (earliest message, or now).
       const born = restored?.messages?.length ? Math.min(...restored.messages.map((m) => m.ts || Date.now())) : Date.now();
       if (living.some((c) => !c.bornAt)) setComps((p) => p.map((x) => (x.bornAt ? x : { ...x, bornAt: born })));
+      // Adopted tastes (no AI): each companion picks up one of the user's favs.
+      const favs = [profile?.favMusic, profile?.favMovies].filter(Boolean).join(',').split(/[,;]/).map((s) => s.trim()).filter(Boolean);
+      if (favs.length && living.some((c) => !c.adopted)) {
+        setComps((p) => p.map((x, i) => (x.adopted || x.status === 'deleted' ? x : { ...x, adopted: favs[i % favs.length] })));
+      }
       const hist = restored?.messages || [];
       // Safeguard: cap inner-life AI generations per open (priority order below);
       // anything skipped is still "due" and runs on a later open.
@@ -363,6 +376,14 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       if (jokesDue(jokes, hist) && budget()) { // 7b) inside jokes / running bits
         gens++; const joke = await generateInsideJoke(living, profile, hist);
         if (alive && joke) setJokes((x) => addJoke(x, joke));
+      }
+      for (const c of living) { // 7c) keepsake letters (every few weeks)
+        if (!letterDue(c) || !budget()) continue;
+        gens++; const letter = await generateLetter(c, profile, knownDuration(c));
+        if (alive && letter) {
+          setComps((p) => p.map((x) => (x.id === c.id ? { ...x, letters: addLetter(x, letter) } : x)));
+          setMsgs((p) => [...p, { role: 'assistant', companion: c, content: 'I wrote you something — it\'s on my profile. ✉️', ts: Date.now() }]);
+        }
       }
       for (const c of living) { // 8) long-term growth
         if (!growthDue(c) || !budget()) continue;
