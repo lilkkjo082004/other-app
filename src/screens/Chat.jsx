@@ -46,6 +46,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   });
   const memOf = (id) => memStore[id] || [];
   const [spacePos, setSpacePos] = useState(restored?.spacePos || {});
+  const [ambientAlerts, setAmbientAlerts] = useState(restored?.ambientAlerts !== false);
   const [confirmDel, setConfirmDel] = useState(null);  // companion pending delete confirmation
   const [copiedIdx, setCopiedIdx] = useState(null);
   const [atBottom, setAtBottom] = useState(true);
@@ -260,9 +261,9 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     // Don't persist on every streamed token — the final setMsgs (after
     // streamingRef flips false) saves the completed turn once.
     if (streamingRef.current) return;
-    onPersist?.({ companions: comps, messages: msgs, chatMode, autoSpeak, trialStart, bonds, voiceCall, pushFrequency: pushFreq, pushSchedule: pushSched, memories: memStore, spacePos });
+    onPersist?.({ companions: comps, messages: msgs, chatMode, autoSpeak, trialStart, bonds, voiceCall, pushFrequency: pushFreq, pushSchedule: pushSched, memories: memStore, spacePos, ambientAlerts });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [comps, msgs, chatMode, autoSpeak, bonds, voiceCall, pushFreq, pushSched, memStore, spacePos]);
+  }, [comps, msgs, chatMode, autoSpeak, bonds, voiceCall, pushFreq, pushSched, memStore, spacePos, ambientAlerts]);
 
   async function greet() {
     setLoading(true);
@@ -436,6 +437,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         voiceCall={voiceCall} onVoiceCall={setVoiceCall}
         pushFrequency={pushFreq} onPushFrequency={setPushFreq}
         pushSchedule={pushSched} onPushSchedule={setPushSched}
+        ambientAlerts={ambientAlerts} onAmbientAlerts={setAmbientAlerts}
         onSleepAll={() => setComps((p) => p.map((c) => (c.status === 'awake' ? { ...c, status: 'sleeping' } : c)))}
         onWakeAll={() => setComps((p) => p.map((c) => (c.status === 'sleeping' ? { ...c, status: 'awake' } : c)))}
         onReset={onReset}

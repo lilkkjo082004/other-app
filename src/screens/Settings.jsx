@@ -10,7 +10,7 @@ import { loadSession, saveSession } from '../lib/storage.js';
 import { LegalLink } from './Legal.jsx';
 import ProfileEdit from './ProfileEdit.jsx';
 
-export default function Settings({ profile, comps, autoSpeak, trialStart, cloud, authed, email, onSignIn, onSignOut, onAutoSpeak, onUpdateProfile, voiceCall, onVoiceCall, pushFrequency, onPushFrequency, pushSchedule, onPushSchedule, onSleepAll, onWakeAll, onReset, onBack }) {
+export default function Settings({ profile, comps, autoSpeak, trialStart, cloud, authed, email, onSignIn, onSignOut, onAutoSpeak, onUpdateProfile, voiceCall, onVoiceCall, pushFrequency, onPushFrequency, pushSchedule, onPushSchedule, ambientAlerts, onAmbientAlerts, onSleepAll, onWakeAll, onReset, onBack }) {
   const [editing, setEditing] = useState(false);
   const living = comps.filter((c) => c.status !== 'deleted');
   const allAwake = living.length > 0 && living.every((c) => c.status === 'awake');
@@ -238,6 +238,15 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
                   <button onClick={addTime} aria-label="Add check-in time" style={{ padding: '9px 18px', borderRadius: 9, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", fontSize: 13, fontWeight: 600, background: `${C.glow1}22`, border: `1px solid ${C.glow1}`, color: C.glow1 }}>Add</button>
                 </div>
                 <div style={{ fontSize: 11, color: C.textDim, marginTop: 10 }}>Times are checked about every 15 minutes, so a check-in may arrive a few minutes after the time you set.</div>
+              </div>
+            )}
+            {pushOn && onAmbientAlerts && (
+              <div style={{ ...card, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ flex: 1, paddingRight: 10 }}>
+                  <div style={{ fontSize: 13 }}>Conversation alerts</div>
+                  <div style={{ fontSize: 11, color: C.textDim }}>Sometimes ping you when your companions are chatting with each other</div>
+                </div>
+                <Toggle on={ambientAlerts !== false} onClick={() => onAmbientAlerts(!(ambientAlerts !== false))} />
               </div>
             )}
           </>

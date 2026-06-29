@@ -116,7 +116,7 @@ Notifications,Random thoughts,Unprompted idle thoughts,Built,P2,UPDATED Future->
 Notifications,Customizable check-in times,"User-set times, multiple per day, timezone-aware",Built,P1,NEW; replaces daily/few preset; worker scheduleDue + Intl tz
 Notifications,Push self-test & diagnostics,In-app test notification + delivery status,Built,P2,"NEW; /push/status, /push/test, local SW notify"
 Notifications,Toggle voice activation,Disable call-by-name,Built,P1,UPDATED Future->Built
-Notifications,Ambient conversation alerts,Notified companions were chatting,Future,P2,
+Notifications,Ambient conversation alerts,Push when companions were chatting with each other,Built,P2,"NEW; cron ambientAlertLine, Settings toggle, default on"
 Notifications,Location-based nudges,Near favorite spot suggestions,Future,P2,
 Platforms,Web app,"Primary platform, full experience",Built,P0,React + Vite (rebuilt from Flutter)
 Platforms,PWA install,Installable + offline app shell,Built,P1,NEW; manifest + service worker

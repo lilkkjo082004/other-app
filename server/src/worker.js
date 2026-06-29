@@ -96,6 +96,19 @@ async function markFollowedInState(store, userId, compId, memId) {
   } catch (e) { /* best-effort */ }
 }
 
+// Ambient conversation alert — the companions were chatting with each other,
+// nudging the user to come catch the moment.
+function ambientAlertLine(a, b) {
+  const T = [
+    `${a} and ${b} were just talking about you ✦`,
+    `You're missing it — ${a} and ${b} are deep in conversation.`,
+    `${a} & ${b} have been chatting... mostly about you 👀`,
+    `${a} and ${b} are having a moment without you. Come say hi?`,
+    `${a} and ${b} can't agree on something — come settle it.`,
+  ];
+  return T[Math.floor(Math.random() * T.length)];
+}
+
 const CHECKINS = [
   (n) => `${n} was just thinking about you. How's your day going?`,
   (n) => `${n} left the light on for you. Come say hi when you can ✦`,
@@ -155,8 +168,15 @@ export default {
       let line = 'Your companions are thinking about you ✦';
       const followup = pickFollowup(blob, now);
       const comps = (blob.companions || []).filter((c) => c.status === 'awake');
+      const ambientOn = blob.ambientAlerts !== false; // default on
       if (followup) {
         line = followupLine(followup.comp.name, followup.mem.text);
+      } else if (ambientOn && comps.length >= 2 && Math.random() < 0.4) {
+        // Ambient conversation alert: the companions were chatting with each other.
+        const a = comps[Math.floor(Math.random() * comps.length)];
+        let b = comps[Math.floor(Math.random() * comps.length)];
+        if (b.name === a.name) b = comps[(comps.indexOf(a) + 1) % comps.length];
+        line = ambientAlertLine(a.name, b.name);
       } else if (comps.length) {
         const c = comps[Math.floor(Math.random() * comps.length)];
         line = CHECKINS[Math.floor(Math.random() * CHECKINS.length)](c.name);
