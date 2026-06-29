@@ -41,6 +41,8 @@ Builder Traits,Protectiveness / Communication / Archetype / Interest,Relationshi
 Chat System,Group chat,All awake companions participate,Built,P0,
 Chat System,Private one-on-one,Truly private from other companions,Built,P0,
 Chat System,Companion-initiated chat,Returning welcome + unprompted idle thoughts,Built,P1,UPDATED Future->Built; NEW proactive
+Chat System,Proactive memory follow-ups,"Companions ask how a remembered past event went, deduped",Built,P1,"NEW; pendingFollowups/markFollowed, return + idle"
+Chat System,While-you-were-away recap,Labeled ambient catch-up divider on open,Built,P2,NEW
 Chat System,Companion disagreements,"Companions disagree, own opinions",Built,P0,
 Chat System,Cross-referencing,Companions react to each other in-turn,Built,P0,Sequential w/ typing indicator
 Chat System,Ambient conversations,"Personality + bond-aware, regenerated each open",Built,P0,lib/relationships.js
