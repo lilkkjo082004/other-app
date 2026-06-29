@@ -77,7 +77,7 @@ Location,Preference-aware filtering,Honors cuisines/dislikes,Built,P1,UPDATED; i
 Content/Age,Under 18 mode,"Friendship only, no mature content",Built,P0,
 Content/Age,Over 18 suggestive,Romantic warmth for verified adults,Built,P0,UPDATED Partial->Built; matureContentAllowed
 Content/Age,Over 18 explicit (web),"Mature themes, web build only",Partial,P1,UPDATED; gated to verified adult on web
-Content/Age,AI disclosure reminders,"Required, recurring, not disableable",Built,P0,NEW; ToS 13; open + hourly
+Content/Age,AI disclosure reminders,"One-time must-click ack at start + once-daily in-chat reminder",Built,P0,"UPDATED; ToS 13; ack gate + daily, not disableable"
 Content/Age,Multi-companion explicit,All together or one-on-one,Future,P1,
 Monetization,Freemium model,One companion free forever,Partial,P0,UI + entitlements; no real payment
 Monetization,Two-week trial,All 3 for 14 days,Built,P0,UPDATED Partial->Built; real timer

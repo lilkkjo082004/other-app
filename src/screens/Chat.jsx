@@ -9,7 +9,7 @@ import { isLimited } from '../lib/entitlements.js';
 import { genComp } from '../lib/companions.js';
 import { pickSigns } from '../lib/zodiac.js';
 import { detectMood } from '../lib/evolution.js';
-import { useDisclosureReminder, DISCLOSURE_TEXT } from '../lib/disclosure.js';
+import { DISCLOSURE_TEXT, isAcknowledged, acknowledgeDisclosure, consumeDailyReminder } from '../lib/disclosure.js';
 import { detectCrisis, CRISIS_RESOURCES, CRISIS_INTRO } from '../lib/crisis.js';
 import { isAuthed as apiAuthed, logMood } from '../lib/api.js';
 import { aiEnabled } from '../config.js';
@@ -129,10 +129,12 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
           setBonds((b) => bumpBond(b, res.pair[0], res.pair[1]));
         }
       })();
-      // AI disclosure is shown up front, then repeats hourly (see below).
+      // In-chat AI reminder: shown at most once per calendar day (the one-time
+      // acknowledgment gate covers the very first day).
       const disc = { role: 'system', kind: 'disclosure', content: DISCLOSURE_TEXT };
+      const showDaily = isAcknowledged() && consumeDailyReminder();
       if (restored) {
-        setMsgs((p) => (p[p.length - 1]?.kind === 'disclosure' ? p : [...p, disc]));
+        if (showDaily) setMsgs((p) => [...p, disc]);
         // Returning after a while? A companion welcomes you back, unprompted.
         const lastTs = Math.max(0, ...((restored.messages || []).map((m) => m.ts || 0)));
         const awayMs = lastTs ? Date.now() - lastTs : 0;
@@ -153,7 +155,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         armIdle();
         return;
       }
-      setMsgs([disc]);
+      setMsgs(showDaily ? [disc] : []);
       await greet();
       armIdle();
     })();
@@ -195,10 +197,10 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     }, 4 * 60 * 1000);
   }
 
-  // Recurring AI disclosure reminder (ToS §13 — required, not user-disableable).
-  useDisclosureReminder(useCallback(() => {
-    setMsgs((p) => [...p, { role: 'system', kind: 'disclosure', content: DISCLOSURE_TEXT }]);
-  }, []));
+  // One-time AI-disclosure acknowledgment (ToS §13). Shown as a blocking gate
+  // the very first time, after the user accepted the Terms + Privacy on Welcome.
+  const [needsAck, setNeedsAck] = useState(() => !isAcknowledged());
+  const ackDisclosure = () => { acknowledgeDisclosure(); setNeedsAck(false); };
 
   // Only auto-scroll if the user is already near the bottom (don't yank them
   // away while they're reading back).
@@ -438,6 +440,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
 
   return (
     <Shell>
+      {needsAck && <DisclosureGate onAck={ackDisclosure} />}
       <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${C.border}`, background: `${C.bg}dd`, backdropFilter: 'blur(12px)', position: 'relative', zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {chatMode === 'group' ? (
@@ -658,6 +661,20 @@ function fmtDay(ts) {
   if (diff === 1) return 'Yesterday';
   if (diff < 7) return d.toLocaleDateString([], { weekday: 'long' });
   return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: now.getFullYear() === d.getFullYear() ? undefined : 'numeric' });
+}
+
+// One-time, must-click acknowledgment shown at the very start (ToS §13).
+function DisclosureGate({ onAck }) {
+  return (
+    <div role="dialog" aria-modal="true" aria-label="AI disclosure" style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(6,6,12,0.82)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div style={{ maxWidth: 380, width: '100%', background: C.card, border: `1px solid ${C.borderLit}`, borderRadius: 18, padding: '26px 22px', textAlign: 'center' }}>
+        <div style={{ fontSize: 30, marginBottom: 10 }}>✦</div>
+        <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 22, fontWeight: 700, margin: '0 0 12px' }}>One thing first</h2>
+        <p style={{ fontSize: 13.5, color: C.textSoft, lineHeight: 1.6, marginBottom: 22 }}>{DISCLOSURE_TEXT}</p>
+        <button className="bp" onClick={onAck} style={{ width: '100%', padding: '13px', fontSize: 15 }}>I understand</button>
+      </div>
+    </div>
+  );
 }
 
 function DisclosureNote({ text }) {
