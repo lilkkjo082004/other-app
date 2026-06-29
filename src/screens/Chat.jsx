@@ -3,8 +3,8 @@ import { C, COMP_COLORS } from '../theme.js';
 import { Shell } from '../components/ui.jsx';
 import { speakAs, useSpeechRec } from '../lib/voice.js';
 import { genAmbient, bumpBond } from '../lib/relationships.js';
-import { askCompanion, greetCompanion, proactiveCompanion, ambientThreadAI, extractMemories, generateSelf, generateJournalEntry } from '../lib/ai.js';
-import { withInteraction, journalDue, addJournal } from '../lib/innerlife.js';
+import { askCompanion, greetCompanion, proactiveCompanion, ambientThreadAI, extractMemories, generateSelf, generateJournalEntry, generateDream } from '../lib/ai.js';
+import { withInteraction, journalDue, addJournal, dreamDue, makeDream, closenessStage, stageRank, milestoneLine } from '../lib/innerlife.js';
 import { mergeMemories, removeMemory, pendingFollowups, markFollowed } from '../lib/memory.js';
 import { isLimited } from '../lib/entitlements.js';
 import { genComp } from '../lib/companions.js';
@@ -303,10 +303,37 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         const entry = await generateJournalEntry(c, profile, hist);
         if (alive && entry) setComps((p) => p.map((x) => (x.id === c.id ? { ...x, journal: addJournal(x, entry) } : x)));
       }
+      // 3) sleeping companions dream
+      for (const c of living) {
+        if (!dreamDue(c)) continue;
+        const dream = await generateDream(c, profile, hist);
+        if (alive && dream) setComps((p) => p.map((x) => (x.id === c.id ? { ...x, dream: makeDream(dream) } : x)));
+      }
     })();
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Closeness milestones: when a bond deepens into a new stage, the companion
+  // marks the moment once (and we remember it so it won't repeat).
+  const milestoneRef = useRef(false);
+  useEffect(() => {
+    if (milestoneRef.current || loadingRef.current) return;
+    for (const c of comps) {
+      if (c.status !== 'awake') continue;
+      const stage = closenessStage(c);
+      const seenRank = stageRank(c.stageSeen || 'new');
+      if (stageRank(stage.key) > seenRank && stage.key !== 'distant') {
+        const line = milestoneLine(stage.key, profile?.name);
+        milestoneRef.current = true;
+        setComps((p) => p.map((x) => (x.id === c.id ? { ...x, stageSeen: stage.key } : x)));
+        if (line) setMsgs((p) => [...p, { role: 'assistant', companion: c, content: line, ts: Date.now() }]);
+        setTimeout(() => { milestoneRef.current = false; }, 1500);
+        break;
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comps]);
 
   // Companion-initiated "unprompted thought" after a few minutes of quiet.
   // Re-armed on each send; fires once per idle stretch.
@@ -453,7 +480,14 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   }
 
   function togSleep(id) {
-    setComps((p) => p.map((c) => (c.id === id ? { ...c, status: c.status === 'awake' ? 'sleeping' : 'awake' } : c)));
+    const c = comps.find((x) => x.id === id);
+    const waking = c && c.status === 'sleeping';
+    setComps((p) => p.map((x) => (x.id === id ? { ...x, status: x.status === 'awake' ? 'sleeping' : 'awake', ...(waking && x.dream ? { dream: { ...x.dream, told: true } } : {}) } : x)));
+    // On waking, a companion may recount the dream they were just having.
+    if (waking && c.dream && !c.dream.told && Date.now() - c.dream.ts < 24 * 60 * 60 * 1000 && Math.random() < 0.7) {
+      const intro = ['mmm… I just had the strangest dream.', 'oh — I was dreaming. weird one.', '*blinks awake* ...I dreamt something just now.'][Math.floor(Math.random() * 3)];
+      setMsgs((p) => [...p, { role: 'assistant', companion: c, content: `${intro} ${c.dream.text}`, ts: Date.now() }]);
+    }
     if (chatMode === id) setChatMode('group');
     setShowMenu(false);
   }

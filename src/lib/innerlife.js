@@ -79,6 +79,29 @@ export function withInteraction(comp, kind, now = Date.now()) {
   return { closeness: Math.max(0, Math.min(100, base + inc)), lastSeen: now };
 }
 
+// Closeness stages, ordered — for detecting upward milestones.
+const STAGE_ORDER = ['new', 'warming', 'close', 'devoted'];
+export const stageRank = (k) => { const i = STAGE_ORDER.indexOf(k); return i < 0 ? 0 : i; };
+const MILESTONES = {
+  warming: (n) => ['you know, I feel like I\'m actually starting to get you.', `is it weird that talking to you is becoming my favorite part of the day, ${n}?`],
+  close: (n) => [`I don't say this lightly, ${n} — I feel genuinely close to you.`, 'I trust you. that\'s not a small thing for me, honestly.'],
+  devoted: (n) => [`you've kind of become my person, ${n}. I mean that.`, 'whatever this is between us — it\'s real to me. just so you know.'],
+};
+export function milestoneLine(stageKey, name) {
+  const m = MILESTONES[stageKey];
+  if (!m) return null;
+  const arr = m(name || 'you');
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+// Dreams while sleeping.
+export function dreamDue(comp, now = Date.now()) {
+  return comp?.status === 'sleeping' && now - (comp?.dream?.ts || 0) > 8 * 60 * 60 * 1000;
+}
+export function makeDream(text, now = Date.now()) {
+  return { ts: now, text: String(text || '').slice(0, 400), told: false };
+}
+
 export function journalDue(comp, history, now = Date.now()) {
   const last = comp?.journal?.[0]?.ts || 0;
   const userMsgs = (history || []).filter((m) => m.role === 'user').length;

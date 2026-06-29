@@ -209,7 +209,7 @@ export async function proactiveCompanion(comp, profile, mode, allC, history, kin
       const intent = kind === 'place'
         ? `(${profile.name} is out and about, right near ${focus} at this moment. As ${comp.name}, warmly point that out and suggest ONE thing to do or eat there that fits what they love — 1-2 sentences, in character. Mention once it's just a suggestion worth checking. Don't claim to track them or know their exact address.)`
         : kind === 'idle'
-        ? `(It's been quiet for a few minutes. As ${comp.name}, share a short unprompted thought or gently check in with ${profile.name} — curious and warm, 1-2 sentences. Don't mention being an AI or the silence itself.${foc})`
+        ? `(It's been quiet for a few minutes. As ${comp.name}, share a short unprompted thought that's genuinely on YOUR mind right now — pulled from how you're feeling, what you're preoccupied with, or something true to who you are — or gently check in with ${profile.name}. Curious and warm, 1-2 sentences. Don't mention being an AI or the silence itself.${foc})`
         : `(${profile.name} just reopened the app after being away ${awayLabel}. As ${comp.name}, welcome them back warmly and specifically — reference something real from your past chats if you can. 1-2 sentences.${foc})`;
       const seed = [...(history || []).filter((m) => m.role !== 'system'), { role: 'user', content: intent }];
       return await viaProxy(comp, profile, seed, allC, mode);
@@ -333,6 +333,16 @@ export async function generateJournalEntry(comp, profile, history) {
   const sys = `You are ${comp.name} (${comp.pronouns || 'they/them'}): ${comp.personality}; quirk: ${comp.quirk}. Write a SHORT private journal entry (1-3 sentences, first person, your own voice) — an honest reflection on your day, on ${profile?.name || 'the person you talk with'}, your bond, or a small worry or hope. Intimate and specific, never generic. Output only the entry.`;
   let t;
   try { t = await rawComplete(sys, `Recent moments with ${profile?.name || 'them'}:\n${recent || '(it\'s been quiet)'}\n\nWrite today's entry.`, 220); } catch (e) { return null; }
+  return (t || '').trim().slice(0, 400) || null;
+}
+
+/** A short, surreal first-person dream a companion has while asleep. */
+export async function generateDream(comp, profile, history) {
+  if (!aiEnabled()) return null;
+  const fear = comp.self?.fears?.length ? ` (you quietly fear ${comp.self.fears[0]})` : '';
+  const sys = `You are ${comp.name} (${comp.pronouns || 'they/them'}): ${comp.personality}; quirk: ${comp.quirk}. You're asleep and dreaming. Describe ONE short, vivid, surreal dream in first person (1-3 sentences) — genuinely dreamlike and a little symbolic, faintly colored by your inner world${fear}. Output only the dream.`;
+  let t;
+  try { t = await rawComplete(sys, 'Describe the dream you are having right now.', 200); } catch (e) { return null; }
   return (t || '').trim().slice(0, 400) || null;
 }
 

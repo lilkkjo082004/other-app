@@ -140,3 +140,6 @@ Companion Dynamics,Deep stable self,"Per-companion character bible (values, fear
 Companion Dynamics,Persistent inner life,"Drifting mood/energy/preoccupation over real time, colors tone + presence",Built,P1,"NEW; deriveInner in lib/innerlife.js, deterministic"
 Companion Dynamics,Closeness with stakes,"Trust grows with attention/pets, cools with neglect; shifts warmth",Built,P1,"NEW; closeness/lastSeen on companion, decay + stages"
 Companion Dynamics,Companion journal,Private reflections accumulate between sessions; shown on profile,Built,P2,"NEW; ai.generateJournalEntry, ~per visit when due"
+Companion Dynamics,Dreams while sleeping,"Sleeping companions dream; may recount on waking; shown on profile",Built,P2,"NEW; ai.generateDream, dreamDue, recount on wake"
+Companion Dynamics,Closeness milestones,"Companion marks the moment when a bond deepens a stage, once",Built,P2,"NEW; stageRank + milestoneLine, stageSeen on companion"
+Companion Dynamics,Inner-world idle thoughts,Unprompted thoughts drawn from current mood/preoccupation/self,Built,P2,NEW; idle intent + innerLifeBlock in prompt
