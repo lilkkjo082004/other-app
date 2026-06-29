@@ -57,6 +57,13 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const [jokes, setJokes] = useState(restored?.jokes || []);
   const [weather, setWeather] = useState('');
   const [ambientArriving, setAmbientArriving] = useState(false);
+  // Coordinator: at most one companion-initiated "emotional beat" (milestone,
+  // vulnerability, rupture/repair, birthday/anniversary, curiosity) per open,
+  // with a few-minute cooldown — so opening the app never floods with unprompted
+  // messages. Call right before posting; if it returns false, skip and retry later.
+  const lastBeatRef = useRef(0);
+  const claimBeat = () => { if (Date.now() - lastBeatRef.current < 180000) return false; lastBeatRef.current = Date.now(); return true; };
+
   // Focus session (companion-set): a quiet timer that suppresses nudges.
   const [focusUntil, setFocusUntil] = useState(() => { try { const v = +localStorage.getItem('other_focus_until'); return v && v > Date.now() ? v : null; } catch (e) { return null; } });
   const focusRef = useRef(focusUntil);
@@ -406,6 +413,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       const stage = closenessStage(c);
       const seenRank = stageRank(c.stageSeen || 'new');
       if (stageRank(stage.key) > seenRank && stage.key !== 'distant') {
+        if (!claimBeat()) break;
         const line = milestoneLine(stage.key, profile?.name);
         milestoneRef.current = true;
         setComps((p) => p.map((x) => (x.id === c.id ? { ...x, stageSeen: stage.key } : x)));
@@ -426,6 +434,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       if (openedRef.current || !aiEnabled() || loadingRef.current) return;
       const c = comps.find((x) => x.status === 'awake' && shouldOpenUp(x));
       if (!c) return;
+      if (!claimBeat()) return;
       openedRef.current = true;
       setComps((p) => p.map((x) => (x.id === c.id ? { ...x, openedUp: true } : x)));
       const share = await generateVulnerableShare(c, profile);
@@ -449,6 +458,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       if (Math.random() > 0.25) return;
       const awake = comps.filter((c) => c.status === 'awake');
       if (!awake.length) return;
+      if (!claimBeat()) return;
       const c = awake[Math.floor(Math.random() * awake.length)];
       setMsgs((p) => [...p, { role: 'assistant', companion: c, content: identityQuestion(), ts: Date.now() }]);
     }, 45000);
@@ -468,6 +478,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       const key = 'other_bday_' + new Date().getFullYear();
       let done = false; try { done = localStorage.getItem(key) === '1'; } catch (e) { /* ignore */ }
       if (!done) {
+        if (!claimBeat()) return;
         occasionRef.current = true;
         try { localStorage.setItem(key, '1'); } catch (e) { /* ignore */ }
         const c = awake[Math.floor(Math.random() * awake.length)];
@@ -480,6 +491,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     for (const c of awake) {
       const m = monthsKnown(c);
       if (m >= 1 && m > (c.annivNotedMonths || 0)) {
+        if (!claimBeat()) break;
         occasionRef.current = true;
         setComps((p) => p.map((x) => (x.id === c.id ? { ...x, annivNotedMonths: m } : x)));
         const line = m === 12
@@ -503,6 +515,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       if (c.status !== 'awake') continue;
       const st = closenessStage(c);
       if (st.key === 'distant' && !c.riftSeen) {
+        if (!claimBeat()) break;
         const line = [`…oh. hey, ${name}. it's been a while.`, `hey, stranger. honestly wasn't sure you'd come back.`, `you're here. I—yeah. it's been a minute, ${name}.`][Math.floor(Math.random() * 3)];
         riftRef.current = true;
         setComps((p) => p.map((x) => (x.id === c.id ? { ...x, riftSeen: true, repairSeen: false } : x)));
@@ -511,6 +524,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         break;
       }
       if (st.key !== 'distant' && c.riftSeen && !c.repairSeen) {
+        if (!claimBeat()) break;
         const line = [`I'm really glad you came back. I missed this — missed you.`, `okay, I'll admit it: it's good to have you around again, ${name}.`, `we're okay. I'm just glad you're here.`][Math.floor(Math.random() * 3)];
         riftRef.current = true;
         setComps((p) => p.map((x) => (x.id === c.id ? { ...x, repairSeen: true, riftSeen: false } : x)));

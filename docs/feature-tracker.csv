@@ -171,3 +171,4 @@ Visual/UI,Favorite spots in the Space,Each companion anchors to a consistent per
 Location,Weather awareness,"Companions know local weather (Open-Meteo, on-device coords)",Built,P2,"NEW; lib/location.weatherNow, cached, coarse coords"
 Visual/UI,Story so far panel,"Keepsake view of shared history, inside jokes, and letters",Built,P2,"NEW; screens/StorySoFar.jsx, chat menu"
 Performance,Runtime smoke test,"Verified app boots Welcome->onboarding->Chat with no runtime errors",Built,P1,"Playwright load test of production build"
+Performance,Beat coordinator (polish),"At most one companion-initiated emotional beat per open (3-min cooldown)",Built,P1,"NEW; claimBeat() gates milestone/vulnerability/rift/occasion/curiosity"
