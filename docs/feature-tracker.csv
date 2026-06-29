@@ -96,6 +96,7 @@ Data/Privacy,Privacy Policy + Disclaimer,Source documents,Future,P0,"Slot wired,
 Visual/UI,Dark cosmic aesthetic,"Abstract, space-inspired",Built,P0,
 Visual/UI,Companion color identity,Abstract color per companion,Built,P0,
 Visual/UI,Generative avatars,Unique cosmic constellation sigil per companion,Built,P1,"NEW; components/Avatar.jsx, deterministic SVG, recolors live"
+Visual/UI,Companion sitting space,"Avatars hang out, drag to move, tap to pet, mingle on their own",Built,P1,"NEW; screens/CompanionSpace.jsx, positions persist+sync"
 Visual/UI,Cosmetic customization,"Recolor a companion: 8-color palette + custom color wheel",Built,P1,"UPDATED; ToS 4.1; <input type=color> any color"
 Visual/UI,Animated waking sequence,Companion discovers themselves,Built,P0,
 Visual/UI,Smooth transitions,Fade and slide animations,Built,P0,
