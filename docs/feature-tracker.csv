@@ -95,7 +95,8 @@ Data/Privacy,In-app Terms of Service,Rendered legal doc + links,Built,P0,NEW; da
 Data/Privacy,Privacy Policy + Disclaimer,Source documents,Future,P0,"Slot wired, awaiting documents"
 Visual/UI,Dark cosmic aesthetic,"Abstract, space-inspired",Built,P0,
 Visual/UI,Companion color identity,Abstract color per companion,Built,P0,
-Visual/UI,Cosmetic customization,Recolor a companion (8-color palette),Built,P1,NEW; ToS 4.1 free tier
+Visual/UI,Generative avatars,Unique cosmic constellation sigil per companion,Built,P1,"NEW; components/Avatar.jsx, deterministic SVG, recolors live"
+Visual/UI,Cosmetic customization,"Recolor a companion: 8-color palette + custom color wheel",Built,P1,"UPDATED; ToS 4.1; <input type=color> any color"
 Visual/UI,Animated waking sequence,Companion discovers themselves,Built,P0,
 Visual/UI,Smooth transitions,Fade and slide animations,Built,P0,
 Visual/UI,Companion profile screen,"Identity, traits, bond, appearance, voice",Built,P1,UPDATED Future->Built

@@ -8,6 +8,7 @@ import { relationshipsFor } from '../lib/relationships.js';
 import { naturalVoiceEnabled } from '../config.js';
 import { speakAs, listBrowserVoices, NATURAL_VOICE_PRESETS, VOICE_TONES } from '../lib/voice.js';
 import { splitMemories } from '../lib/memory.js';
+import Avatar from '../components/Avatar.jsx';
 
 export default function CompanionProfile({ companion: c, trialStart, history, comps, bonds, memories, onForgetMemory, onCustomize, onPrivate, onSleepToggle, onDelete, onUnlock, onBack }) {
   const col = c.color.primary;
@@ -39,7 +40,7 @@ export default function CompanionProfile({ companion: c, trialStart, history, co
         <span style={{ fontSize: 15, fontWeight: 600 }}>{c.name}</span>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px 40px', textAlign: 'center' }}>
-        <div style={{ width: 110, height: 110, borderRadius: '50%', margin: '8px auto 0', background: `radial-gradient(circle,${col},${col}40)`, boxShadow: `0 0 50px ${c.color.glow}` }} />
+        <div style={{ width: 110, margin: '8px auto 0' }}><Avatar comp={c} size={110} /></div>
         <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 30, fontWeight: 700, margin: '18px 0 0' }}>{c.name}</h1>
         <p style={{ fontSize: 13, color: C.textSoft }}>{c.pronouns}</p>
         <div style={{ display: 'inline-block', margin: '8px 0 24px', padding: '4px 12px', borderRadius: 20, background: `${col}1f`, border: `1px solid ${col}66`, fontSize: 11, color: col, fontWeight: 600 }}>{sleeping ? '💤 Sleeping' : (c.status === 'deleted' ? 'Gone' : '● Awake')}</div>
@@ -52,17 +53,28 @@ export default function CompanionProfile({ companion: c, trialStart, history, co
         {c.freeText && <div style={card}><div style={label}>Drawn toward</div><div style={{ fontSize: 14 }}>{c.freeText}</div></div>}
         {onCustomize && c.status !== 'deleted' && (
           <div style={card}>
-            <div style={label}>Appearance</div>
-            <div style={{ fontSize: 12, color: C.textSoft, marginBottom: 10 }}>{c.colorName}</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={label}>Appearance</span>
+              <Avatar comp={c} size={40} />
+            </div>
+            <div style={{ fontSize: 12, color: C.textSoft, margin: '6px 0 12px' }}>{c.colorName}</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
               {COMP_COLORS.map((opt) => {
                 const on = opt.name === c.colorName;
                 return (
-                  <button key={opt.name} onClick={() => onCustomize({ color: opt, colorName: opt.name })} title={opt.name}
+                  <button key={opt.name} onClick={() => onCustomize({ color: { primary: opt.primary, glow: opt.glow, name: opt.name }, colorName: opt.name })} title={opt.name}
                     style={{ width: 34, height: 34, borderRadius: '50%', cursor: 'pointer', padding: 0, background: `radial-gradient(circle,${opt.primary},${opt.primary}66)`, border: on ? `2px solid ${C.text}` : `2px solid ${C.border}`, boxShadow: on ? `0 0 14px ${opt.glow}` : 'none' }} />
                 );
               })}
+              {/* Custom colour wheel — pick any colour. */}
+              <label title="Custom colour" style={{ width: 34, height: 34, borderRadius: '50%', cursor: 'pointer', position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${C.border}`, background: 'conic-gradient(red,#ff0,#0f0,#0ff,#00f,#f0f,red)' }}>
+                <span style={{ position: 'absolute', inset: 6, borderRadius: '50%', background: C.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: C.text }}>+</span>
+                <input type="color" aria-label="Pick a custom colour" value={/^#[0-9a-fA-F]{6}$/.test(c.color?.primary || '') ? c.color.primary : '#7c5bf5'}
+                  onChange={(e) => { const hex = e.target.value; onCustomize({ color: { primary: hex, glow: `${hex}59`, name: 'Custom' }, colorName: 'Custom' }); }}
+                  style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }} />
+              </label>
             </div>
+            <div style={{ fontSize: 11, color: C.textDim, marginTop: 10 }}>Tap a swatch or the wheel to pick any colour — {c.name}'s avatar and chat recolour instantly.</div>
           </div>
         )}
         {onCustomize && c.status !== 'deleted' && (() => {

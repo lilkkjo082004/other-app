@@ -13,6 +13,7 @@ import { DISCLOSURE_TEXT, isAcknowledged, acknowledgeDisclosure, consumeDailyRem
 import { detectCrisis, CRISIS_RESOURCES, CRISIS_INTRO } from '../lib/crisis.js';
 import { isAuthed as apiAuthed, logMood } from '../lib/api.js';
 import { aiEnabled } from '../config.js';
+import Avatar from '../components/Avatar.jsx';
 import UnlockSheet from '../components/UnlockSheet.jsx';
 import Settings from './Settings.jsx';
 import CompanionProfile from './CompanionProfile.jsx';
@@ -475,12 +476,12 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {chatMode === 'group' ? (
             <>
-              <div style={{ display: 'flex' }}>{active.map((c, i) => <div key={c.id} style={{ width: 26, height: 26, borderRadius: '50%', background: `radial-gradient(circle,${c.color.primary},${c.color.primary}66)`, border: `2px solid ${C.bg}`, marginLeft: i ? -7 : 0, zIndex: 3 - i, opacity: isLimited(c, trialStart) ? 0.4 : 1 }} />)}</div>
+              <div style={{ display: 'flex' }}>{active.map((c, i) => <div key={c.id} style={{ borderRadius: '50%', border: `2px solid ${C.bg}`, marginLeft: i ? -7 : 0, zIndex: 3 - i, opacity: isLimited(c, trialStart) ? 0.4 : 1, lineHeight: 0 }}><Avatar comp={c} size={26} glow={false} /></div>)}</div>
               <div><div style={{ fontSize: 13, fontWeight: 600 }}>Group Chat</div><div style={{ fontSize: 9, color: C.textSoft }}>{active.map((c) => c.name).join(', ') || 'Everyone resting'}</div></div>
             </>
           ) : (
             <>
-              <div style={{ width: 30, height: 30, borderRadius: '50%', background: `radial-gradient(circle,${priv.color.primary},${priv.color.primary}66)` }} />
+              <Avatar comp={priv} size={30} glow={false} />
               <div><div style={{ fontSize: 13, fontWeight: 600 }}>{priv.name}</div><div style={{ fontSize: 9, color: C.glow3 }}>Private</div></div>
             </>
           )}
@@ -562,7 +563,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
               m.kind === 'crisis' ? <CrisisCard /> : <DisclosureNote text={m.content} />
             ) : (
             <div style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', marginBottom: 7, animation: 'fadeUp 0.3s both' }}>
-              {m.role === 'assistant' && <div style={{ width: 24, height: 24, borderRadius: '50%', background: `radial-gradient(circle,${m.companion?.color?.primary || C.glow1},${m.companion?.color?.primary || C.glow1}55)`, marginRight: 7, flexShrink: 0, marginTop: chatMode === 'group' ? 14 : 0 }} />}
+              {m.role === 'assistant' && <div style={{ marginRight: 7, flexShrink: 0, marginTop: chatMode === 'group' ? 14 : 0, lineHeight: 0 }}><Avatar comp={m.companion} size={24} glow={false} /></div>}
               <div style={{ maxWidth: '78%' }}>
                 {m.role === 'assistant' && chatMode === 'group' && <span style={{ fontSize: 9, color: m.companion?.color?.primary, fontWeight: 600, display: 'block', marginBottom: 1 }}>{m.companion?.name}</span>}
                 <div style={{ position: 'relative' }}>
@@ -591,7 +592,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         )}
         {loading && !searching && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 7 }}>
-            <div style={{ width: 24, height: 24, borderRadius: '50%', background: `radial-gradient(circle,${typing?.color?.primary || C.glow1},${(typing?.color?.primary || C.glow1)}55)` }} />
+            <Avatar comp={typing} size={24} glow={false} />
             <div style={{ padding: '8px 12px', borderRadius: '14px 14px 14px 4px', background: C.card, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 6 }}>
               {typing && chatMode === 'group' && <span style={{ fontSize: 9, color: typing.color?.primary, fontWeight: 600 }}>{typing.name}</span>}
               <div style={{ display: 'flex', gap: 3 }}>{[0, 1, 2].map((i) => <div key={i} style={{ width: 5, height: 5, borderRadius: '50%', background: C.textDim, animation: `typewriter 1.4s ${i * 0.15}s infinite` }} />)}</div>

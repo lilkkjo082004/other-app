@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { C } from '../theme.js';
 import { ZODIAC, cap } from '../lib/zodiac.js';
 import { Shell } from '../components/ui.jsx';
+import Avatar from '../components/Avatar.jsx';
 
 export default function CompanionSelect({ comps, onSelect }) {
   const [sel, setSel] = useState(new Set());
@@ -24,7 +25,7 @@ export default function CompanionSelect({ comps, onSelect }) {
             return (
               <button key={c.id} onClick={() => tog(c.id)} style={{ background: s ? `${c.color.primary}10` : C.surface, border: `1.5px solid ${s ? c.color.primary : C.border}`, borderRadius: 14, padding: '14px 16px', cursor: 'pointer', textAlign: 'left', transition: 'all 0.3s', fontFamily: "'DM Sans',sans-serif", boxShadow: s ? `0 0 18px ${c.color.glow}` : 'none', animation: `fadeUp 0.5s ${0.1 + i * 0.1}s both` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 38, height: 38, borderRadius: '50%', background: `radial-gradient(circle,${c.color.primary},${c.color.primary}44)`, flexShrink: 0 }} />
+                  <Avatar comp={c} size={38} glow={false} />
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                       <span style={{ fontSize: 15, fontWeight: 700 }}>{c.name}</span>
