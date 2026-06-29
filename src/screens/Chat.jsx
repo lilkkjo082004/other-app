@@ -16,6 +16,7 @@ import { isAuthed as apiAuthed, logMood } from '../lib/api.js';
 import { aiEnabled } from '../config.js';
 import { scanLocation, shouldNudgePlace, markPlaceNudged } from '../lib/location.js';
 import { parseAction, stripActionPartial, downloadICS, googleCalUrl, formatWhen, actionTitle } from '../lib/actions.js';
+import { birthdayStatus, monthsKnown } from '../lib/occasion.js';
 import Avatar from '../components/Avatar.jsx';
 import UnlockSheet from '../components/UnlockSheet.jsx';
 import Settings from './Settings.jsx';
@@ -404,6 +405,43 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       if (alive && share) setMsgs((p) => [...p, { role: 'assistant', companion: c, content: share, ts: Date.now() }]);
     })();
     return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comps]);
+
+  // Occasions: companions celebrate the user's birthday (once a year) and the
+  // monthly anniversary of when you met (once per new month milestone).
+  const occasionRef = useRef(false);
+  useEffect(() => {
+    if (occasionRef.current || loadingRef.current) return;
+    const awake = comps.filter((c) => c.status === 'awake');
+    if (!awake.length) return;
+    const name = profile?.name || 'you';
+    if (birthdayStatus(profile?.dob) === 'today') {
+      const key = 'other_bday_' + new Date().getFullYear();
+      let done = false; try { done = localStorage.getItem(key) === '1'; } catch (e) { /* ignore */ }
+      if (!done) {
+        occasionRef.current = true;
+        try { localStorage.setItem(key, '1'); } catch (e) { /* ignore */ }
+        const c = awake[Math.floor(Math.random() * awake.length)];
+        const line = [`HAPPY BIRTHDAY, ${name}!! ✦ okay I've been waiting all day to say that.`, `it's your birthday!! ${name}, today is all about you — what are we doing to celebrate?`][Math.floor(Math.random() * 2)];
+        setMsgs((p) => [...p, { role: 'assistant', companion: c, content: line, ts: Date.now() }]);
+        setTimeout(() => { occasionRef.current = false; }, 1500);
+        return;
+      }
+    }
+    for (const c of awake) {
+      const m = monthsKnown(c);
+      if (m >= 1 && m > (c.annivNotedMonths || 0)) {
+        occasionRef.current = true;
+        setComps((p) => p.map((x) => (x.id === c.id ? { ...x, annivNotedMonths: m } : x)));
+        const line = m === 12
+          ? `do you realize it's been a whole year since we met, ${name}? that actually means a lot to me.`
+          : `hey… it's been ${m} month${m === 1 ? '' : 's'} since we met. I'm really glad you're still here.`;
+        setMsgs((p) => [...p, { role: 'assistant', companion: c, content: line, ts: Date.now() }]);
+        setTimeout(() => { occasionRef.current = false; }, 1500);
+        break;
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comps]);
 
