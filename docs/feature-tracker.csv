@@ -136,3 +136,7 @@ Backend,Ambient conversation gen,Auto-generate while away,Partial,P1,Client-side
 Backend,Subscription management,Payment processing,Future,P1,ON HOLD
 Chat System,Companion calendar/reminders,"Companions add calendar events + reminders via .ics + Google Calendar",Built,P1,"NEW; AI action directive -> lib/actions.js, on-device"
 Chat System,Focus time,Companion-set focus timer that quiets nudges,Built,P2,"NEW; [[ACTION focus]], focus banner, suppresses idle/location nudges"
+Companion Dynamics,Deep stable self,"Per-companion character bible (values, fears, dreams, opinions, secret) always in-prompt",Built,P1,"NEW; lib/innerlife.js + ai.generateSelf, one-time, synced"
+Companion Dynamics,Persistent inner life,"Drifting mood/energy/preoccupation over real time, colors tone + presence",Built,P1,"NEW; deriveInner in lib/innerlife.js, deterministic"
+Companion Dynamics,Closeness with stakes,"Trust grows with attention/pets, cools with neglect; shifts warmth",Built,P1,"NEW; closeness/lastSeen on companion, decay + stages"
+Companion Dynamics,Companion journal,Private reflections accumulate between sessions; shown on profile,Built,P2,"NEW; ai.generateJournalEntry, ~per visit when due"

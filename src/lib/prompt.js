@@ -4,6 +4,7 @@ import { locationBlock } from './location.js';
 import { matureContentAllowed } from './age.js';
 import { supportNetworkBlock } from './people.js';
 import { memoryBlock } from './memory.js';
+import { innerLifeBlock } from './innerlife.js';
 
 const fmt = (v) => (Array.isArray(v) ? (v.length ? v.join(', ') : '?') : v || '?');
 
@@ -40,7 +41,7 @@ RULES: Have opinions that evolve, and push back when you disagree. Share your ow
     ? 'IMPORTANT: this user is under 18 — keep everything strictly platonic and age-appropriate. No romance, flirting, or mature content.'
     : mature
       ? 'This user is a verified adult (18+) — romantic warmth and mature themes are allowed if they fit your personality, but always tasteful and consensual. Never produce sexual content involving minors or anything non-consensual.'
-      : 'This user is an adult, but keep things tasteful and non-explicit.'} Reply in 1-4 sentences usually. NEVER say "as an AI." Be casual and real.${actionsBlock(profile.name)}${evolutionBlock(profile, history)}${locationBlock(profile.name)}${supportNetworkBlock(history, profile.name)}${memoryBlock(profile.memories, profile.name)}`;
+      : 'This user is an adult, but keep things tasteful and non-explicit.'} Reply in 1-4 sentences usually. NEVER say "as an AI." Be casual and real.${innerLifeBlock(comp, history, profile.name)}${actionsBlock(profile.name)}${evolutionBlock(profile, history)}${locationBlock(profile.name)}${supportNetworkBlock(history, profile.name)}${memoryBlock(profile.memories, profile.name)}`;
 }
 
 // Lets companions actually help with the user's schedule. When asked, the model

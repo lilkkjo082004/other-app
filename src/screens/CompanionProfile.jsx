@@ -10,6 +10,7 @@ import { speakAs, listBrowserVoices, NATURAL_VOICE_PRESETS, VOICE_TONES } from '
 import { splitMemories } from '../lib/memory.js';
 import Avatar from '../components/Avatar.jsx';
 import { currentActivity } from '../lib/presence.js';
+import { closenessStage } from '../lib/innerlife.js';
 
 export default function CompanionProfile({ companion: c, trialStart, history, comps, bonds, memories, onForgetMemory, onCustomize, onPrivate, onSleepToggle, onDelete, onUnlock, onBack }) {
   const col = c.color.primary;
@@ -48,6 +49,41 @@ export default function CompanionProfile({ companion: c, trialStart, history, co
 
         <div style={card}><div style={label}>Astrology</div><div style={{ fontSize: 14 }}>{z.sym} {cap(c.zodiac)}</div><div style={{ fontSize: 12, color: C.textSoft }}>{z.el} · {z.trait}</div></div>
         {c.status !== 'deleted' && <div style={card}><div style={label}>Right now</div><div style={{ fontSize: 14, fontStyle: 'italic' }}>{c.name} is {currentActivity(c)}.</div></div>}
+        {c.self && (
+          <div style={card}>
+            <div style={label}>Who {c.name} is</div>
+            {c.self.history && <div style={{ fontSize: 13, lineHeight: 1.5, color: C.textSoft, marginBottom: 8 }}>{c.self.history}</div>}
+            {c.self.values?.length > 0 && <div style={{ fontSize: 13, marginBottom: 4 }}><span style={{ color: C.textDim }}>Values:</span> {c.self.values.join(', ')}</div>}
+            {c.self.dreams?.length > 0 && <div style={{ fontSize: 13, marginBottom: 4 }}><span style={{ color: C.textDim }}>Dreams of:</span> {c.self.dreams[0]}</div>}
+            {c.self.opinions?.length > 0 && <div style={{ fontSize: 13 }}><span style={{ color: C.textDim }}>Will argue:</span> {c.self.opinions[0]}</div>}
+          </div>
+        )}
+        {c.status !== 'deleted' && (() => {
+          const st = closenessStage(c);
+          return (
+            <div style={card}>
+              <div style={label}>Closeness with you</div>
+              <div style={{ fontSize: 14, textTransform: 'capitalize' }}>{st.label}</div>
+              <div style={{ height: 6, borderRadius: 4, background: C.surfaceUp, marginTop: 8, overflow: 'hidden' }}>
+                <div style={{ width: `${Math.max(4, st.pct)}%`, height: '100%', background: `linear-gradient(90deg,${col},${col}88)` }} />
+              </div>
+              <div style={{ fontSize: 11, color: C.textDim, marginTop: 6 }}>Grows when you talk and spend time together; cools if you're away a while.</div>
+            </div>
+          );
+        })()}
+        {c.journal?.length > 0 && (
+          <div style={card}>
+            <div style={label}>{c.name}'s journal</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
+              {c.journal.slice(0, 8).map((e, i) => (
+                <div key={i}>
+                  <div style={{ fontSize: 10, color: C.textDim, marginBottom: 2 }}>{(() => { try { return new Date(e.ts).toLocaleDateString([], { month: 'short', day: 'numeric' }); } catch (x) { return ''; } })()}</div>
+                  <div style={{ fontSize: 13, lineHeight: 1.5, fontStyle: 'italic', color: C.text }}>"{e.text}"</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         <div style={card}><div style={label}>Personality</div><div style={{ fontSize: 14, lineHeight: 1.4 }}>{c.personality}</div><div style={{ fontSize: 12, color: C.textSoft, marginTop: 4 }}>Quirk: {c.quirk}</div></div>
         {traits.length > 0 && (
           <div style={card}><div style={label}>Trait seeds</div><div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{traits.map((t, i) => <span key={i} style={{ padding: '5px 10px', borderRadius: 20, background: C.surfaceUp, border: `1px solid ${C.border}`, fontSize: 11 }}>{t}</span>)}</div></div>

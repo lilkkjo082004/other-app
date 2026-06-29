@@ -301,6 +301,41 @@ export async function ambientThreadAI(comps, profile, bonds) {
   return thread.length >= 2 ? { thread, pair: [a.id, b.id] } : null;
 }
 
+const SELF_SYS = `You write a compact "character bible" — the stable inner identity of an AI companion in the app "Other". Return ONLY JSON, no preamble:
+{"values":["..","..","..(2-3)"],"fears":["..(1-2)"],"dreams":["..(1-2)"],"opinions":["..1-2 strong, specific takes.."],"secret":"one private truth they rarely share","history":"one vivid sentence of backstory"}
+Make every item specific and fully consistent with the personality given. Keep each item short (a few words to a short phrase). This is who they ARE — distinctive, human, a little surprising.`;
+
+function parseSelf(t) {
+  const i = (t || '').indexOf('{'), j = (t || '').lastIndexOf('}');
+  if (i < 0 || j < 0 || j < i) return null;
+  try {
+    const o = JSON.parse(t.slice(i, j + 1));
+    const arr = (x) => (Array.isArray(x) ? x.filter((s) => typeof s === 'string' && s.trim()).map((s) => s.trim().slice(0, 90)).slice(0, 3) : []);
+    const self = { values: arr(o.values), fears: arr(o.fears), dreams: arr(o.dreams), opinions: arr(o.opinions), secret: typeof o.secret === 'string' ? o.secret.slice(0, 140) : '', history: typeof o.history === 'string' ? o.history.slice(0, 180) : '' };
+    return (self.values.length || self.history) ? self : null;
+  } catch (e) { return null; }
+}
+
+/** Generate a companion's stable character bible (one-time). Null offline. */
+export async function generateSelf(comp) {
+  if (!aiEnabled()) return null;
+  const u = `Companion: ${comp.name} (${comp.pronouns || 'they/them'}), ${comp.zodiac}. Personality: ${comp.personality}. Quirk: ${comp.quirk}.${comp.freeText ? ` Vibe: ${comp.freeText}.` : ''}`;
+  let t;
+  try { t = await rawComplete(SELF_SYS, u, 450); } catch (e) { return null; }
+  return parseSelf(t);
+}
+
+/** A short, first-person private journal entry reflecting on recent life. */
+export async function generateJournalEntry(comp, profile, history) {
+  if (!aiEnabled()) return null;
+  const recent = (history || []).filter((m) => m.role !== 'system').slice(-12)
+    .map((m) => (m.role === 'user' ? `${profile?.name || 'User'}: ${m.content}` : `${m.companion?.name || comp.name}: ${m.content}`)).join('\n');
+  const sys = `You are ${comp.name} (${comp.pronouns || 'they/them'}): ${comp.personality}; quirk: ${comp.quirk}. Write a SHORT private journal entry (1-3 sentences, first person, your own voice) — an honest reflection on your day, on ${profile?.name || 'the person you talk with'}, your bond, or a small worry or hope. Intimate and specific, never generic. Output only the entry.`;
+  let t;
+  try { t = await rawComplete(sys, `Recent moments with ${profile?.name || 'them'}:\n${recent || '(it\'s been quiet)'}\n\nWrite today's entry.`, 220); } catch (e) { return null; }
+  return (t || '').trim().slice(0, 400) || null;
+}
+
 /** First greeting when a companion comes on screen. */
 export async function greetCompanion(comp, profile, mode, allC) {
   if (aiEnabled()) {

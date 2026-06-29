@@ -33,7 +33,7 @@ function petStyle(comp) {
 }
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 
-export default function CompanionSpace({ comps, bonds, positions, onPositions, onBonds, onBack, onOpenProfile }) {
+export default function CompanionSpace({ comps, bonds, positions, onPositions, onBonds, onInteract, onBack, onOpenProfile }) {
   const living = (comps || []).filter((c) => c.status !== 'deleted');
   const containerRef = useRef(null);
   const dragRef = useRef(null);
@@ -85,6 +85,7 @@ export default function CompanionSpace({ comps, bonds, positions, onPositions, o
 
   function pet(c) {
     const st = petStyle(c);
+    onInteract?.(c.id, 'pet');
     setPets((p) => ({ ...p, [c.id]: (p[c.id] || 0) + 1 }));
     const made = Array.from({ length: st.burst + 1 }, (_, k) => ({
       key: `${c.id}-${Date.now()}-${k}`,

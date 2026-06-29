@@ -3,7 +3,8 @@ import { C, COMP_COLORS } from '../theme.js';
 import { Shell } from '../components/ui.jsx';
 import { speakAs, useSpeechRec } from '../lib/voice.js';
 import { genAmbient, bumpBond } from '../lib/relationships.js';
-import { askCompanion, greetCompanion, proactiveCompanion, ambientThreadAI, extractMemories } from '../lib/ai.js';
+import { askCompanion, greetCompanion, proactiveCompanion, ambientThreadAI, extractMemories, generateSelf, generateJournalEntry } from '../lib/ai.js';
+import { withInteraction, journalDue, addJournal } from '../lib/innerlife.js';
 import { mergeMemories, removeMemory, pendingFollowups, markFollowed } from '../lib/memory.js';
 import { isLimited } from '../lib/entitlements.js';
 import { genComp } from '../lib/companions.js';
@@ -103,6 +104,11 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   }
   const consumeFollowup = (compId, id) =>
     setMemStore((s) => ({ ...s, [compId]: markFollowed(s[compId] || [], id) }));
+
+  // Closeness grows with attention (messages, pets). Decay from neglect is
+  // applied at read-time in lib/innerlife.js.
+  const bumpCloseness = (ids, kind) =>
+    setComps((p) => p.map((c) => (ids.includes(c.id) ? { ...c, ...withInteraction(c, kind) } : c)));
 
   // Stream one companion's reply into the transcript: shows the typing indicator
   // until the first token, then grows the message live. Returns the final text.
@@ -279,6 +285,29 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comps]);
 
+  // Inner life (once on open): give each companion a stable self if missing, and
+  // let them write a journal entry when due. Sequential to avoid an AI burst.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (!aiEnabled()) return;
+      const living = comps.filter((c) => c.status !== 'deleted');
+      for (const c of living) {
+        if (c.self) continue;
+        const self = await generateSelf(c);
+        if (alive && self) setComps((p) => p.map((x) => (x.id === c.id ? { ...x, self } : x)));
+      }
+      const hist = restored?.messages || [];
+      for (const c of living) {
+        if (!journalDue(c, hist)) continue;
+        const entry = await generateJournalEntry(c, profile, hist);
+        if (alive && entry) setComps((p) => p.map((x) => (x.id === c.id ? { ...x, journal: addJournal(x, entry) } : x)));
+      }
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Companion-initiated "unprompted thought" after a few minutes of quiet.
   // Re-armed on each send; fires once per idle stretch.
   function armIdle() {
@@ -373,6 +402,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     }
     // Reply in turn so each companion can see and react to what the others just
     // said this turn. A per-companion typing indicator keeps it feeling live.
+    if (act.length) bumpCloseness(act.map((c) => c.id), 'message');
     stopRef.current = false;
     streamingRef.current = true;
     let run = [...nm];
@@ -490,6 +520,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         comps={comps} bonds={bonds} positions={spacePos}
         onPositions={(next) => setSpacePos({ ...next })}
         onBonds={setBonds}
+        onInteract={(id, kind) => bumpCloseness([id], kind)}
         onOpenProfile={(id) => setPanel({ profile: id })}
         onBack={() => setPanel(null)}
       />
