@@ -66,6 +66,18 @@ export function removeMemory(list = [], id) {
   return list.filter((m) => m.id !== id);
 }
 
+// Event memories whose date has passed and that a companion hasn't followed up
+// on yet — used to drive proactive "how did it go?" check-ins.
+export function pendingFollowups(memories = [], now = nowMs()) {
+  return (memories || []).filter((m) => m && m.kind === 'event' && m.at && m.at < now && !m.followed);
+}
+
+// Mark memories as followed up so companions don't raise the same event twice.
+export function markFollowed(list = [], ids) {
+  const set = new Set(Array.isArray(ids) ? ids : [ids]);
+  return (list || []).map((m) => (set.has(m.id) ? { ...m, followed: true } : m));
+}
+
 const KIND_LABEL = { fact: 'About you', preference: 'Likes/dislikes', event: 'Events', relationship: 'People', goal: 'Goals', emotion: 'How you\'ve felt', trait: 'Who you are' };
 export const memoryKindLabel = (k) => KIND_LABEL[k] || 'About you';
 

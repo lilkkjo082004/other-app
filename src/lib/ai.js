@@ -153,12 +153,13 @@ function placeholderProactive(comp, profile, kind) {
 
 /** A companion-initiated message: a warm welcome-back ('return') or an
  *  unprompted thought during a lull ('idle'). Falls back to placeholders. */
-export async function proactiveCompanion(comp, profile, mode, allC, history, kind = 'return', awayLabel = '') {
+export async function proactiveCompanion(comp, profile, mode, allC, history, kind = 'return', awayLabel = '', focus = '') {
   if (aiEnabled()) {
     try {
+      const foc = focus ? ` Specifically, naturally bring up and ask how this went: "${focus}". Sound like you've genuinely been wondering, not like you're reading a reminder.` : '';
       const intent = kind === 'idle'
-        ? `(It's been quiet for a few minutes. As ${comp.name}, share a short unprompted thought or gently check in with ${profile.name} — curious and warm, 1-2 sentences. Don't mention being an AI or the silence itself.)`
-        : `(${profile.name} just reopened the app after being away ${awayLabel}. As ${comp.name}, welcome them back warmly and specifically — reference something real from your past chats if you can. 1-2 sentences.)`;
+        ? `(It's been quiet for a few minutes. As ${comp.name}, share a short unprompted thought or gently check in with ${profile.name} — curious and warm, 1-2 sentences. Don't mention being an AI or the silence itself.${foc})`
+        : `(${profile.name} just reopened the app after being away ${awayLabel}. As ${comp.name}, welcome them back warmly and specifically — reference something real from your past chats if you can. 1-2 sentences.${foc})`;
       const seed = [...(history || []).filter((m) => m.role !== 'system'), { role: 'user', content: intent }];
       return await viaProxy(comp, profile, seed, allC, mode);
     } catch (e) { return placeholderProactive(comp, profile, kind); }

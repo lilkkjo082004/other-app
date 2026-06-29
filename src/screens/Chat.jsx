@@ -4,7 +4,7 @@ import { Shell } from '../components/ui.jsx';
 import { speakAs, useSpeechRec } from '../lib/voice.js';
 import { genAmbient, bumpBond } from '../lib/relationships.js';
 import { askCompanion, greetCompanion, proactiveCompanion, ambientThreadAI, extractMemories } from '../lib/ai.js';
-import { mergeMemories, removeMemory } from '../lib/memory.js';
+import { mergeMemories, removeMemory, pendingFollowups, markFollowed } from '../lib/memory.js';
 import { isLimited } from '../lib/entitlements.js';
 import { genComp } from '../lib/companions.js';
 import { pickSigns } from '../lib/zodiac.js';
@@ -63,6 +63,20 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   // A companion's own memory rides along on `profile` so its prompt/AI call
   // sees only what *it* remembers about the user.
   const profFor = (c) => ({ ...profile, memories: memOf(c.id) });
+
+  // Find a companion sitting on a past event they haven't followed up on yet,
+  // so they can proactively ask how it went. Picks the most recent such event.
+  function nextFollowup(candidates) {
+    let best = null;
+    for (const c of candidates) {
+      for (const e of pendingFollowups(memOf(c.id))) {
+        if (!best || (e.at || 0) > (best.e.at || 0)) best = { c, e };
+      }
+    }
+    return best ? { comp: best.c, focus: best.e.text, id: best.e.id } : null;
+  }
+  const consumeFollowup = (compId, id) =>
+    setMemStore((s) => ({ ...s, [compId]: markFollowed(s[compId] || [], id) }));
 
   // After enough new turns, extract long-term memories from recent history and
   // file them under the companion(s) who were present: the one companion in a
@@ -124,11 +138,14 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         const awayMs = lastTs ? Date.now() - lastTs : 0;
         const awake = comps.filter((c) => c.status === 'awake');
         if (awake.length && awayMs > 2 * 60 * 60 * 1000) {
-          const c = awake[Math.floor(Math.random() * awake.length)];
+          // Prefer a companion who has something to follow up on (a past event).
+          const fu = nextFollowup(awake);
+          const c = fu ? fu.comp : awake[Math.floor(Math.random() * awake.length)];
           setTyping(c); setLoading(true);
           try {
-            const t = await proactiveCompanion(c, profFor(c), 'group', comps, restored.messages || [], 'return', humanizeAway(awayMs));
+            const t = await proactiveCompanion(c, profFor(c), 'group', comps, restored.messages || [], 'return', humanizeAway(awayMs), fu?.focus || '');
             setMsgs((p) => [...p, { role: 'assistant', companion: c, content: t, ts: Date.now() }]);
+            if (fu) consumeFollowup(c.id, fu.id);
             if (autoSpeak) speakAs(t, c);
           } catch (e) { /* ignore */ }
           setTyping(null); setLoading(false);
@@ -165,11 +182,13 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       if (loadingRef.current) return;
       const awake = comps.filter((c) => c.status === 'awake');
       if (!awake.length) return;
-      const c = awake[Math.floor(Math.random() * awake.length)];
+      const fu = nextFollowup(awake);
+      const c = fu ? fu.comp : awake[Math.floor(Math.random() * awake.length)];
       setTyping(c); setLoading(true);
       try {
-        const t = await proactiveCompanion(c, profFor(c), 'group', comps, msgsRef.current, 'idle');
+        const t = await proactiveCompanion(c, profFor(c), 'group', comps, msgsRef.current, 'idle', '', fu?.focus || '');
         setMsgs((p) => [...p, { role: 'assistant', companion: c, content: t, ts: Date.now() }]);
+        if (fu) consumeFollowup(c.id, fu.id);
         if (autoSpeak) speakAs(t, c);
       } catch (e) { /* ignore */ }
       setTyping(null); setLoading(false);
@@ -408,10 +427,13 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     : stream;
   // Tag each message with a day-separator label when the calendar day changes.
   let prevDay = null;
+  let ambientHeaderDone = false;
   const decorated = base.map((m) => {
     let dayLabel = null;
     if (m.ts) { const d = new Date(m.ts).toDateString(); if (d !== prevDay) { dayLabel = fmtDay(m.ts); prevDay = d; } }
-    return { m, dayLabel };
+    let ambientHead = false;
+    if (!searching && m.isAmbient && !ambientHeaderDone) { ambientHead = true; ambientHeaderDone = true; }
+    return { m, dayLabel, ambientHead };
   });
 
   return (
@@ -489,8 +511,15 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       )}
 
       <div ref={scrollRef} onScroll={onScroll} style={{ flex: 1, overflowY: 'auto', padding: '10px 10px 4px', position: 'relative' }}>
-        {decorated.map(({ m, dayLabel }, i) => (
+        {decorated.map(({ m, dayLabel, ambientHead }, i) => (
           <React.Fragment key={i}>
+            {ambientHead && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '4px 0 10px' }}>
+                <div style={{ flex: 1, height: 1, background: C.border }} />
+                <span style={{ fontSize: 10, color: C.textSoft, letterSpacing: 1, whiteSpace: 'nowrap' }}>✦ while you were away</span>
+                <div style={{ flex: 1, height: 1, background: C.border }} />
+              </div>
+            )}
             {dayLabel && (
               <div style={{ display: 'flex', justifyContent: 'center', margin: '10px 0 8px' }}>
                 <span style={{ fontSize: 10, color: C.textDim, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 20, padding: '3px 12px' }}>{dayLabel}</span>
