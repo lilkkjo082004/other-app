@@ -5,10 +5,10 @@ import Avatar from '../components/Avatar.jsx';
 import { genAmbient, bumpBond } from '../lib/relationships.js';
 
 // The "sitting space": awake companions hang out together, drift and mingle on
-// their own, and react when you pet (tap) or drag them around. Positions persist.
+// their own (leaning toward each other when they talk), and react when you pet
+// (tap) or drag them around. Positions persist.
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const FLOATS = ['floatA', 'floatB', 'floatC'];
-const PET_EMOJI = ['♡', '✦', '✨', '💜', '🩷'];
 const SIZE = 78;
 
 function defaultPos(i, n) {
@@ -16,6 +16,21 @@ function defaultPos(i, n) {
   const ang = (i / n) * Math.PI * 2 - Math.PI / 2;
   return { x: 0.5 + Math.cos(ang) * 0.27, y: 0.46 + Math.sin(ang) * 0.24 };
 }
+
+// Pet reactions vary by personality — derived from the companion's personality,
+// quirk, and builder traits. Returns the particles to puff out, a few possible
+// reaction words, and how big the burst is.
+function petStyle(comp) {
+  const t = `${comp.personality || ''} ${comp.quirk || ''} ${comp.builderTraits ? Object.values(comp.builderTraits).flat().join(' ') : ''}`.toLowerCase();
+  const has = (...w) => w.some((x) => t.includes(x));
+  if (has('playful', 'mischiev', 'witty', 'funny', 'humor', 'goofy', 'teas', 'silly')) return { emojis: ['😄', '✨', '😆', '✦'], words: ['hehe~', 'again!', 'that tickles', 'eee'], burst: 5 };
+  if (has('shy', 'reserved', 'quiet', 'gentle', 'soft', 'timid', 'introvert')) return { emojis: ['☺️', '♡', '✿'], words: ['oh—', '*soft smile*', 'hi…', '!'], burst: 2 };
+  if (has('warm', 'affection', 'nurtur', 'caring', 'loving', 'sweet', 'tender')) return { emojis: ['💜', '♡', '🥰', '✦'], words: ['mmm♡', 'I needed that', 'cozy', '♡'], burst: 4 };
+  if (has('cool', 'dry', 'sarcas', 'aloof', 'stoic', 'calm', 'grounded', 'deadpan')) return { emojis: ['✦', '✧', '·'], words: ['…heh', 'okay, fine', 'noted', 'hm'], burst: 1 };
+  if (has('energ', 'bold', 'fiery', 'bubbly', 'excit', 'vivac', 'passion', 'wild')) return { emojis: ['✨', '💥', '⭐', '✦'], words: ['YES', 'more!', 'woo!', 'hi hi hi'], burst: 6 };
+  return { emojis: ['♡', '✦', '✨', '💜'], words: ['✨', '♡', 'hi'], burst: 3 };
+}
+const pick = (a) => a[Math.floor(Math.random() * a.length)];
 
 export default function CompanionSpace({ comps, bonds, positions, onPositions, onBonds, onBack, onOpenProfile }) {
   const living = (comps || []).filter((c) => c.status !== 'deleted');
@@ -28,46 +43,60 @@ export default function CompanionSpace({ comps, bonds, positions, onPositions, o
   });
   const posRef = useRef(pos);
   useEffect(() => { posRef.current = pos; }, [pos]);
-  const [dragId, setDragId] = useState(null);
-  const [pets, setPets] = useState({});       // id -> bump counter (restarts pop)
-  const [hearts, setHearts] = useState([]);   // {key, compId, dx, emoji}
-  const [bubble, setBubble] = useState(null); // {compId, text}
+  const bondsRef = useRef(bonds);
+  useEffect(() => { bondsRef.current = bonds; }, [bonds]);
 
-  // Mingling: companions chat with each other on their own. Template-generated
-  // (no API cost), refreshed periodically, and it nudges their bond.
+  const [dragId, setDragId] = useState(null);
+  const [pets, setPets] = useState({});        // id -> bump counter (restarts pop)
+  const [hearts, setHearts] = useState([]);    // {key, compId, dx, emoji}
+  const [reaction, setReaction] = useState(null); // {compId, word}
+  const [bubble, setBubble] = useState(null);  // {compId, text}
+  const [approaching, setApproaching] = useState(null); // [idA, idB] currently talking
+  const timersRef = useRef([]);
+
+  // Mingling: companions chat with each other on their own. The talking pair
+  // leans together and trades lines, then drifts back. Template-generated
+  // (no API cost) and it nudges their bond.
   useEffect(() => {
     let alive = true;
-    const tick = () => {
+    const clearTimers = () => { timersRef.current.forEach(clearTimeout); timersRef.current = []; };
+    const play = () => {
       const awake = living.filter((c) => c.status === 'awake');
-      if (awake.length < 2) { setBubble(null); return; }
-      const res = genAmbient(awake, bonds);
-      if (res && res.thread?.length) {
-        const line = res.thread[Math.floor(Math.random() * res.thread.length)];
-        if (line?.from) {
-          setBubble({ compId: line.from.id, text: line.text });
-          if (res.pair && onBonds) onBonds((b) => bumpBond(b, res.pair[0], res.pair[1]));
-          setTimeout(() => { if (alive) setBubble((cur) => (cur && cur.text === line.text ? null : cur)); }, 5200);
-        }
-      }
+      if (awake.length < 2) { setBubble(null); setApproaching(null); return; }
+      const res = genAmbient(awake, bondsRef.current);
+      if (!res || !res.thread?.length) return;
+      setApproaching(res.pair || null);
+      const lines = res.thread.slice(0, 4);
+      lines.forEach((line, i) => {
+        timersRef.current.push(setTimeout(() => { if (alive && line?.from) setBubble({ compId: line.from.id, text: line.text }); }, i * 2300));
+      });
+      timersRef.current.push(setTimeout(() => {
+        if (!alive) return;
+        setBubble(null); setApproaching(null);
+        if (res.pair && onBonds) onBonds((b) => bumpBond(b, res.pair[0], res.pair[1]));
+      }, lines.length * 2300 + 900));
     };
-    const first = setTimeout(tick, 900);
-    const iv = setInterval(tick, 13000);
-    return () => { alive = false; clearTimeout(first); clearInterval(iv); };
+    timersRef.current.push(setTimeout(play, 900));
+    const iv = setInterval(() => { clearTimers(); play(); }, 16000);
+    return () => { alive = false; clearInterval(iv); clearTimers(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [living.length, bonds]);
+  }, [living.length]);
 
   function pet(c) {
+    const st = petStyle(c);
     setPets((p) => ({ ...p, [c.id]: (p[c.id] || 0) + 1 }));
-    const burst = 3 + Math.floor(Math.random() * 2);
-    const made = Array.from({ length: burst }, (_, k) => ({
+    const made = Array.from({ length: st.burst + 1 }, (_, k) => ({
       key: `${c.id}-${Date.now()}-${k}`,
       compId: c.id,
-      dx: Math.round((Math.random() - 0.5) * 46),
-      emoji: PET_EMOJI[Math.floor(Math.random() * PET_EMOJI.length)],
+      dx: Math.round((Math.random() - 0.5) * 50),
+      emoji: pick(st.emojis),
     }));
     setHearts((h) => [...h, ...made]);
     const keys = new Set(made.map((m) => m.key));
-    setTimeout(() => setHearts((h) => h.filter((x) => !keys.has(x.key))), 1150);
+    timersRef.current.push(setTimeout(() => setHearts((h) => h.filter((x) => !keys.has(x.key))), 1150));
+    const word = pick(st.words);
+    setReaction({ compId: c.id, word });
+    timersRef.current.push(setTimeout(() => setReaction((r) => (r && r.word === word && r.compId === c.id ? null : r)), 1100));
   }
 
   function onPointerDown(e, c) {
@@ -77,9 +106,7 @@ export default function CompanionSpace({ comps, bonds, positions, onPositions, o
   function onPointerMove(e) {
     const d = dragRef.current;
     if (!d) return;
-    if (!d.moved && (Math.abs(e.clientX - d.sx) > 4 || Math.abs(e.clientY - d.sy) > 4)) {
-      d.moved = true; setDragId(d.id);
-    }
+    if (!d.moved && (Math.abs(e.clientX - d.sx) > 4 || Math.abs(e.clientY - d.sy) > 4)) { d.moved = true; setDragId(d.id); }
     if (!d.moved) return;
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -95,6 +122,17 @@ export default function CompanionSpace({ comps, bonds, positions, onPositions, o
     else { setDragId(null); onPositions?.(posRef.current); }
   }
 
+  // Render position: while two companions are talking, each leans ~38% toward
+  // the other so they visibly approach, then eases back when the chat ends.
+  function leanPos(c, base) {
+    if (approaching && (approaching[0] === c.id || approaching[1] === c.id)) {
+      const otherId = approaching[0] === c.id ? approaching[1] : approaching[0];
+      const ob = pos[otherId];
+      if (ob) return { x: base.x + ((base.x + ob.x) / 2 - base.x) * 0.38, y: base.y + ((base.y + ob.y) / 2 - base.y) * 0.38 };
+    }
+    return base;
+  }
+
   return (
     <Shell>
       <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: `1px solid ${C.border}`, position: 'relative', zIndex: 5 }}>
@@ -105,46 +143,44 @@ export default function CompanionSpace({ comps, bonds, positions, onPositions, o
         </div>
       </div>
 
-      <div
-        ref={containerRef}
-        onPointerMove={onPointerMove}
-        style={{ flex: 1, position: 'relative', overflow: 'hidden', touchAction: 'none', userSelect: 'none' }}
-      >
+      <div ref={containerRef} onPointerMove={onPointerMove}
+        style={{ flex: 1, position: 'relative', overflow: 'hidden', touchAction: 'none', userSelect: 'none' }}>
         {living.length === 0 && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.textDim, fontSize: 13 }}>No companions here yet.</div>
         )}
         {living.map((c, i) => {
-          const p = pos[c.id] || defaultPos(i, living.length);
+          const base = pos[c.id] || defaultPos(i, living.length);
+          const p = leanPos(c, base);
           const awake = c.status === 'awake';
           const dragging = dragId === c.id;
+          const talking = approaching && (approaching[0] === c.id || approaching[1] === c.id);
           const floatName = FLOATS[i % FLOATS.length];
           const dur = 6 + (i % 4);
           return (
-            <div
-              key={c.id}
-              onPointerDown={(e) => onPointerDown(e, c)}
-              onPointerUp={(e) => onPointerUp(e, c)}
+            <div key={c.id} onPointerDown={(e) => onPointerDown(e, c)} onPointerUp={(e) => onPointerUp(e, c)}
               style={{
                 position: 'absolute', left: `${p.x * 100}%`, top: `${p.y * 100}%`,
                 marginLeft: -SIZE / 2, marginTop: -SIZE / 2, width: SIZE,
                 cursor: dragging ? 'grabbing' : 'grab', touchAction: 'none',
+                transition: dragging ? 'none' : 'left 1.1s ease, top 1.1s ease',
+                zIndex: dragging ? 20 : (talking ? 10 : 2),
                 animation: awake && !dragging ? `${floatName} ${dur}s ease-in-out infinite` : 'none',
-                zIndex: dragging ? 20 : 2, transition: dragging ? 'none' : 'filter 0.2s',
                 opacity: awake ? 1 : 0.5,
-              }}
-            >
-              {/* mingle speech bubble */}
+              }}>
               {bubble && bubble.compId === c.id && (
                 <div style={{ position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: 8, background: C.card, border: `1px solid ${c.color?.primary || C.border}`, color: C.text, fontSize: 11.5, lineHeight: 1.4, padding: '7px 10px', borderRadius: 12, width: 'max-content', maxWidth: 180, textAlign: 'center', animation: 'fadeUp 0.3s both', pointerEvents: 'none', boxShadow: `0 6px 20px ${C.void}` }}>
                   {bubble.text}
                 </div>
               )}
-              {/* floating pet hearts */}
+              {reaction && reaction.compId === c.id && (
+                <div style={{ position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: 4, color: c.color?.primary || C.glow1, fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', pointerEvents: 'none', animation: 'heartRise 1.1s ease-out forwards' }}>
+                  {reaction.word}
+                </div>
+              )}
               {hearts.filter((h) => h.compId === c.id).map((h) => (
                 <span key={h.key} style={{ position: 'absolute', left: '50%', top: 6, marginLeft: h.dx, fontSize: 16, pointerEvents: 'none', animation: 'heartRise 1.1s ease-out forwards' }}>{h.emoji}</span>
               ))}
-              {/* avatar (inner wrapper restarts the pet-pop on each tap) */}
-              <div key={`pop-${pets[c.id] || 0}`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', animation: pets[c.id] ? 'petPop 0.5s ease' : 'none' }}>
+              <div key={`pop-${pets[c.id] || 0}`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', animation: pets[c.id] ? 'petPop 0.5s ease' : 'none', filter: talking ? `drop-shadow(0 0 10px ${c.color?.glow || 'rgba(124,91,245,0.5)'})` : 'none' }}>
                 <Avatar comp={c} size={SIZE} glow />
                 <span style={{ fontSize: 11, color: C.textSoft, marginTop: 6, fontWeight: 600, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 3 }}>
                   {!awake && <span style={{ fontSize: 9 }}>💤</span>}{c.name}
