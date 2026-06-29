@@ -9,27 +9,29 @@ binding = "DB"
 database_name = "other"
 database_id = "REPLACE_WITH_D1_DATABASE_ID"
 
+# Public, non-secret config only. These are authoritative: on deploy, Wrangler
+# replaces the worker's plain-text vars with exactly this list, so anything set
+# in the dashboard that isn't here would be dropped. (None of these are secret —
+# the VAPID public key, origin, and mailto are already public in the web build.)
 [vars]
-# Lock CORS to your web app's origin in production, e.g.
-#   ALLOWED_ORIGIN = "https://other.example.com"
-# VAPID public key + contact subject for Web Push (the public key is safe to
-# expose; it must match VITE_VAPID_PUBLIC in the web app's .env):
-#   VAPID_PUBLIC  = "B..."
-#   VAPID_SUBJECT = "mailto:you@example.com"
-# Rate limits (requests per minute per client IP). Defaults: AI 30, auth 20.
-#   AI_RATE_LIMIT   = "30"
-#   AUTH_RATE_LIMIT = "20"
-# Natural voices (ElevenLabs) for POST /tts — optional:
-#   ELEVEN_VOICE_IDS = "id1,id2,id3"   # one per companion voiceIdx (optional)
+ALLOWED_ORIGIN = "https://lilkkjo082004.github.io"
+VAPID_PUBLIC = "BF_oz9i57Om2HKGoM_OFSMagZCD8iUmKzRaYLBRbJwkbbBoBePyoE0OFZjnh54CZpk-ub3Z03-acBA60jCn7tS0"
+VAPID_SUBJECT = "mailto:lilkkjo082004@gmail.com"
+AI_RATE_LIMIT = "30"
+AUTH_RATE_LIMIT = "20"
+# Natural voices (ElevenLabs) for POST /tts — optional, off unless set:
+#   ELEVEN_VOICE_IDS = "id1,id2,id3"
 #   ELEVEN_MODEL     = "eleven_turbo_v2_5"
 
-# Secrets (do NOT put these here) — set with wrangler:
-#   wrangler secret put AUTH_SECRET        # long random string for signing tokens
-#   wrangler secret put ANTHROPIC_API_KEY  # sk-ant-... (enables POST /ai)
-#   wrangler secret put VAPID_PRIVATE      # VAPID private key (enables push check-ins)
-#   wrangler secret put ELEVENLABS_API_KEY # enables POST /tts (natural voices)
+# Secrets are NOT listed here and are preserved across deploys. They must be set
+# as Cloudflare *Secrets* (encrypted), not plain-text Variables, or a deploy
+# would drop them:
+#   AUTH_SECRET        — signs auth tokens (encrypt the existing one if needed!)
+#   ANTHROPIC_API_KEY  — sk-ant-… (enables POST /ai)
+#   VAPID_PRIVATE      — push check-ins
+#   ELEVENLABS_API_KEY — optional, POST /tts
 
-# Companion check-ins — the scheduled() handler fans out Web Push notifications.
-# No-op until VAPID keys are configured. Adjust the cadence to taste.
+# Companion check-ins. Every 15 min so user-chosen check-in times are honored
+# (the scheduled() handler decides per-user whether a time is due).
 [triggers]
-crons = ["0 18 * * *"]
+crons = ["*/15 * * * *"]

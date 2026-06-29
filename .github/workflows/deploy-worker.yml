@@ -1,0 +1,37 @@
+name: Deploy Worker (other-api)
+
+# Auto-deploys the server/ Cloudflare Worker on every push that touches it.
+# Runs in GitHub's cloud (not the dev sandbox), so it can reach Cloudflare.
+# Does nothing until the CLOUDFLARE_API_TOKEN repo secret is set, so it's safe
+# to merge before configuration is complete.
+
+on:
+  push:
+    branches: [main, claude/continue-other-app-ewuf2q]
+    paths:
+      - 'server/**'
+      - '.github/workflows/deploy-worker.yml'
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check that Cloudflare credentials are configured
+        id: gate
+        run: echo "ready=${{ secrets.CLOUDFLARE_API_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy with Wrangler
+        if: steps.gate.outputs.ready == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: server
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Not configured yet
+        if: steps.gate.outputs.ready != 'true'
+        run: echo "Skipping deploy — add CLOUDFLARE_API_TOKEN (and CLOUDFLARE_ACCOUNT_ID) in repo Settings → Secrets and variables → Actions."
