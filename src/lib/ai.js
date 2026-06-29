@@ -180,14 +180,18 @@ async function rawComplete(system, userText, maxTokens = 240) {
   return (data.text || '').trim();
 }
 
-const MEMORY_SYS = `You extract durable, long-term memories about the USER from a chat between them and their AI companion(s). Return ONLY a JSON array, nothing else.
-Each item: {"text": string, "kind": "fact"|"preference"|"event"|"relationship"|"goal"|"emotion", "at": number|null}
+const MEMORY_SYS = `You build an evolving understanding of the USER from their chat with AI companion(s) — both the important facts AND the lighter texture of who they are — so the companions can relate to them like a close friend who really gets them. Return ONLY a JSON array, nothing else.
+Each item: {"text": string, "kind": "fact"|"preference"|"event"|"relationship"|"goal"|"emotion"|"trait", "at": number|null}
+
+Capture TWO kinds of things:
+1) Concrete facts worth recalling for weeks — job/studies, pets, family & friends (with names), where they live, meaningful upcoming or past events, goals, notable life situations. -> kinds: fact, event, relationship, goal
+2) Personality texture, INCLUDING from ordinary small talk — their sense of humour, interests & passions they light up about, communication style, values, recurring themes, what tends to lift or stress them, pet peeves, the general vibe they give off. -> kinds: trait, preference, emotion
+
 Rules:
-- Capture only things worth remembering weeks from now: their job/studies, pets, family & friends (with names), where they live, meaningful hobbies, important upcoming or past events, goals, strong likes/dislikes, health or major life situations.
-- Write each "text" as a short third-person statement: "Has a dog named Biscuit", "Job interview on Friday", "Training for a half marathon", "Best friend is Sam".
+- Write each "text" as a short third-person statement: "Has a dog named Biscuit", "Job interview on Friday", "Dry, self-deprecating sense of humour", "Lights up talking about basketball", "Deflects with jokes when stressed", "Texts in lowercase, very casual".
 - "at" applies to events ONLY: an absolute time in UNIX MILLISECONDS when a date is given or clearly implied (use the provided current date to resolve "Friday", "next week", etc.); otherwise null.
-- Do NOT capture small talk, the companion's own statements, or anything already in the profile.
-- Return 0 to 8 items. If nothing durable was shared, return [].`;
+- Prefer specific, telling observations over generic filler. Don't restate the profile, and never capture the companion's own statements — only what reveals the user.
+- Return 0 to 10 items. If genuinely nothing was revealed, return [].`;
 
 function parseMemoryJSON(text) {
   if (!text) return [];
@@ -200,7 +204,7 @@ function parseMemoryJSON(text) {
   return arr
     .filter((m) => m && typeof m.text === 'string' && m.text.trim())
     .map((m) => ({ text: m.text.trim(), kind: m.kind, at: Number.isFinite(m.at) ? m.at : null }))
-    .slice(0, 8);
+    .slice(0, 10);
 }
 
 /** Extract long-term memories about the user from recent history. Returns an
@@ -217,7 +221,7 @@ export async function extractMemories(profile, messages) {
   const today = new Date().toDateString();
   const ask = `Current date: ${today}.\nExtract long-term memories about ${profile?.name || 'the user'} from this conversation:\n\n${transcript}`;
   let text;
-  try { text = await rawComplete(MEMORY_SYS, ask, 500); } catch (e) { return []; }
+  try { text = await rawComplete(MEMORY_SYS, ask, 700); } catch (e) { return []; }
   return parseMemoryJSON(text);
 }
 
