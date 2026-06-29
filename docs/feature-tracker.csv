@@ -73,7 +73,7 @@ Emotional Intel,Support network referral,Suggest talking to friends/family,Built
 Location,Location access,Opt-in geolocation or manual area,Built,P1,UPDATED Future->Built; precise stays on-device
 Location,Restaurant/activity suggestions,Local ideas via companion prompt,Built,P1,UPDATED; coarse area label only
 Location,Therapist finder,Local mental health providers,Partial,P1,Via prompt
-Location,Proximity alerts,Notice user near favorite spots,Future,P2,On-device only by design
+Location,Proximity alerts,Companion nudge when near a saved favorite spot,Built,P2,"NEW; on-device, lib/location.js favorites + nearbyFavorite"
 Location,Preference-aware filtering,Honors cuisines/dislikes,Built,P1,UPDATED; in prompt
 Content/Age,Under 18 mode,"Friendship only, no mature content",Built,P0,
 Content/Age,Over 18 suggestive,Romantic warmth for verified adults,Built,P0,UPDATED Partial->Built; matureContentAllowed
@@ -117,7 +117,7 @@ Notifications,Customizable check-in times,"User-set times, multiple per day, tim
 Notifications,Push self-test & diagnostics,In-app test notification + delivery status,Built,P2,"NEW; /push/status, /push/test, local SW notify"
 Notifications,Toggle voice activation,Disable call-by-name,Built,P1,UPDATED Future->Built
 Notifications,Ambient conversation alerts,Push when companions were chatting with each other,Built,P2,"NEW; cron ambientAlertLine, Settings toggle, default on"
-Notifications,Location-based nudges,Near favorite spot suggestions,Future,P2,
+Notifications,Location-based nudges,Near favorite spot suggestions (on-device),Built,P2,"NEW; in-app companion nudge, coords stay on device"
 Platforms,Web app,"Primary platform, full experience",Built,P0,React + Vite (rebuilt from Flutter)
 Platforms,PWA install,Installable + offline app shell,Built,P1,NEW; manifest + service worker
 Platforms,Android (Google Play),TWA/Capacitor wrapper,Partial,P0,Needs store setup + __OTHER_NATIVE__

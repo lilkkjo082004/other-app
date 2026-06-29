@@ -13,6 +13,7 @@ import { DISCLOSURE_TEXT, isAcknowledged, acknowledgeDisclosure, consumeDailyRem
 import { detectCrisis, CRISIS_RESOURCES, CRISIS_INTRO } from '../lib/crisis.js';
 import { isAuthed as apiAuthed, logMood } from '../lib/api.js';
 import { aiEnabled } from '../config.js';
+import { nearbyFavorite, shouldNudgePlace, markPlaceNudged } from '../lib/location.js';
 import Avatar from '../components/Avatar.jsx';
 import UnlockSheet from '../components/UnlockSheet.jsx';
 import Settings from './Settings.jsx';
@@ -213,6 +214,37 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   useEffect(() => { msgsRef.current = msgs; }, [msgs]);
   useEffect(() => { loadingRef.current = loading; }, [loading]);
   useEffect(() => () => clearTimeout(idleRef.current), []);
+
+  // On-device location nudge: when the user is near a saved favorite spot, a
+  // companion points it out and suggests something. Proximity is computed
+  // locally (lib/location.js) — precise coordinates never leave the device.
+  const placeBusyRef = useRef(false);
+  useEffect(() => {
+    let alive = true;
+    async function check() {
+      if (!alive || placeBusyRef.current || loadingRef.current) return;
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+      const awake = comps.filter((c) => c.status === 'awake');
+      if (!awake.length) return;
+      let hit;
+      try { hit = await nearbyFavorite(); } catch (e) { return; }
+      if (!alive || !hit || !shouldNudgePlace(hit.place.id)) return;
+      placeBusyRef.current = true;
+      markPlaceNudged(hit.place.id);
+      const c = awake[Math.floor(Math.random() * awake.length)];
+      setTyping(c); setLoading(true);
+      try {
+        const t = await proactiveCompanion(c, profFor(c), 'group', comps, msgsRef.current, 'place', '', hit.place.name);
+        if (alive) { setMsgs((p) => [...p, { role: 'assistant', companion: c, content: t, ts: Date.now() }]); if (autoSpeak) speakAs(t, c); }
+      } catch (e) { /* ignore */ }
+      setTyping(null); setLoading(false);
+      placeBusyRef.current = false;
+    }
+    const first = setTimeout(check, 6000);
+    const iv = setInterval(check, 5 * 60 * 1000);
+    return () => { alive = false; clearTimeout(first); clearInterval(iv); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comps]);
 
   // Companion-initiated "unprompted thought" after a few minutes of quiet.
   // Re-armed on each send; fires once per idle stretch.

@@ -176,8 +176,16 @@ export async function askCompanion(comp, profile, msgs, allC, mode, signal, onDe
   return placeholder(comp, profile, lastUser?.content);
 }
 
-function placeholderProactive(comp, profile, kind) {
+function placeholderProactive(comp, profile, kind, focus) {
   const name = profile.name || 'you';
+  if (kind === 'place') {
+    const love = profile.cuisineLove?.length ? ` maybe grab some ${profile.cuisineLove[0]}?` : '';
+    return pick([
+      `wait, you're right by ${focus}! ${name}, you should make the most of it —${love || ' treat yourself.'} (just a suggestion, worth a look)`,
+      `${focus}! one of your spots. since you're here, why not slow down a sec and enjoy it?${love}`,
+      `ooh you're near ${focus}. perfect little excuse for a break, ${name}.${love}`,
+    ]);
+  }
   if (kind === 'idle') {
     return pick([
       `random thought, ${name} — do you think plants get bored? anyway. what's on your mind?`,
@@ -198,15 +206,17 @@ export async function proactiveCompanion(comp, profile, mode, allC, history, kin
   if (aiEnabled()) {
     try {
       const foc = focus ? ` Specifically, naturally bring up and ask how this went: "${focus}". Sound like you've genuinely been wondering, not like you're reading a reminder.` : '';
-      const intent = kind === 'idle'
+      const intent = kind === 'place'
+        ? `(${profile.name} is out and about, right near ${focus} at this moment. As ${comp.name}, warmly point that out and suggest ONE thing to do or eat there that fits what they love — 1-2 sentences, in character. Mention once it's just a suggestion worth checking. Don't claim to track them or know their exact address.)`
+        : kind === 'idle'
         ? `(It's been quiet for a few minutes. As ${comp.name}, share a short unprompted thought or gently check in with ${profile.name} — curious and warm, 1-2 sentences. Don't mention being an AI or the silence itself.${foc})`
         : `(${profile.name} just reopened the app after being away ${awayLabel}. As ${comp.name}, welcome them back warmly and specifically — reference something real from your past chats if you can. 1-2 sentences.${foc})`;
       const seed = [...(history || []).filter((m) => m.role !== 'system'), { role: 'user', content: intent }];
       return await viaProxy(comp, profile, seed, allC, mode);
-    } catch (e) { return placeholderProactive(comp, profile, kind); }
+    } catch (e) { return placeholderProactive(comp, profile, kind, focus); }
   }
   await delay(400);
-  return placeholderProactive(comp, profile, kind);
+  return placeholderProactive(comp, profile, kind, focus);
 }
 
 // Lightweight one-shot completion through the proxy (used for ambient threads

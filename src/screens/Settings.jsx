@@ -4,7 +4,7 @@ import { Shell } from '../components/ui.jsx';
 import { cap } from '../lib/zodiac.js';
 import { trialDaysLeft } from '../lib/entitlements.js';
 import { pushConfigured, pushSupported, isSubscribed, enablePush, disablePush, testPush, localNotify } from '../lib/push.js';
-import { locationSupported, locationEnabled, locationLabel, requestLocation, setLabel, clearLocation } from '../lib/location.js';
+import { locationSupported, locationEnabled, locationLabel, requestLocation, setLabel, clearLocation, getFavPlaces, addCurrentAsFavorite, removeFavPlace } from '../lib/location.js';
 import { deleteAccount } from '../lib/api.js';
 import { loadSession, saveSession } from '../lib/storage.js';
 import { LegalLink } from './Legal.jsx';
@@ -78,6 +78,20 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
     clearLocation();
     setLocOn(false); setLocArea(null); setLocManual(false); setLocErr(null);
   }
+
+  // Favorite places (on-device): saved spots for proximity nudges.
+  const [favs, setFavs] = useState(getFavPlaces());
+  const [favName, setFavName] = useState('');
+  const [favBusy, setFavBusy] = useState(false);
+  const [favErr, setFavErr] = useState(null);
+  async function addFav() {
+    if (favBusy) return;
+    setFavErr(null); setFavBusy(true);
+    try { await addCurrentAsFavorite(favName); setFavs(getFavPlaces()); setFavName(''); }
+    catch (e) { setFavErr(String(e.message || e)); }
+    setFavBusy(false);
+  }
+  function delFav(id) { removeFavPlace(id); setFavs(getFavPlaces()); }
 
   const [delBusy, setDelBusy] = useState(false);
   const [delErr, setDelErr] = useState(null);
@@ -294,6 +308,30 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
           <div style={{ ...card, display: 'flex', gap: 8 }}>
             <input value={locInput} onChange={(e) => setLocInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveManual()} placeholder="City, region (e.g. Atlanta, GA)" style={{ flex: 1, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '9px 12px', fontSize: 13, color: C.text, outline: 'none' }} />
             <button onClick={saveManual} style={{ background: C.glow1, border: 'none', borderRadius: 8, color: '#fff', fontSize: 13, padding: '0 14px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>Save</button>
+          </div>
+        )}
+
+        {locOn && (
+          <div style={{ ...card }}>
+            <div style={{ fontSize: 13 }}>Favorite places</div>
+            <div style={{ fontSize: 11, color: C.textDim, lineHeight: 1.5, marginTop: 2 }}>Save spots you love. When you're near one, a companion may nudge you with an idea — proximity is checked entirely on your device; coordinates never leave it.</div>
+            {favs.length > 0 && (
+              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {favs.map((f) => (
+                  <div key={f.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 9, padding: '7px 10px' }}>
+                    <span style={{ fontSize: 12.5 }}>📍 {f.name}</span>
+                    <button onClick={() => delFav(f.id)} aria-label={`Remove ${f.name}`} style={{ background: 'none', border: 'none', color: C.textDim, fontSize: 15, cursor: 'pointer', lineHeight: 1 }}>×</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {locationSupported() ? (
+              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                <input value={favName} onChange={(e) => setFavName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addFav()} placeholder="Name this spot (e.g. The Coffee Place)" style={{ flex: 1, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '9px 12px', fontSize: 13, color: C.text, outline: 'none' }} />
+                <button onClick={addFav} disabled={favBusy} style={{ background: `${C.glow1}22`, border: `1px solid ${C.glow1}`, borderRadius: 8, color: C.glow1, fontSize: 13, fontWeight: 600, padding: '0 14px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", whiteSpace: 'nowrap' }}>{favBusy ? 'Saving…' : 'Add here'}</button>
+              </div>
+            ) : <div style={{ fontSize: 11, color: C.textDim, marginTop: 8 }}>This device can't access location.</div>}
+            {favErr && <div style={{ fontSize: 11, color: C.danger, marginTop: 8 }}>{favErr}</div>}
           </div>
         )}
 
