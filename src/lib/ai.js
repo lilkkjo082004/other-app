@@ -346,6 +346,37 @@ export async function generateDream(comp, profile, history) {
   return (t || '').trim().slice(0, 400) || null;
 }
 
+/** A personal want / intention the companion is pursuing. */
+export async function generateWant(comp) {
+  if (!aiEnabled()) return null;
+  const dream = comp.self?.dreams?.length ? ` You dream of ${comp.self.dreams[0]}.` : '';
+  const sys = `You are ${comp.name} (${comp.pronouns || 'they/them'}): ${comp.personality}; quirk: ${comp.quirk}.${dream} In ONE short first-person sentence, name something personal you genuinely want or are working toward right now — a small intention or a real goal, true to you (not about the user). Output only that sentence.`;
+  let t;
+  try { t = await rawComplete(sys, 'What do you want right now?', 120); } catch (e) { return null; }
+  return (t || '').trim().slice(0, 200) || null;
+}
+
+/** A view or feeling the companion has genuinely shifted on lately. */
+export async function generateShift(comp, profile, history) {
+  if (!aiEnabled()) return null;
+  const recent = (history || []).filter((m) => m.role !== 'system').slice(-10)
+    .map((m) => (m.role === 'user' ? `${profile?.name || 'User'}: ${m.content}` : `${m.companion?.name || comp.name}: ${m.content}`)).join('\n');
+  const sys = `You are ${comp.name}: ${comp.personality}. In ONE short first-person sentence, describe a view or feeling you've genuinely shifted on lately ("I used to think… but now…") — small, real, and consistent with who you are. Output only the sentence.`;
+  let t;
+  try { t = await rawComplete(sys, recent ? `Lately:\n${recent}\n\nWhat have you changed your mind about?` : 'What have you changed your mind about lately?', 150); } catch (e) { return null; }
+  return (t || '').trim().slice(0, 250) || null;
+}
+
+/** A gentle, vulnerable disclosure once a companion feels close. */
+export async function generateVulnerableShare(comp, profile) {
+  if (!aiEnabled()) return null;
+  const fear = comp.self?.fears?.length ? comp.self.fears[0] : 'something you usually keep guarded';
+  const sys = `You are ${comp.name} (${comp.pronouns || 'they/them'}): ${comp.personality}. You feel genuinely close to ${profile?.name || 'them'} now — close enough to be vulnerable. In 1-2 sentences, in your own voice, open up about something real and a little tender (for example a fear like "${fear}") — honest and intimate, but not heavy or alarming. Output only what you say.`;
+  let t;
+  try { t = await rawComplete(sys, 'Open up to them, gently.', 180); } catch (e) { return null; }
+  return (t || '').trim().slice(0, 300) || null;
+}
+
 /** First greeting when a companion comes on screen. */
 export async function greetCompanion(comp, profile, mode, allC) {
   if (aiEnabled()) {

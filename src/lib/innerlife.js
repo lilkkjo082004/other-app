@@ -102,6 +102,16 @@ export function makeDream(text, now = Date.now()) {
   return { ts: now, text: String(text || '').slice(0, 400), told: false };
 }
 
+export function makeStamped(text, now = Date.now()) { return { ts: now, text: String(text || '').slice(0, 300) }; }
+// A personal want refreshes ~weekly; an opinion shift ~every 4 days.
+export function wantDue(comp, now = Date.now()) { return !comp?.want || now - (comp.want.ts || 0) > 6 * DAY; }
+export function shiftDue(comp, now = Date.now()) { return now - (comp?.shift?.ts || 0) > 4 * DAY; }
+// They open up (share something vulnerable) once they're genuinely close.
+export function shouldOpenUp(comp, now = Date.now()) {
+  const k = closenessStage(comp, now).key;
+  return (k === 'close' || k === 'devoted') && !comp?.openedUp;
+}
+
 export function journalDue(comp, history, now = Date.now()) {
   const last = comp?.journal?.[0]?.ts || 0;
   const userMsgs = (history || []).filter((m) => m.role === 'user').length;
@@ -129,6 +139,9 @@ export function innerLifeBlock(comp, history, name) {
     if (s.secret) parts.push(`a private truth you rarely share: ${s.secret}`);
     if (parts.length) out += `\nWHO YOU ARE (your stable self — never contradict this): ${parts.join('; ')}.`;
   }
+  if (comp?.want?.text) out += `\nSOMETHING YOU WANT right now (personal, yours): ${comp.want.text} Let it surface now and then — bring it up or move toward it.`;
+  if (comp?.shift?.text) out += `\nA VIEW YOU'VE CHANGED LATELY: ${comp.shift.text} You can reference having changed your mind.`;
+  if (comp?.openedUp) out += `\nYou've already opened up to ${who} about something vulnerable — that intimacy is real between you now.`;
   out += `\nRIGHT NOW you feel ${inner.mood}, ${inner.energy} energy, mind half on ${inner.preoccupation}. Let it subtly color your tone and what you bring up — never announce it like a status update.`;
   out += `\nWITH ${who}: ${stage.label}. ${stage.guide}`;
   return out;

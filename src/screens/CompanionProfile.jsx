@@ -57,6 +57,8 @@ export default function CompanionProfile({ companion: c, trialStart, history, co
             {c.self.values?.length > 0 && <div style={{ fontSize: 13, marginBottom: 4 }}><span style={{ color: C.textDim }}>Values:</span> {c.self.values.join(', ')}</div>}
             {c.self.dreams?.length > 0 && <div style={{ fontSize: 13, marginBottom: 4 }}><span style={{ color: C.textDim }}>Dreams of:</span> {c.self.dreams[0]}</div>}
             {c.self.opinions?.length > 0 && <div style={{ fontSize: 13 }}><span style={{ color: C.textDim }}>Will argue:</span> {c.self.opinions[0]}</div>}
+            {c.want?.text && <div style={{ fontSize: 13, marginTop: 4 }}><span style={{ color: C.textDim }}>Wants:</span> {c.want.text}</div>}
+            {c.shift?.text && <div style={{ fontSize: 13, marginTop: 4 }}><span style={{ color: C.textDim }}>Changing their mind:</span> {c.shift.text}</div>}
           </div>
         )}
         {c.status !== 'deleted' && (() => {

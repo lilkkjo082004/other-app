@@ -109,6 +109,18 @@ function ambientAlertLine(a, b) {
   return T[Math.floor(Math.random() * T.length)];
 }
 
+// Inner-life check-in — draws on what a companion personally wants or has been
+// journaling about, so the ping feels like it comes from their inner world.
+const snip = (s) => { s = String(s || '').replace(/\s+/g, ' ').trim(); return s.length > 80 ? s.slice(0, 77) + '…' : s; };
+function innerLine(name, text) {
+  const t = snip(text);
+  return [
+    `${name} has been turning something over: "${t}"`,
+    `${name} can't stop thinking about ${t}`,
+    `${name} wanted to share what's on their mind: "${t}"`,
+  ][Math.floor(Math.random() * 3)];
+}
+
 const CHECKINS = [
   (n) => `${n} was just thinking about you. How's your day going?`,
   (n) => `${n} left the light on for you. Come say hi when you can ✦`,
@@ -179,7 +191,8 @@ export default {
         line = ambientAlertLine(a.name, b.name);
       } else if (comps.length) {
         const c = comps[Math.floor(Math.random() * comps.length)];
-        line = CHECKINS[Math.floor(Math.random() * CHECKINS.length)](c.name);
+        const inner = c.want?.text || c.journal?.[0]?.text;
+        line = (inner && Math.random() < 0.5) ? innerLine(c.name, inner) : CHECKINS[Math.floor(Math.random() * CHECKINS.length)](c.name);
       }
       try {
         const code = await sendPush(

@@ -3,8 +3,8 @@ import { C, COMP_COLORS } from '../theme.js';
 import { Shell } from '../components/ui.jsx';
 import { speakAs, useSpeechRec } from '../lib/voice.js';
 import { genAmbient, bumpBond } from '../lib/relationships.js';
-import { askCompanion, greetCompanion, proactiveCompanion, ambientThreadAI, extractMemories, generateSelf, generateJournalEntry, generateDream } from '../lib/ai.js';
-import { withInteraction, journalDue, addJournal, dreamDue, makeDream, closenessStage, stageRank, milestoneLine } from '../lib/innerlife.js';
+import { askCompanion, greetCompanion, proactiveCompanion, ambientThreadAI, extractMemories, generateSelf, generateJournalEntry, generateDream, generateWant, generateShift, generateVulnerableShare } from '../lib/ai.js';
+import { withInteraction, journalDue, addJournal, dreamDue, makeDream, closenessStage, stageRank, milestoneLine, wantDue, shiftDue, shouldOpenUp, makeStamped } from '../lib/innerlife.js';
 import { mergeMemories, removeMemory, pendingFollowups, markFollowed } from '../lib/memory.js';
 import { isLimited } from '../lib/entitlements.js';
 import { genComp } from '../lib/companions.js';
@@ -309,6 +309,17 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         const dream = await generateDream(c, profile, hist);
         if (alive && dream) setComps((p) => p.map((x) => (x.id === c.id ? { ...x, dream: makeDream(dream) } : x)));
       }
+      // 4) personal wants (refresh ~weekly) + opinion shifts (once they've a self + a journal)
+      for (const c of living) {
+        if (!wantDue(c)) continue;
+        const w = await generateWant(c);
+        if (alive && w) setComps((p) => p.map((x) => (x.id === c.id ? { ...x, want: makeStamped(w) } : x)));
+      }
+      for (const c of living) {
+        if (!c.self || (c.journal?.length || 0) < 1 || !shiftDue(c)) continue;
+        const s = await generateShift(c, profile, hist);
+        if (alive && s) setComps((p) => p.map((x) => (x.id === c.id ? { ...x, shift: makeStamped(s) } : x)));
+      }
     })();
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -332,6 +343,24 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         break;
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comps]);
+
+  // Vulnerability at depth: once a companion feels close, they open up about
+  // something tender — once. Fires at most once per session.
+  const openedRef = useRef(false);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (openedRef.current || !aiEnabled() || loadingRef.current) return;
+      const c = comps.find((x) => x.status === 'awake' && shouldOpenUp(x));
+      if (!c) return;
+      openedRef.current = true;
+      setComps((p) => p.map((x) => (x.id === c.id ? { ...x, openedUp: true } : x)));
+      const share = await generateVulnerableShare(c, profile);
+      if (alive && share) setMsgs((p) => [...p, { role: 'assistant', companion: c, content: share, ts: Date.now() }]);
+    })();
+    return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comps]);
 
