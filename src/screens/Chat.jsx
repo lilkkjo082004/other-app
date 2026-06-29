@@ -19,6 +19,7 @@ import UnlockSheet from '../components/UnlockSheet.jsx';
 import Settings from './Settings.jsx';
 import CompanionProfile from './CompanionProfile.jsx';
 import CompanionSpace from './CompanionSpace.jsx';
+import PlacesNearby from './PlacesNearby.jsx';
 import WakingUp from './WakingUp.jsx';
 
 export default function Chat({ companions: init, profile, trialStart, restored, onPersist, onReset, onUpdateProfile, cloud, authed, email, onSignIn, onSignOut }) {
@@ -457,6 +458,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   function openProfile(c) { setShowMenu(false); setPanel({ profile: c.id }); }
 
   // ── Panels (full-screen views) ──
+  if (panel === 'places') return <PlacesNearby onBack={() => setPanel(null)} />;
   if (panel === 'space') {
     return (
       <CompanionSpace
@@ -595,6 +597,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
           ))}
           <div style={{ borderTop: `1px solid ${C.border}`, margin: '8px 0' }} />
           {living.length < 3 && <button onClick={summon} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.glow2, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif" }}>✦  Summon a companion</button>}
+          <button onClick={() => { setShowMenu(false); setPanel('places'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📍  Find nearby</button>
           <button onClick={() => { setShowMenu(false); setPanel('settings'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>⚙  Settings</button>
           <button onClick={() => setShowMenu(false)} style={{ width: '100%', background: 'none', border: `1px solid ${C.border}`, borderRadius: 7, padding: '5px', color: C.textSoft, cursor: 'pointer', fontSize: 11, fontFamily: "'DM Sans',sans-serif" }}>Close</button>
         </div>

@@ -175,6 +175,31 @@ export async function scanLocation(nearThresholdM = 250) {
   return { near, auto };
 }
 
+// Current coords for centering a maps search, or null if location is off. The
+// coords are used only to build an external maps link the user chooses to open.
+export async function mapsCoords() {
+  if (!locationEnabled()) return null;
+  try { return await currentCoords(); } catch (e) { return null; }
+}
+
+// "Find nearby" categories. Each hands off to the device's maps app — the maps
+// provider does the place lookup; our servers never see the user's location.
+export const PLACE_CATEGORIES = [
+  { key: 'er', label: 'Emergency room', term: 'emergency room', icon: '🏥', urgent: true },
+  { key: 'urgent', label: 'Urgent care', term: 'urgent care', icon: '➕', urgent: true },
+  { key: 'mental', label: 'Therapist / mental health', term: 'therapist mental health clinic', icon: '🧠' },
+  { key: 'abortion', label: 'Abortion clinic', term: 'abortion clinic', icon: '🩺' },
+  { key: 'pharmacy', label: 'Pharmacy', term: 'pharmacy', icon: '💊' },
+  { key: 'grocery', label: 'Grocery store', term: 'grocery store', icon: '🛒' },
+  { key: 'auto', label: 'Auto repair', term: 'auto repair shop', icon: '🔧' },
+];
+
+// Build a universal Google Maps search URL (works in browser + the maps apps).
+export function mapsSearchUrl(term, coords) {
+  const q = coords ? `${term} near ${coords.lat.toFixed(4)},${coords.lon.toFixed(4)}` : `${term} near me`;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+}
+
 // Debounce so we don't nudge for the same spot repeatedly.
 export function shouldNudgePlace(id, withinMs = 3 * 60 * 60 * 1000) {
   try { const m = JSON.parse(localStorage.getItem(NUDGE_KEY) || '{}'); return !(m[id] && Date.now() - m[id] < withinMs); } catch (e) { return true; }

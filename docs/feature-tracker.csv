@@ -68,11 +68,11 @@ Emotional Intel,Tone adjustment,Companions shift tone based on mood,Built,P0,
 Emotional Intel,Invisible tracking,User never sees mood data,Built,P0,
 Emotional Intel,Long-term pattern analysis,Track mood across sessions,Built,P1,UPDATED Future->Built; /mood backend + summary
 Emotional Intel,Support escalation,Crisis detection + resources (988),Built,P0,UPDATED Partial->Built; lib/crisis.js
-Emotional Intel,Therapist suggestions,Local mental health providers,Partial,P1,Via location-aware prompt
+Emotional Intel,Therapist suggestions,Local mental health providers,Built,P1,"UPDATED; Find nearby maps handoff + location prompt"
 Emotional Intel,Support network referral,Suggest talking to friends/family,Built,P1,UPDATED Future->Built; lib/people.js support-network prompt block
 Location,Location access,Opt-in geolocation or manual area,Built,P1,UPDATED Future->Built; precise stays on-device
 Location,Restaurant/activity suggestions,Local ideas via companion prompt,Built,P1,UPDATED; coarse area label only
-Location,Therapist finder,Local mental health providers,Partial,P1,Via prompt
+Location,Find nearby (maps),"ER, urgent care, therapist, abortion clinic, pharmacy, grocery, auto via maps handoff",Built,P1,"NEW; screens/PlacesNearby.jsx, on-device coords -> maps URL"
 Location,Proximity alerts,Companion nudge when near a saved favorite spot,Built,P2,"NEW; on-device, lib/location.js favorites + scanLocation"
 Location,Auto-detected frequent spots,"Repeat visits (4+/month) auto-saved as a favorite, on-device",Built,P2,"NEW; visit clustering in lib/location.js, fully local"
 Location,Preference-aware filtering,Honors cuisines/dislikes,Built,P1,UPDATED; in prompt
