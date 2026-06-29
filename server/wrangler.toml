@@ -7,7 +7,7 @@ compatibility_date = "2024-11-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "other"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "13f0f67b-bbc2-432f-82c4-fdb9df3e20ba"
 
 # Public, non-secret config only. These are authoritative: on deploy, Wrangler
 # replaces the worker's plain-text vars with exactly this list, so anything set
