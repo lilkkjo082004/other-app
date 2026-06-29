@@ -315,53 +315,53 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       // Seed "known since" for age/growth tracking (earliest message, or now).
       const born = restored?.messages?.length ? Math.min(...restored.messages.map((m) => m.ts || Date.now())) : Date.now();
       if (living.some((c) => !c.bornAt)) setComps((p) => p.map((x) => (x.bornAt ? x : { ...x, bornAt: born })));
-      for (const c of living) {
-        if (c.self) continue;
-        const self = await generateSelf(c);
+      const hist = restored?.messages || [];
+      // Safeguard: cap inner-life AI generations per open (priority order below);
+      // anything skipped is still "due" and runs on a later open.
+      let gens = 0; const MAX_GENS = 3;
+      const budget = () => alive && gens < MAX_GENS;
+
+      for (const c of living) { // 1) stable self (highest priority)
+        if (c.self || !budget()) continue;
+        gens++; const self = await generateSelf(c);
         if (alive && self) setComps((p) => p.map((x) => (x.id === c.id ? { ...x, self } : x)));
       }
-      const hist = restored?.messages || [];
-      for (const c of living) {
-        if (!journalDue(c, hist)) continue;
-        const entry = await generateJournalEntry(c, profile, hist);
+      for (const c of living) { // 2) journal
+        if (!journalDue(c, hist) || !budget()) continue;
+        gens++; const entry = await generateJournalEntry(c, profile, hist);
         if (alive && entry) setComps((p) => p.map((x) => (x.id === c.id ? { ...x, journal: addJournal(x, entry) } : x)));
       }
-      // 3) sleeping companions dream
-      for (const c of living) {
-        if (!dreamDue(c)) continue;
-        const dream = await generateDream(c, profile, hist);
+      for (const c of living) { // 3) dreams while sleeping
+        if (!dreamDue(c) || !budget()) continue;
+        gens++; const dream = await generateDream(c, profile, hist);
         if (alive && dream) setComps((p) => p.map((x) => (x.id === c.id ? { ...x, dream: makeDream(dream) } : x)));
       }
-      // 4) personal wants (refresh ~weekly) + opinion shifts (once they've a self + a journal)
-      for (const c of living) {
-        if (!wantDue(c)) continue;
-        const w = await generateWant(c);
+      for (const c of living) { // 4) personal wants
+        if (!wantDue(c) || !budget()) continue;
+        gens++; const w = await generateWant(c);
         if (alive && w) setComps((p) => p.map((x) => (x.id === c.id ? { ...x, want: makeStamped(w) } : x)));
       }
-      for (const c of living) {
-        if (!c.self || (c.journal?.length || 0) < 1 || !shiftDue(c)) continue;
-        const s = await generateShift(c, profile, hist);
+      for (const c of living) { // 5) opinion shifts
+        if (!c.self || (c.journal?.length || 0) < 1 || !shiftDue(c) || !budget()) continue;
+        gens++; const s = await generateShift(c, profile, hist);
         if (alive && s) setComps((p) => p.map((x) => (x.id === c.id ? { ...x, shift: makeStamped(s) } : x)));
       }
-      // 5) how each companion feels about the others (distinct peer opinions)
-      for (const c of living) {
+      for (const c of living) { // 6) how each feels about the others
         const others = living.filter((o) => o.id !== c.id);
-        if (!others.length || !peerViewsDue(c)) continue;
-        const map = await generatePeerViews(c, others);
+        if (!others.length || !peerViewsDue(c) || !budget()) continue;
+        gens++; const map = await generatePeerViews(c, others);
         if (!alive || !map) continue;
         const pv = {};
         for (const o of others) if (map[o.name]) pv[o.id] = { text: map[o.name], ts: Date.now() };
         if (Object.keys(pv).length) setComps((p) => p.map((x) => (x.id === c.id ? { ...x, peerViews: { ...(x.peerViews || {}), ...pv }, peerViewsAt: Date.now() } : x)));
       }
-      // 6) the group distills a memorable shared moment into their history
-      if (loreDue(lore, hist)) {
-        const moment = await generateSharedMoment(living, profile, hist);
+      if (loreDue(lore, hist) && budget()) { // 7) shared history
+        gens++; const moment = await generateSharedMoment(living, profile, hist);
         if (alive && moment) setLore((l) => addLore(l, moment));
       }
-      // 7) long-term growth — after months together, the self slowly evolves
-      for (const c of living) {
-        if (!growthDue(c)) continue;
-        const g = await generateGrowth(c, profile, knownDuration(c), closenessStage(c).label);
+      for (const c of living) { // 8) long-term growth
+        if (!growthDue(c) || !budget()) continue;
+        gens++; const g = await generateGrowth(c, profile, knownDuration(c), closenessStage(c).label);
         if (alive && g?.self) setComps((p) => p.map((x) => (x.id === c.id ? { ...x, self: g.self, grownAt: Date.now(), growth: addGrowth(x, g.note || 'I’ve changed a little since we met.') } : x)));
       }
     })();

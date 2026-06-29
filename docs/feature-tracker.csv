@@ -157,3 +157,5 @@ Chat System,Walk into a scene,"Sometimes you arrive mid-conversation and a compa
 Companion Dynamics,Rupture & repair,"Long neglect leaves a once-close companion hurt/guarded; re-engagement heals with a reconciliation moment",Built,P2,"NEW; distant stage + riftSeen/repairSeen arc"
 Companion Dynamics,Long-term personality growth,"Companion's stable self subtly evolves over months together; growth log on profile",Built,P1,"NEW; ai.generateGrowth ~monthly, knownDuration, growth log"
 Companion Dynamics,Occasion awareness,"Companions know the date/season/holidays + the user's birthday and anniversary; celebrate them",Built,P2,"NEW; lib/occasion.js context + birthday/anniversary greetings"
+Performance,Inner-life generation budget,"Caps inner-life AI generations per open (max 3); rest run next open",Built,P1,"NEW; prioritized, prevents first-open AI burst"
+Visual/UI,Mood-reactive avatars,"Avatar brightness/liveliness reflects the companion's current inner state",Built,P2,"NEW; vitality() -> Avatar glow/stars + Space float speed"

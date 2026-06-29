@@ -4,6 +4,7 @@ import { Shell } from '../components/ui.jsx';
 import Avatar from '../components/Avatar.jsx';
 import { genAmbient, bumpBond } from '../lib/relationships.js';
 import { currentActivity } from '../lib/presence.js';
+import { vitality } from '../lib/innerlife.js';
 
 // The "sitting space": awake companions hang out together, drift and mingle on
 // their own (leaning toward each other when they talk), and react when you pet
@@ -157,7 +158,8 @@ export default function CompanionSpace({ comps, bonds, positions, onPositions, o
           const dragging = dragId === c.id;
           const talking = approaching && (approaching[0] === c.id || approaching[1] === c.id);
           const floatName = FLOATS[i % FLOATS.length];
-          const dur = 6 + (i % 4);
+          const vit = awake ? vitality(c) : 0.3;
+          const dur = (6 + (i % 4)) / (0.6 + 0.4 * vit); // lower energy drifts slower
           return (
             <div key={c.id} onPointerDown={(e) => onPointerDown(e, c)} onPointerUp={(e) => onPointerUp(e, c)}
               style={{
@@ -183,7 +185,7 @@ export default function CompanionSpace({ comps, bonds, positions, onPositions, o
                 <span key={h.key} style={{ position: 'absolute', left: '50%', top: 6, marginLeft: h.dx, fontSize: 16, pointerEvents: 'none', animation: 'heartRise 1.1s ease-out forwards' }}>{h.emoji}</span>
               ))}
               <div key={`pop-${pets[c.id] || 0}`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', animation: pets[c.id] ? 'petPop 0.5s ease' : 'none', filter: talking ? `drop-shadow(0 0 10px ${c.color?.glow || 'rgba(124,91,245,0.5)'})` : 'none' }}>
-                <Avatar comp={c} size={SIZE} glow />
+                <Avatar comp={c} size={SIZE} glow vitality={vit} />
                 <span style={{ fontSize: 11, color: C.textSoft, marginTop: 6, fontWeight: 600, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 3 }}>
                   {!awake && <span style={{ fontSize: 9 }}>💤</span>}{c.name}
                 </span>

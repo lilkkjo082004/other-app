@@ -141,6 +141,18 @@ export function addJournal(comp, text, now = Date.now()) {
   return [{ ts: now, text: String(text || '').slice(0, 400) }, ...(comp?.journal || [])].slice(0, 30);
 }
 
+// A 0–1 "vitality" from the companion's current inner state, used to make their
+// avatar visibly brighter/livelier when up and dimmer/slower when low or sleepy.
+export function vitality(comp, history = [], now = Date.now()) {
+  const inner = deriveInner(comp, history, now);
+  let v = 0.6;
+  if (/sleepy|low|winding/.test(inner.energy)) v -= 0.25;
+  if (/fresh|warm/.test(inner.energy)) v += 0.2;
+  if (/happy|playful|buzzing|light|open|content/.test(inner.mood)) v += 0.2;
+  if (/wistful|pensive|tender|low-key|introspective|feelings/.test(inner.mood)) v -= 0.2;
+  return Math.max(0.25, Math.min(1, v));
+}
+
 // How the room feels — a blend of the awake companions' current inner states,
 // so they can pick up on and react to each other's energy (mood contagion).
 export function roomMood(comps, history = [], now = Date.now()) {

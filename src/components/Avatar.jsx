@@ -28,7 +28,7 @@ const toHex = (r, g, b) => '#' + [r, g, b].map((x) => clamp(Math.round(x)).toStr
 function lighten(hex, amt = 0.45) { const [r, g, b] = hexToRgb(hex); return toHex(r + (255 - r) * amt, g + (255 - g) * amt, b + (255 - b) * amt); }
 function darken(hex, amt = 0.6) { const [r, g, b] = hexToRgb(hex); return toHex(r * (1 - amt), g * (1 - amt), b * (1 - amt)); }
 
-export default function Avatar({ comp, size = 40, glow = true, style }) {
+export default function Avatar({ comp, size = 40, glow = true, vitality = 1, style }) {
   const color = comp?.color?.primary || '#7c5bf5';
   const glowC = comp?.color?.glow || `${color}66`;
   // Seed by identity only (not colour) so recolouring re-tints the same sigil.
@@ -51,7 +51,7 @@ export default function Avatar({ comp, size = 40, glow = true, style }) {
   return (
     <svg
       width={size} height={size} viewBox="0 0 100 100" aria-hidden="true"
-      style={{ borderRadius: '50%', display: 'block', flexShrink: 0, boxShadow: glow ? `0 0 ${Math.round(size * 0.4)}px ${glowC}` : 'none', ...style }}
+      style={{ borderRadius: '50%', display: 'block', flexShrink: 0, boxShadow: glow ? `0 0 ${Math.round(size * 0.4 * (0.45 + 0.55 * vitality))}px ${glowC}` : 'none', transition: 'box-shadow 0.6s ease, filter 0.6s ease', filter: vitality < 1 ? `saturate(${(0.6 + 0.4 * vitality).toFixed(2)})` : 'none', ...style }}
     >
       <defs>
         <radialGradient id={gid} cx="38%" cy="30%" r="78%">
@@ -66,7 +66,7 @@ export default function Avatar({ comp, size = 40, glow = true, style }) {
       </g>
       <path d={path} fill="none" stroke="#ffffff" strokeOpacity="0.5" strokeWidth="0.8" strokeLinejoin="round" strokeLinecap="round" />
       {stars.map((s, i) => (
-        <circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#ffffff" opacity={0.9} />
+        <circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#ffffff" opacity={0.55 + 0.35 * vitality} />
       ))}
     </svg>
   );

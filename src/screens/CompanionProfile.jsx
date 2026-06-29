@@ -10,7 +10,7 @@ import { speakAs, listBrowserVoices, NATURAL_VOICE_PRESETS, VOICE_TONES } from '
 import { splitMemories } from '../lib/memory.js';
 import Avatar from '../components/Avatar.jsx';
 import { currentActivity } from '../lib/presence.js';
-import { closenessStage, knownDuration } from '../lib/innerlife.js';
+import { closenessStage, knownDuration, vitality } from '../lib/innerlife.js';
 
 export default function CompanionProfile({ companion: c, trialStart, history, comps, bonds, memories, onForgetMemory, onCustomize, onPrivate, onSleepToggle, onDelete, onUnlock, onBack }) {
   const col = c.color.primary;
@@ -42,7 +42,7 @@ export default function CompanionProfile({ companion: c, trialStart, history, co
         <span style={{ fontSize: 15, fontWeight: 600 }}>{c.name}</span>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px 40px', textAlign: 'center' }}>
-        <div style={{ width: 110, margin: '8px auto 0' }}><Avatar comp={c} size={110} /></div>
+        <div style={{ width: 110, margin: '8px auto 0' }}><Avatar comp={c} size={110} vitality={sleeping ? 0.3 : vitality(c, history || [])} /></div>
         <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 30, fontWeight: 700, margin: '18px 0 0' }}>{c.name}</h1>
         <p style={{ fontSize: 13, color: C.textSoft }}>{c.pronouns}</p>
         <div style={{ display: 'inline-block', margin: '8px 0 24px', padding: '4px 12px', borderRadius: 20, background: `${col}1f`, border: `1px solid ${col}66`, fontSize: 11, color: col, fontWeight: 600 }}>{sleeping ? '💤 Sleeping' : (c.status === 'deleted' ? 'Gone' : '● Awake')}</div>
