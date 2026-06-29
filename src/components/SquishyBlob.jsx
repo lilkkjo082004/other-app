@@ -202,8 +202,8 @@ export default function SquishyBlob({ comp, size = 110, interactive = false, pok
       <path ref={pathRef} d="" fill={`url(#${gid})`} />
       {/* gel sheen */}
       <ellipse cx={CX - R * 0.34} cy={CY - R * 0.4} rx={R * 0.34} ry={R * 0.22} fill={lighten(color, 0.78)} opacity="0.5" />
-      {/* identity constellation */}
-      {sigil && rest.stars.map((s, i) => (
+      {/* identity constellation (hidden when the companion turns the sigil off) */}
+      {sigil && comp?.showSigil !== false && rest.stars.map((s, i) => (
         <circle key={i} cx={s.x} cy={s.y} r={s.r} fill={lighten(color, 0.85)} opacity="0.85" />
       ))}
     </svg>

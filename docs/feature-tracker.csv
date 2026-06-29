@@ -103,7 +103,7 @@ Visual/UI,Space approach animation,Talking companions lean toward each other + t
 Visual/UI,Personality pet reactions,Pet response (emoji/word/burst) varies by personality,Built,P2,NEW; petStyle() from personality+traits
 Companion Dynamics,Companion presence,"""Right now"" activity per companion (lives of their own)",Built,P2,"NEW; lib/presence.js, shown in Space + profile, time-bucketed"
 Visual/UI,Lounge decoration,"Customize the Space: background pictures, tiles, patterns/themes",Future,P3,"User request; intentionally deferred months out as a later-stage customization (uploads or preset patterns)"
-Visual/UI,Cosmetic customization,"Recolor a companion: 8-color palette + custom color wheel",Built,P1,"UPDATED; ToS 4.1; <input type=color> any color"
+Visual/UI,Cosmetic customization,"Recolor a companion: 8-color palette + custom color wheel; squishiness slider; optional constellation sigil toggle",Built,P1,"UPDATED; ToS 4.1; <input type=color> any color; comp.blob, comp.showSigil"
 Visual/UI,Animated waking sequence,Companion discovers themselves,Built,P0,
 Visual/UI,Smooth transitions,Fade and slide animations,Built,P0,
 Visual/UI,Companion profile screen,"Identity, traits, bond, appearance, voice",Built,P1,UPDATED Future->Built

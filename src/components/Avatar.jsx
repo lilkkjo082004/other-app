@@ -61,13 +61,17 @@ export default function Avatar({ comp, size = 40, glow = true, vitality = 1, sty
         </radialGradient>
       </defs>
       <circle cx="50" cy="50" r="50" fill={`url(#${gid})`} />
-      <g transform={`rotate(${ringRot} 50 50)`}>
-        <ellipse cx="50" cy="50" rx="41" ry={ringRy} fill="none" stroke="#ffffff" strokeOpacity="0.32" strokeWidth="0.9" />
-      </g>
-      <path d={path} fill="none" stroke="#ffffff" strokeOpacity="0.5" strokeWidth="0.8" strokeLinejoin="round" strokeLinecap="round" />
-      {stars.map((s, i) => (
-        <circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#ffffff" opacity={0.55 + 0.35 * vitality} />
-      ))}
+      {comp?.showSigil !== false && (
+        <>
+          <g transform={`rotate(${ringRot} 50 50)`}>
+            <ellipse cx="50" cy="50" rx="41" ry={ringRy} fill="none" stroke="#ffffff" strokeOpacity="0.32" strokeWidth="0.9" />
+          </g>
+          <path d={path} fill="none" stroke="#ffffff" strokeOpacity="0.5" strokeWidth="0.8" strokeLinejoin="round" strokeLinecap="round" />
+          {stars.map((s, i) => (
+            <circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#ffffff" opacity={0.55 + 0.35 * vitality} />
+          ))}
+        </>
+      )}
     </svg>
   );
 }

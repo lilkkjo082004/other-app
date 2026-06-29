@@ -155,6 +155,17 @@ export default function CompanionProfile({ companion: c, trialStart, history, co
               <span style={{ fontSize: 11, color: C.textSoft, whiteSpace: 'nowrap' }}>Squishy</span>
             </div>
             <div style={{ fontSize: 11, color: C.textDim, marginTop: 6 }}>How bouncy {c.name}'s goop feels when you touch it.</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 }}>
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ fontSize: 13, color: C.text }}>Constellation sigil</div>
+                <div style={{ fontSize: 11, color: C.textDim }}>Show the stars on {c.name}'s avatar</div>
+              </div>
+              <button role="switch" aria-checked={c.showSigil !== false} aria-label="Show the constellation sigil"
+                onClick={() => onCustomize({ showSigil: c.showSigil === false })}
+                style={{ width: 44, height: 26, borderRadius: 50, border: 'none', cursor: 'pointer', background: c.showSigil !== false ? col : C.border, position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+                <span style={{ position: 'absolute', top: 3, left: c.showSigil !== false ? 21 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
+              </button>
+            </div>
           </div>
         )}
         {onCustomize && c.status !== 'deleted' && (() => {
