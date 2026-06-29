@@ -73,7 +73,8 @@ Emotional Intel,Support network referral,Suggest talking to friends/family,Built
 Location,Location access,Opt-in geolocation or manual area,Built,P1,UPDATED Future->Built; precise stays on-device
 Location,Restaurant/activity suggestions,Local ideas via companion prompt,Built,P1,UPDATED; coarse area label only
 Location,Therapist finder,Local mental health providers,Partial,P1,Via prompt
-Location,Proximity alerts,Companion nudge when near a saved favorite spot,Built,P2,"NEW; on-device, lib/location.js favorites + nearbyFavorite"
+Location,Proximity alerts,Companion nudge when near a saved favorite spot,Built,P2,"NEW; on-device, lib/location.js favorites + scanLocation"
+Location,Auto-detected frequent spots,"Repeat visits (4+/month) auto-saved as a favorite, on-device",Built,P2,"NEW; visit clustering in lib/location.js, fully local"
 Location,Preference-aware filtering,Honors cuisines/dislikes,Built,P1,UPDATED; in prompt
 Content/Age,Under 18 mode,"Friendship only, no mature content",Built,P0,
 Content/Age,Over 18 suggestive,Romantic warmth for verified adults,Built,P0,UPDATED Partial->Built; matureContentAllowed

@@ -13,7 +13,7 @@ import { DISCLOSURE_TEXT, isAcknowledged, acknowledgeDisclosure, consumeDailyRem
 import { detectCrisis, CRISIS_RESOURCES, CRISIS_INTRO } from '../lib/crisis.js';
 import { isAuthed as apiAuthed, logMood } from '../lib/api.js';
 import { aiEnabled } from '../config.js';
-import { nearbyFavorite, shouldNudgePlace, markPlaceNudged } from '../lib/location.js';
+import { scanLocation, shouldNudgePlace, markPlaceNudged } from '../lib/location.js';
 import Avatar from '../components/Avatar.jsx';
 import UnlockSheet from '../components/UnlockSheet.jsx';
 import Settings from './Settings.jsx';
@@ -226,9 +226,17 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
       const awake = comps.filter((c) => c.status === 'awake');
       if (!awake.length) return;
-      let hit;
-      try { hit = await nearbyFavorite(); } catch (e) { return; }
-      if (!alive || !hit || !shouldNudgePlace(hit.place.id)) return;
+      let res;
+      try { res = await scanLocation(); } catch (e) { return; }
+      if (!alive || !res) return;
+      const hit = res.near;
+      // A place the user keeps returning to was auto-saved as a favorite.
+      if (res.auto) {
+        const c = awake[Math.floor(Math.random() * awake.length)];
+        const name = profile?.name || 'you';
+        setMsgs((p) => [...p, { role: 'assistant', companion: c, content: `I've noticed you come around here a lot lately, ${name} — I saved this spot as a favorite ✦ Rename it in Settings whenever you like.`, ts: Date.now() }]);
+      }
+      if (!hit || !shouldNudgePlace(hit.place.id)) return;
       placeBusyRef.current = true;
       markPlaceNudged(hit.place.id);
       const c = awake[Math.floor(Math.random() * awake.length)];

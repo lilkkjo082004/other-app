@@ -91,12 +91,16 @@ function currentCoords() {
   });
 }
 
+function addFavoriteAt(lat, lon, name, extra = {}) {
+  const place = { id: 'p_' + Math.random().toString(36).slice(2, 9), name: (name || 'A favorite spot').trim() || 'A favorite spot', lat, lon, createdAt: Date.now(), ...extra };
+  saveFavs([...getFavPlaces(), place]);
+  return place;
+}
+
 // Save the spot the user is standing in right now as a named favorite.
 export async function addCurrentAsFavorite(name) {
   const cur = await currentCoords();
-  const place = { id: 'p_' + Math.random().toString(36).slice(2, 9), name: (name || 'A favorite spot').trim() || 'A favorite spot', lat: cur.lat, lon: cur.lon, createdAt: Date.now() };
-  saveFavs([...getFavPlaces(), place]);
-  return place;
+  return addFavoriteAt(cur.lat, cur.lon, name);
 }
 
 function haversine(la1, lo1, la2, lo2) {
@@ -106,21 +110,69 @@ function haversine(la1, lo1, la2, lo2) {
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
-// On-device proximity check: is the user near a saved favorite right now?
-// Returns { place, distance } for the nearest within `thresholdM`, else null.
-export async function nearbyFavorite(thresholdM = 250) {
-  if (!locationEnabled()) return null;
-  const favs = getFavPlaces();
-  if (!favs.length) return null;
-  let cur;
-  try { cur = await currentCoords(); } catch (e) { return null; }
+const nearestFavorite = (cur, thresholdM) => {
   let best = null;
-  for (const f of favs) {
+  for (const f of getFavPlaces()) {
     if (typeof f.lat !== 'number') continue;
     const d = haversine(cur.lat, cur.lon, f.lat, f.lon);
     if (d <= thresholdM && (!best || d < best.distance)) best = { place: f, distance: d };
   }
   return best;
+};
+
+// ── Auto-detected frequent spots ──────────────────────────────────────────
+// We quietly cluster repeated visits on-device. When a place is visited enough
+// distinct times in a month, it's auto-saved as a favorite. All of this is local.
+const VISIT_KEY = 'other_visit_clusters_v1';
+const CLUSTER_RADIUS = 120;            // m — same place
+const VISIT_GAP = 3 * 60 * 60 * 1000;  // a new "visit" must be ≥3h after the last
+const MONTH = 30 * 24 * 60 * 60 * 1000;
+const AUTO_THRESHOLD = 4;              // "more than a few times in a month"
+
+function getClusters() { try { return JSON.parse(localStorage.getItem(VISIT_KEY) || '[]'); } catch (e) { return []; } }
+function saveClusters(a) { try { localStorage.setItem(VISIT_KEY, JSON.stringify(a)); } catch (e) { /* ignore */ } }
+const isFavoriteNear = (lat, lon) => getFavPlaces().some((f) => typeof f.lat === 'number' && haversine(lat, lon, f.lat, f.lon) < CLUSTER_RADIUS);
+
+// Record the current position as a visit; auto-promote a frequented cluster to a
+// favorite. Returns the newly auto-added favorite, or null.
+function recordVisit(cur) {
+  const now = Date.now();
+  let clusters = getClusters();
+  for (const c of clusters) c.visits = (c.visits || []).filter((t) => now - t < MONTH + 6 * 24 * 60 * 60 * 1000);
+  clusters = clusters.filter((c) => c.visits.length > 0);
+
+  let cl = null, best = CLUSTER_RADIUS;
+  for (const c of clusters) { const d = haversine(cur.lat, cur.lon, c.lat, c.lon); if (d < best) { best = d; cl = c; } }
+  if (!cl) {
+    cl = { id: 'c_' + Math.random().toString(36).slice(2, 9), lat: cur.lat, lon: cur.lon, visits: [now], promoted: false };
+    clusters.push(cl);
+  } else if (now - Math.max(...cl.visits) >= VISIT_GAP) {
+    cl.visits.push(now);
+    cl.lat += (cur.lat - cl.lat) * 0.2; // ease centroid toward the new fix
+    cl.lon += (cur.lon - cl.lon) * 0.2;
+  }
+
+  let promoted = null;
+  if (!cl.promoted) {
+    const recent = cl.visits.filter((t) => now - t < MONTH).length;
+    if (recent >= AUTO_THRESHOLD && !isFavoriteNear(cl.lat, cl.lon)) {
+      promoted = addFavoriteAt(cl.lat, cl.lon, 'A spot you visit often', { auto: true });
+      cl.promoted = true;
+    }
+  }
+  saveClusters(clusters);
+  return promoted;
+}
+
+// One geolocation read → both: nearest saved favorite (for a nudge) and any
+// place auto-promoted to a favorite from repeat visits. Entirely on-device.
+export async function scanLocation(nearThresholdM = 250) {
+  if (!locationEnabled()) return { near: null, auto: null };
+  let cur;
+  try { cur = await currentCoords(); } catch (e) { return { near: null, auto: null }; }
+  const near = getFavPlaces().length ? nearestFavorite(cur, nearThresholdM) : null;
+  const auto = recordVisit(cur);
+  return { near, auto };
 }
 
 // Debounce so we don't nudge for the same spot repeatedly.
