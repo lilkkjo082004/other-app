@@ -350,7 +350,8 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
         {section('Legal')}
         <div style={{ ...card }}>
           <div style={{ fontSize: 13, marginBottom: 4 }}><LegalLink docKey="tos" style={{ textDecoration: 'none', color: C.text }}>Terms of Service ›</LegalLink></div>
-          <div style={{ fontSize: 13 }}><LegalLink docKey="privacy" style={{ textDecoration: 'none', color: C.text }}>Privacy Policy ›</LegalLink></div>
+          <div style={{ fontSize: 13, marginBottom: 4 }}><LegalLink docKey="privacy" style={{ textDecoration: 'none', color: C.text }}>Privacy Policy ›</LegalLink></div>
+          <div style={{ fontSize: 13 }}><LegalLink docKey="disclaimer" style={{ textDecoration: 'none', color: C.text }}>Disclaimer & Terms of Use ›</LegalLink></div>
         </div>
 
         <div style={{ height: 10 }} />

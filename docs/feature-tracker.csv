@@ -93,7 +93,7 @@ Data/Privacy,Cloud sync / backup,Account sync + JSON export/import,Built,P1,UPDA
 Data/Privacy,Full data reset,Wipe everything,Built,P1,UPDATED Future->Built
 Data/Privacy,Account & data deletion,DELETE /account erases all server data,Built,P0,NEW; ToS 10.1 / GDPR
 Data/Privacy,In-app Terms of Service,Rendered legal doc + links,Built,P0,NEW; data/legal.js
-Data/Privacy,Privacy Policy + Disclaimer,Source documents,Future,P0,"Slot wired, awaiting documents"
+Data/Privacy,Privacy Policy + Disclaimer,"Full Privacy Policy (local-first, on-device location, AI processing, third parties, CCPA/GDPR, children 13-17, deletion/retention) and Disclaimer & Terms of Use (AI-not-human, not medical/legal/financial/crisis advice, 988, dependency warning, as-is) in data/legal.js; linked from Welcome/Auth/Settings",Built,P0,"Standard-practice copy for Extratac LLC; recommends legal review before launch"
 Visual/UI,Dark cosmic aesthetic,"Abstract, space-inspired",Built,P0,
 Visual/UI,Companion color identity,Abstract color per companion,Built,P0,
 Visual/UI,Generative avatars,Unique cosmic constellation sigil per companion,Built,P1,"NEW; components/Avatar.jsx, deterministic SVG, recolors live"

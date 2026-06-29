@@ -20,7 +20,7 @@ export default function Welcome({ onStart, onSignIn }) {
           </button>
         )}
         <p style={{ color: C.textDim, fontSize: 11, lineHeight: 1.6, maxWidth: 300, marginTop: 28 }}>
-          By continuing you agree to our <LegalLink docKey="tos">Terms of Service</LegalLink> and <LegalLink docKey="privacy">Privacy Policy</LegalLink>.
+          By continuing you agree to our <LegalLink docKey="tos">Terms of Service</LegalLink>, <LegalLink docKey="privacy">Privacy Policy</LegalLink>, and <LegalLink docKey="disclaimer">Disclaimer</LegalLink>.
         </p>
       </div>
     </Shell>

@@ -55,7 +55,7 @@ export default function Auth({ onAuthed, onBack }) {
 
         {isSignup && (
           <p style={{ color: C.textDim, fontSize: 11, lineHeight: 1.6, marginTop: 18 }}>
-            By creating an account you agree to our <LegalLink docKey="tos">Terms of Service</LegalLink> and <LegalLink docKey="privacy">Privacy Policy</LegalLink>.
+            By creating an account you agree to our <LegalLink docKey="tos">Terms of Service</LegalLink>, <LegalLink docKey="privacy">Privacy Policy</LegalLink>, and <LegalLink docKey="disclaimer">Disclaimer</LegalLink>.
           </p>
         )}
       </div>
