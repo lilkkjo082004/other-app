@@ -3,8 +3,8 @@ import { C, COMP_COLORS } from '../theme.js';
 import { Shell } from '../components/ui.jsx';
 import { speakAs, useSpeechRec } from '../lib/voice.js';
 import { genAmbient, bumpBond } from '../lib/relationships.js';
-import { askCompanion, greetCompanion, proactiveCompanion, ambientThreadAI, extractMemories, generateSelf, generateJournalEntry, generateDream, generateWant, generateShift, generateVulnerableShare, generatePeerViews, generateSharedMoment, generateGrowth } from '../lib/ai.js';
-import { withInteraction, journalDue, addJournal, dreamDue, makeDream, closenessStage, stageRank, milestoneLine, wantDue, shiftDue, shouldOpenUp, makeStamped, peerViewsDue, loreDue, addLore, growthDue, addGrowth, knownDuration } from '../lib/innerlife.js';
+import { askCompanion, greetCompanion, proactiveCompanion, ambientThreadAI, extractMemories, generateSelf, generateJournalEntry, generateDream, generateWant, generateShift, generateVulnerableShare, generatePeerViews, generateSharedMoment, generateGrowth, generateInsideJoke } from '../lib/ai.js';
+import { withInteraction, journalDue, addJournal, dreamDue, makeDream, closenessStage, stageRank, milestoneLine, wantDue, shiftDue, shouldOpenUp, makeStamped, peerViewsDue, loreDue, addLore, growthDue, addGrowth, knownDuration, jokesDue, addJoke, identityQuestion } from '../lib/innerlife.js';
 import { mergeMemories, removeMemory, pendingFollowups, markFollowed, gossipPick, absorbOverheard } from '../lib/memory.js';
 import { isLimited } from '../lib/entitlements.js';
 import { genComp } from '../lib/companions.js';
@@ -53,6 +53,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const [spacePos, setSpacePos] = useState(restored?.spacePos || {});
   const [ambientAlerts, setAmbientAlerts] = useState(restored?.ambientAlerts !== false);
   const [lore, setLore] = useState(restored?.lore || []);
+  const [jokes, setJokes] = useState(restored?.jokes || []);
   const [ambientArriving, setAmbientArriving] = useState(false);
   // Focus session (companion-set): a quiet timer that suppresses nudges.
   const [focusUntil, setFocusUntil] = useState(() => { try { const v = +localStorage.getItem('other_focus_until'); return v && v > Date.now() ? v : null; } catch (e) { return null; } });
@@ -92,7 +93,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
 
   // A companion's own memory rides along on `profile` so its prompt/AI call
   // sees only what *it* remembers about the user.
-  const profFor = (c) => ({ ...profile, memories: memOf(c.id), lore });
+  const profFor = (c) => ({ ...profile, memories: memOf(c.id), lore, jokes });
 
   // Find a companion sitting on a past event they haven't followed up on yet,
   // so they can proactively ask how it went. Picks the most recent such event.
@@ -359,6 +360,10 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         gens++; const moment = await generateSharedMoment(living, profile, hist);
         if (alive && moment) setLore((l) => addLore(l, moment));
       }
+      if (jokesDue(jokes, hist) && budget()) { // 7b) inside jokes / running bits
+        gens++; const joke = await generateInsideJoke(living, profile, hist);
+        if (alive && joke) setJokes((x) => addJoke(x, joke));
+      }
       for (const c of living) { // 8) long-term growth
         if (!growthDue(c) || !budget()) continue;
         gens++; const g = await generateGrowth(c, profile, knownDuration(c), closenessStage(c).label);
@@ -407,6 +412,27 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comps]);
+
+  // Identity curiosity: now and then a companion asks the user something about
+  // who they are / how they're seen. Low-probability, once per session.
+  const curiosityRef = useRef(false);
+  useEffect(() => {
+    if (curiosityRef.current) return;
+    curiosityRef.current = true;
+    const t = setTimeout(() => {
+      if (focusRef.current && Date.now() < focusRef.current) return;
+      if (loadingRef.current) return;
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+      if (msgsRef.current.filter((m) => m.role === 'user').length < 4) return;
+      if (Math.random() > 0.25) return;
+      const awake = comps.filter((c) => c.status === 'awake');
+      if (!awake.length) return;
+      const c = awake[Math.floor(Math.random() * awake.length)];
+      setMsgs((p) => [...p, { role: 'assistant', companion: c, content: identityQuestion(), ts: Date.now() }]);
+    }, 45000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Occasions: companions celebrate the user's birthday (once a year) and the
   // monthly anniversary of when you met (once per new month milestone).
@@ -522,9 +548,9 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     // Don't persist on every streamed token — the final setMsgs (after
     // streamingRef flips false) saves the completed turn once.
     if (streamingRef.current) return;
-    onPersist?.({ companions: comps, messages: msgs, chatMode, autoSpeak, trialStart, bonds, voiceCall, pushFrequency: pushFreq, pushSchedule: pushSched, memories: memStore, spacePos, ambientAlerts, lore });
+    onPersist?.({ companions: comps, messages: msgs, chatMode, autoSpeak, trialStart, bonds, voiceCall, pushFrequency: pushFreq, pushSchedule: pushSched, memories: memStore, spacePos, ambientAlerts, lore, jokes });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [comps, msgs, chatMode, autoSpeak, bonds, voiceCall, pushFreq, pushSched, memStore, spacePos, ambientAlerts, lore]);
+  }, [comps, msgs, chatMode, autoSpeak, bonds, voiceCall, pushFreq, pushSched, memStore, spacePos, ambientAlerts, lore, jokes]);
 
   async function greet() {
     setLoading(true);

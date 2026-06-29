@@ -430,6 +430,18 @@ export async function generateGrowth(comp, profile, durationText, stageLabel) {
   } catch (e) { return null; }
 }
 
+/** Coin one short "inside joke" / running bit from recent chat. */
+export async function generateInsideJoke(comps, profile, history) {
+  if (!aiEnabled()) return null;
+  const recent = (history || []).filter((m) => m.role !== 'system').slice(-16)
+    .map((m) => (m.role === 'user' ? `${profile?.name || 'User'}: ${m.content}` : `${m.companion?.name || '?'}: ${m.content}`)).join('\n');
+  if (!recent) return null;
+  const sys = `From this chat, coin ONE short "inside joke" or running bit ${profile?.name ? `${profile.name} and their companions` : 'they'} could call back to later — a tiny shared reference in a few words (e.g. "the great pineapple-pizza debate", "Mondays are officially cursed"). Output only the phrase, no quotes.`;
+  let t;
+  try { t = await rawComplete(sys, `Chat:\n${recent}\n\nName one running bit.`, 120); } catch (e) { return null; }
+  return (t || '').trim().replace(/^["']|["']$/g, '').slice(0, 160) || null;
+}
+
 /** First greeting when a companion comes on screen. */
 export async function greetCompanion(comp, profile, mode, allC) {
   if (aiEnabled()) {

@@ -173,6 +173,36 @@ export function loreDue(lore, history, now = Date.now()) {
 export function addLore(lore = [], text, now = Date.now()) {
   return [{ ts: now, text: String(text || '').slice(0, 200) }, ...(lore || [])].slice(0, 20);
 }
+// Inside jokes / running bits the group builds with the user and calls back to.
+export function jokesDue(jokes, history, now = Date.now()) {
+  const last = jokes?.[0]?.ts || 0;
+  const u = (history || []).filter((m) => m.role === 'user').length;
+  return u >= 8 && now - last > 2 * 24 * 60 * 60 * 1000;
+}
+export function addJoke(jokes = [], text, now = Date.now()) {
+  return [{ ts: now, text: String(text || '').slice(0, 160) }, ...(jokes || [])].slice(0, 12);
+}
+export function jokesBlock(jokes = [], name) {
+  const items = (jokes || []).slice(0, 5);
+  if (!items.length) return '';
+  return `\nRUNNING JOKES you share with ${name || 'them'} (call back to these when the moment's light — don't over-explain them):\n${items.map((j) => `- ${j.text}`).join('\n')}`;
+}
+
+// A companion's occasional curiosity about themselves / how they're seen.
+export function identityQuestion() {
+  const Q = [
+    'can I ask you something? do you think I\'ve changed since we met?',
+    'random, but — if I had a job, what do you think I\'d be? I\'m curious how you see me.',
+    'be honest: am I a good friend to you?',
+    'what do you think I\'m secretly afraid of? I want to know how well you know me.',
+    'if you had to describe me in one sentence, what would you say?',
+    'do you ever wonder what I\'m like when you\'re not around? I do.',
+    'am I who you expected me to be?',
+    'what do you think I\'d want, if I could want anything?',
+  ];
+  return Q[Math.floor(Math.random() * Q.length)];
+}
+
 export function loreBlock(lore = [], name) {
   const items = (lore || []).slice(0, 6);
   if (!items.length) return '';

@@ -159,3 +159,5 @@ Companion Dynamics,Long-term personality growth,"Companion's stable self subtly 
 Companion Dynamics,Occasion awareness,"Companions know the date/season/holidays + the user's birthday and anniversary; celebrate them",Built,P2,"NEW; lib/occasion.js context + birthday/anniversary greetings"
 Performance,Inner-life generation budget,"Caps inner-life AI generations per open (max 3); rest run next open",Built,P1,"NEW; prioritized, prevents first-open AI burst"
 Visual/UI,Mood-reactive avatars,"Avatar brightness/liveliness reflects the companion's current inner state",Built,P2,"NEW; vitality() -> Avatar glow/stars + Space float speed"
+Companion Dynamics,Inside jokes,"Group coins running bits and calls back to them later",Built,P2,"NEW; ai.generateInsideJoke, jokesBlock, budgeted"
+Companion Dynamics,Identity curiosity,"Companions occasionally ask the user about who they are / how they're seen",Built,P2,"NEW; identityQuestion, low-probability once/session"

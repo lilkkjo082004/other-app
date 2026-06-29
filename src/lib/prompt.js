@@ -4,7 +4,7 @@ import { locationBlock } from './location.js';
 import { matureContentAllowed } from './age.js';
 import { supportNetworkBlock } from './people.js';
 import { memoryBlock } from './memory.js';
-import { innerLifeBlock, peerViewsBlock, roomMood, loreBlock } from './innerlife.js';
+import { innerLifeBlock, peerViewsBlock, roomMood, loreBlock, jokesBlock } from './innerlife.js';
 import { occasionContext } from './occasion.js';
 
 const fmt = (v) => (Array.isArray(v) ? (v.length ? v.join(', ') : '?') : v || '?');
@@ -42,7 +42,7 @@ RULES: Have opinions that evolve, and push back when you disagree. Share your ow
     ? 'IMPORTANT: this user is under 18 — keep everything strictly platonic and age-appropriate. No romance, flirting, or mature content.'
     : mature
       ? 'This user is a verified adult (18+) — romantic warmth and mature themes are allowed if they fit your personality, but always tasteful and consensual. Never produce sexual content involving minors or anything non-consensual.'
-      : 'This user is an adult, but keep things tasteful and non-explicit.'} Reply in 1-4 sentences usually. NEVER say "as an AI." Be casual and real.${innerLifeBlock(comp, history, profile.name)}${isPrivate ? '' : peerViewsBlock(comp, allC) + (roomMood(allC, history) ? `\nTHE ROOM RIGHT NOW: ${roomMood(allC, history)} — let the collective mood and each other's energy shape the vibe; if someone seems low, the others might gently attend to them.` : '')}${actionsBlock(profile.name)}${evolutionBlock(profile, history)}${locationBlock(profile.name)}${supportNetworkBlock(history, profile.name)}${memoryBlock(profile.memories, profile.name)}${loreBlock(profile.lore, profile.name)}${occasionContext(profile)}`;
+      : 'This user is an adult, but keep things tasteful and non-explicit.'} Reply in 1-4 sentences usually. NEVER say "as an AI." Be casual and real.${innerLifeBlock(comp, history, profile.name)}${isPrivate ? '' : peerViewsBlock(comp, allC) + (roomMood(allC, history) ? `\nTHE ROOM RIGHT NOW: ${roomMood(allC, history)} — let the collective mood and each other's energy shape the vibe; if someone seems low, the others might gently attend to them.` : '')}${actionsBlock(profile.name)}${evolutionBlock(profile, history)}${locationBlock(profile.name)}${supportNetworkBlock(history, profile.name)}${memoryBlock(profile.memories, profile.name)}${loreBlock(profile.lore, profile.name)}${jokesBlock(profile.jokes, profile.name)}${occasionContext(profile)}`;
 }
 
 // Lets companions actually help with the user's schedule. When asked, the model
