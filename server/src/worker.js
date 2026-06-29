@@ -56,6 +56,46 @@ function scheduleDue(sched, lastNotified, now) {
   return mostRecent > 0 && mostRecent > lastNotified;
 }
 
+// Find an awake companion sitting on a past event they haven't followed up on
+// (mirrors the in-app pendingFollowups logic). Returns {comp, mem} or null.
+function pickFollowup(blob, now) {
+  const comps = (blob.companions || []).filter((c) => c.status === 'awake');
+  const store = blob.memories && !Array.isArray(blob.memories) ? blob.memories : {};
+  let best = null;
+  for (const c of comps) {
+    for (const m of store[c.id] || []) {
+      if (m && m.kind === 'event' && m.at && m.at < now && !m.followed) {
+        if (!best || (m.at || 0) > (best.mem.at || 0)) best = { comp: c, mem: m };
+      }
+    }
+  }
+  return best;
+}
+
+// Turn an event memory into a warm check-in line, in the third-person voice of
+// the existing CHECKINS. e.g. "Maya has been wondering how your interview went."
+function followupLine(name, text) {
+  const ev = (text || '').trim().replace(/^[A-Z]/, (ch) => ch.toLowerCase());
+  return [
+    `${name} has been wondering how ${ev} went.`,
+    `${name}: been thinking about you — how did ${ev} go? ✦`,
+    `${name} wanted to check in: how did ${ev} go?`,
+  ][Math.floor(Math.random() * 3)];
+}
+
+// Flip a single event memory's `followed` flag in the user's synced state,
+// re-reading immediately before writing so we don't stomp recent client syncs.
+async function markFollowedInState(store, userId, compId, memId) {
+  try {
+    const blob = JSON.parse((await store.getState(userId))?.blob || '{}');
+    const list = blob.memories && !Array.isArray(blob.memories) ? blob.memories[compId] : null;
+    if (!Array.isArray(list)) return;
+    let changed = false;
+    for (const m of list) if (m && m.id === memId && !m.followed) { m.followed = true; changed = true; }
+    if (changed) await store.putState(userId, JSON.stringify(blob));
+  } catch (e) { /* best-effort */ }
+}
+
 const CHECKINS = [
   (n) => `${n} was just thinking about you. How's your day going?`,
   (n) => `${n} left the light on for you. Come say hi when you can ✦`,
@@ -110,9 +150,14 @@ export default {
         if (!Number.isFinite(due)) continue;           // notifications off
         if (s.last_notified && now - s.last_notified < due) continue;
       }
+      // Prefer a memory-driven follow-up ("how did your interview go?"); else a
+      // generic warm check-in from a random awake companion.
       let line = 'Your companions are thinking about you ✦';
+      const followup = pickFollowup(blob, now);
       const comps = (blob.companions || []).filter((c) => c.status === 'awake');
-      if (comps.length) {
+      if (followup) {
+        line = followupLine(followup.comp.name, followup.mem.text);
+      } else if (comps.length) {
         const c = comps[Math.floor(Math.random() * comps.length)];
         line = CHECKINS[Math.floor(Math.random() * CHECKINS.length)](c.name);
       }
@@ -122,8 +167,12 @@ export default {
           JSON.stringify({ title: 'Other', body: line, url: env.ALLOWED_ORIGIN || './' }),
           vapid,
         );
-        if (code === 404 || code === 410) await store.deletePushSub(s.user_id, s.endpoint);
-        else await store.setNotified(s.endpoint, now);
+        if (code === 404 || code === 410) { await store.deletePushSub(s.user_id, s.endpoint); continue; }
+        await store.setNotified(s.endpoint, now);
+        // Mark the followed-up event so neither push nor the app raises it again.
+        // Re-read the freshest blob right before writing to minimize clobbering
+        // a concurrent client sync.
+        if (followup) await markFollowedInState(store, s.user_id, followup.comp.id, followup.mem.id);
       } catch (e) { /* skip this one */ }
     }
   },
