@@ -48,7 +48,7 @@ Chat System,Cross-referencing,Companions react to each other in-turn,Built,P0,Se
 Chat System,Ambient conversations,"Personality + bond-aware, regenerated each open",Built,P0,lib/relationships.js
 Chat System,Streaming replies,Companion messages render token-by-token as generated,Built,P1,"NEW; worker SSE -> plain-text stream, graceful non-stream fallback"
 Chat System,Directed messages,Aim a message at one companion (@name / tap),Built,P1,NEW
-Chat System,Conversation search,"Search history, highlight matches",Built,P1,NEW
+Chat System,Conversation search,"Search messages + history (memories, letters, shared lore, inside jokes) with highlighted matches; tap a result to jump back into the conversation (flash highlight); date-jump chips to scroll to any day",Built,P1,"UPDATED; jump-to-message, history search, day-jump"
 Chat System,Call by name (voice),Say companion name to open private,Built,P0,+ toggle to disable
 Chat System,Auto-speak mode,Companions speak messages aloud,Built,P0,
 Chat System,Per-companion voice customization,"Pick voice + tone, live preview",Built,P1,NEW; lib/voice.js

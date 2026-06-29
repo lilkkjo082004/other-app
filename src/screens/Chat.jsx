@@ -87,9 +87,11 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const [online, setOnline] = useState(typeof navigator === 'undefined' || navigator.onLine !== false);
   const [directTo, setDirectTo] = useState(null);   // in group: aim at one companion
   const [search, setSearch] = useState(null);       // null = closed; string = query
+  const [flashIdx, setFlashIdx] = useState(null);   // message briefly highlighted after a jump
   const [unlock, setUnlock] = useState(null);          // { companion, onResult(ok) }
   const [summonCandidate, setSummonCandidate] = useState(null);
   const scrollRef = useRef(null);
+  const msgRefs = useRef(new Map());                // msgs index -> rendered row, for jump-to
   const inputRef = useRef(null);
   const msgsRef = useRef(msgs);
   const idleRef = useRef(null);
@@ -798,26 +800,73 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     }
   }
 
-  const visible = msgs.filter((m) => m.role === 'system' || chatMode === 'group' || m.role === 'user' || m.companion?.id === chatMode);
+  // Carry each message's index in `msgs` so search results can jump back to it.
+  const indexed = msgs.map((m, idx) => ({ m, idx }));
+  const visible = indexed.filter(({ m }) => m.role === 'system' || chatMode === 'group' || m.role === 'user' || m.companion?.id === chatMode);
   // Ambient catch-up is companion-to-companion, so it only shows in group view.
-  const stream = chatMode === 'group' ? [...ambient, ...visible] : visible;
+  const stream = chatMode === 'group' ? [...ambient.map((m) => ({ m, idx: -1 })), ...visible] : visible;
   const lastAssistant = [...msgs].reverse().find((m) => m.role === 'assistant' && !m.isAmbient);
   // Search filters across the whole history (ignores chat-mode + system notes).
   const q = (search || '').trim().toLowerCase();
   const searching = search != null && q.length > 0;
   const base = searching
-    ? msgs.filter((m) => (m.role === 'user' || m.role === 'assistant') && !m.isAmbient && (m.content || '').toLowerCase().includes(q))
+    ? indexed.filter(({ m }) => (m.role === 'user' || m.role === 'assistant') && !m.isAmbient && (m.content || '').toLowerCase().includes(q))
     : stream;
+  // "& history": search also reaches what companions remember, the letters they
+  // wrote, your shared lore, and inside jokes — things that never scroll by in
+  // the chat. These can't be jumped to, so they render as their own cards.
+  const histHits = [];
+  if (searching) {
+    for (const c of comps) {
+      if (c.status === 'deleted') continue;
+      for (const mem of memOf(c.id)) if ((mem.text || '').toLowerCase().includes(q)) histHits.push({ kind: 'memory', text: mem.text, who: c.name, color: c.color?.primary, ts: mem.ts });
+      for (const l of (c.letters || [])) if ((l.text || '').toLowerCase().includes(q)) histHits.push({ kind: 'letter', text: l.text, who: c.name, color: c.color?.primary, ts: l.ts });
+    }
+    for (const l of lore) if ((l.text || '').toLowerCase().includes(q)) histHits.push({ kind: 'lore', text: 'remember when ' + l.text, ts: l.ts });
+    for (const j of jokes) if ((j.text || '').toLowerCase().includes(q)) histHits.push({ kind: 'joke', text: j.text, ts: j.ts });
+    histHits.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  }
+  // Day-jump: when the search box is open but empty, offer chips that scroll
+  // straight to the start of any day in your history (most recent first).
+  const dayJump = [];
+  if (search != null && !searching) {
+    const firstOf = new Map();
+    for (let k = 0; k < msgs.length; k++) {
+      const m = msgs[k];
+      if (!m.ts) continue;
+      const key = new Date(m.ts).toDateString();
+      if (!firstOf.has(key)) firstOf.set(key, { label: fmtDay(m.ts), idx: k });
+    }
+    dayJump.push(...[...firstOf.values()].reverse());
+  }
   // Tag each message with a day-separator label when the calendar day changes.
   let prevDay = null;
   let ambientHeaderDone = false;
-  const decorated = base.map((m) => {
+  const decorated = base.map(({ m, idx }) => {
     let dayLabel = null;
     if (m.ts) { const d = new Date(m.ts).toDateString(); if (d !== prevDay) { dayLabel = fmtDay(m.ts); prevDay = d; } }
     let ambientHead = false;
     if (!searching && m.isAmbient && !ambientHeaderDone) { ambientHead = true; ambientHeaderDone = true; }
-    return { m, dayLabel, ambientHead };
+    return { m, idx, dayLabel, ambientHead };
   });
+  const totalResults = decorated.length + histHits.length;
+
+  // Jump to a message by its index in `msgs`: close search, switch to group
+  // (which shows everything), scroll it into view, and flash it briefly.
+  const jumpTo = (idx) => {
+    if (idx == null || idx < 0) return;
+    setSearch(null);
+    if (chatMode !== 'group') setChatMode('group');
+    setFlashIdx(idx);
+    let tries = 0;
+    const tick = () => {
+      const el = msgRefs.current.get(idx);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      else if (tries++ < 12) setTimeout(tick, 40);
+    };
+    setTimeout(tick, 40);
+    setTimeout(() => setFlashIdx((f) => (f === idx ? null : f)), 2400);
+  };
 
   return (
     <Shell>
@@ -864,10 +913,20 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       {listening && <div style={{ background: `${C.danger}15`, borderBottom: `1px solid ${C.danger}33`, padding: '6px 14px', textAlign: 'center', fontSize: 11, color: C.danger }}>🎤 Say a companion's name or speak your message</div>}
 
       {search != null && (
-        <div style={{ padding: '8px 12px', borderBottom: `1px solid ${C.border}`, background: C.bg, display: 'flex', gap: 8, alignItems: 'center', position: 'relative', zIndex: 10 }}>
-          <input autoFocus value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search your conversations…" style={{ flex: 1, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 50, padding: '8px 14px', fontSize: 13, color: C.text, outline: 'none' }} />
-          {searching && <span style={{ fontSize: 11, color: C.textDim, whiteSpace: 'nowrap' }}>{decorated.length} result{decorated.length === 1 ? '' : 's'}</span>}
-          <button aria-label="Close search" onClick={() => setSearch(null)} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 18, cursor: 'pointer', lineHeight: 1 }}>×</button>
+        <div style={{ borderBottom: `1px solid ${C.border}`, background: C.bg, position: 'relative', zIndex: 10 }}>
+          <div style={{ padding: '8px 12px', display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input autoFocus value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search messages, memories, letters…" style={{ flex: 1, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 50, padding: '8px 14px', fontSize: 13, color: C.text, outline: 'none' }} />
+            {searching && <span style={{ fontSize: 11, color: C.textDim, whiteSpace: 'nowrap' }}>{totalResults} result{totalResults === 1 ? '' : 's'}</span>}
+            <button aria-label="Close search" onClick={() => setSearch(null)} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 18, cursor: 'pointer', lineHeight: 1 }}>×</button>
+          </div>
+          {!searching && dayJump.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, overflowX: 'auto', padding: '0 12px 9px', WebkitOverflowScrolling: 'touch' }}>
+              <span style={{ fontSize: 10, color: C.textDim, whiteSpace: 'nowrap', alignSelf: 'center', flexShrink: 0 }}>Jump to</span>
+              {dayJump.map((d, i) => (
+                <button key={i} onClick={() => jumpTo(d.idx)} style={{ flexShrink: 0, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 50, padding: '4px 11px', fontSize: 11, color: C.textSoft, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", whiteSpace: 'nowrap' }}>{d.label}</button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -909,7 +968,26 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       )}
 
       <div ref={scrollRef} onScroll={onScroll} style={{ flex: 1, overflowY: 'auto', padding: '10px 10px 4px', position: 'relative' }}>
-        {decorated.map(({ m, dayLabel, ambientHead }, i) => (
+        {searching && totalResults > 0 && (
+          <div style={{ fontSize: 10.5, color: C.textDim, textAlign: 'center', padding: '2px 0 8px' }}>Tap a message to open it in the conversation</div>
+        )}
+        {searching && histHits.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 2, textTransform: 'uppercase', margin: '2px 4px 8px' }}>From your history</div>
+            {histHits.map((h, i) => {
+              const tag = h.kind === 'memory' ? `${h.who} remembers` : h.kind === 'letter' ? `Letter from ${h.who}` : h.kind === 'lore' ? 'Shared history' : 'Inside joke';
+              const icon = h.kind === 'memory' ? '🧠' : h.kind === 'letter' ? '✉️' : h.kind === 'lore' ? '✦' : '😄';
+              return (
+                <div key={'h' + i} style={{ borderLeft: `2px solid ${h.color || C.glow1}`, paddingLeft: 11, marginBottom: 10 }}>
+                  <div style={{ fontSize: 9.5, color: C.textDim, marginBottom: 2 }}>{icon} {tag}</div>
+                  <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>{highlight(h.text, q)}</div>
+                </div>
+              );
+            })}
+            {decorated.length > 0 && <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 2, textTransform: 'uppercase', margin: '14px 4px 4px' }}>Messages</div>}
+          </div>
+        )}
+        {decorated.map(({ m, idx, dayLabel, ambientHead }, i) => (
           <React.Fragment key={i}>
             {ambientHead && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '4px 0 10px' }}>
@@ -926,12 +1004,12 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
             {m.role === 'system' ? (
               m.kind === 'crisis' ? <CrisisCard /> : <DisclosureNote text={m.content} />
             ) : (
-            <div style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', marginBottom: 7, animation: 'fadeUp 0.3s both' }}>
+            <div ref={(el) => { if (idx != null && idx >= 0) { if (el) msgRefs.current.set(idx, el); else msgRefs.current.delete(idx); } }} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', marginBottom: 7, animation: 'fadeUp 0.3s both', borderRadius: 14, boxShadow: flashIdx === idx ? `0 0 0 2px ${C.glow1}aa` : 'none', transition: 'box-shadow 0.6s ease' }}>
               {m.role === 'assistant' && <div style={{ marginRight: 7, flexShrink: 0, marginTop: chatMode === 'group' ? 14 : 0, lineHeight: 0 }}><Avatar comp={m.companion} size={24} glow={false} /></div>}
               <div style={{ maxWidth: '78%' }}>
                 {m.role === 'assistant' && chatMode === 'group' && <span style={{ fontSize: 9, color: m.companion?.color?.primary, fontWeight: 600, display: 'block', marginBottom: 1 }}>{m.companion?.name}</span>}
                 <div style={{ position: 'relative' }}>
-                  <div style={{ padding: '8px 12px', borderRadius: m.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: m.role === 'user' ? C.glow1 : C.card, color: m.role === 'user' ? '#fff' : C.text, fontSize: 13, lineHeight: 1.5, border: m.role === 'user' ? 'none' : `1px solid ${C.border}`, whiteSpace: 'pre-wrap' }}>
+                  <div onClick={searching ? () => jumpTo(idx) : undefined} title={searching ? 'Jump to this message' : undefined} style={{ padding: '8px 12px', borderRadius: m.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: m.role === 'user' ? C.glow1 : C.card, color: m.role === 'user' ? '#fff' : C.text, fontSize: 13, lineHeight: 1.5, border: m.role === 'user' ? 'none' : `1px solid ${C.border}`, whiteSpace: 'pre-wrap', cursor: searching ? 'pointer' : 'default' }}>
                     {m.isAmbient && <span style={{ fontSize: 8, color: C.textDim, display: 'block', marginBottom: 2, fontStyle: 'italic' }}>earlier...</span>}
                     {searching ? highlight(m.content, q) : m.content}
                   </div>
@@ -962,8 +1040,8 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
             )}
           </React.Fragment>
         ))}
-        {searching && decorated.length === 0 && (
-          <p style={{ textAlign: 'center', color: C.textDim, fontSize: 12, padding: '24px 8px' }}>No messages match "{search}".</p>
+        {searching && totalResults === 0 && (
+          <p style={{ textAlign: 'center', color: C.textDim, fontSize: 12, padding: '24px 8px' }}>Nothing matches "{search}" yet — try a name, a place, or a feeling.</p>
         )}
         {loading && !searching && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 7 }}>
