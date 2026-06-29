@@ -28,7 +28,7 @@ export default function App() {
   const [selC, setSelC] = useState(resumable ? saved.companions : []);
   const [trialStart, setTrialStart] = useState(resumable ? (saved.trialStart || null) : null);
   const [restored, setRestored] = useState(
-    resumable ? { messages: saved.messages, chatMode: saved.chatMode, autoSpeak: saved.autoSpeak, bonds: saved.bonds, voiceCall: saved.voiceCall, pushFrequency: saved.pushFrequency, pushSchedule: saved.pushSchedule, memories: saved.memories, spacePos: saved.spacePos, ambientAlerts: saved.ambientAlerts } : null
+    resumable ? { messages: saved.messages, chatMode: saved.chatMode, autoSpeak: saved.autoSpeak, bonds: saved.bonds, voiceCall: saved.voiceCall, pushFrequency: saved.pushFrequency, pushSchedule: saved.pushSchedule, memories: saved.memories, spacePos: saved.spacePos, ambientAlerts: saved.ambientAlerts, lore: saved.lore } : null
   );
   const [authed, setAuthed] = useState(api.isAuthed());
   const [email, setEmailState] = useState(api.getEmail());
@@ -49,7 +49,7 @@ export default function App() {
     setProfile(withAgeVerification(s.profile));
     setSelC(s.companions || []);
     setTrialStart(s.trialStart || null);
-    setRestored({ messages: s.messages || [], chatMode: s.chatMode || 'group', autoSpeak: !!s.autoSpeak, bonds: s.bonds || {}, voiceCall: s.voiceCall, pushFrequency: s.pushFrequency, pushSchedule: s.pushSchedule, memories: s.memories || [], spacePos: s.spacePos || {}, ambientAlerts: s.ambientAlerts });
+    setRestored({ messages: s.messages || [], chatMode: s.chatMode || 'group', autoSpeak: !!s.autoSpeak, bonds: s.bonds || {}, voiceCall: s.voiceCall, pushFrequency: s.pushFrequency, pushSchedule: s.pushSchedule, memories: s.memories || [], spacePos: s.spacePos || {}, ambientAlerts: s.ambientAlerts, lore: s.lore || [] });
     setScreen('chat');
   }
 

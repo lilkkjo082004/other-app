@@ -3,8 +3,8 @@ import { C, COMP_COLORS } from '../theme.js';
 import { Shell } from '../components/ui.jsx';
 import { speakAs, useSpeechRec } from '../lib/voice.js';
 import { genAmbient, bumpBond } from '../lib/relationships.js';
-import { askCompanion, greetCompanion, proactiveCompanion, ambientThreadAI, extractMemories, generateSelf, generateJournalEntry, generateDream, generateWant, generateShift, generateVulnerableShare, generatePeerViews } from '../lib/ai.js';
-import { withInteraction, journalDue, addJournal, dreamDue, makeDream, closenessStage, stageRank, milestoneLine, wantDue, shiftDue, shouldOpenUp, makeStamped, peerViewsDue } from '../lib/innerlife.js';
+import { askCompanion, greetCompanion, proactiveCompanion, ambientThreadAI, extractMemories, generateSelf, generateJournalEntry, generateDream, generateWant, generateShift, generateVulnerableShare, generatePeerViews, generateSharedMoment } from '../lib/ai.js';
+import { withInteraction, journalDue, addJournal, dreamDue, makeDream, closenessStage, stageRank, milestoneLine, wantDue, shiftDue, shouldOpenUp, makeStamped, peerViewsDue, loreDue, addLore } from '../lib/innerlife.js';
 import { mergeMemories, removeMemory, pendingFollowups, markFollowed, gossipPick, absorbOverheard } from '../lib/memory.js';
 import { isLimited } from '../lib/entitlements.js';
 import { genComp } from '../lib/companions.js';
@@ -51,6 +51,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const memOf = (id) => memStore[id] || [];
   const [spacePos, setSpacePos] = useState(restored?.spacePos || {});
   const [ambientAlerts, setAmbientAlerts] = useState(restored?.ambientAlerts !== false);
+  const [lore, setLore] = useState(restored?.lore || []);
   // Focus session (companion-set): a quiet timer that suppresses nudges.
   const [focusUntil, setFocusUntil] = useState(() => { try { const v = +localStorage.getItem('other_focus_until'); return v && v > Date.now() ? v : null; } catch (e) { return null; } });
   const focusRef = useRef(focusUntil);
@@ -89,7 +90,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
 
   // A companion's own memory rides along on `profile` so its prompt/AI call
   // sees only what *it* remembers about the user.
-  const profFor = (c) => ({ ...profile, memories: memOf(c.id) });
+  const profFor = (c) => ({ ...profile, memories: memOf(c.id), lore });
 
   // Find a companion sitting on a past event they haven't followed up on yet,
   // so they can proactively ask how it went. Picks the most recent such event.
@@ -345,6 +346,11 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         for (const o of others) if (map[o.name]) pv[o.id] = { text: map[o.name], ts: Date.now() };
         if (Object.keys(pv).length) setComps((p) => p.map((x) => (x.id === c.id ? { ...x, peerViews: { ...(x.peerViews || {}), ...pv }, peerViewsAt: Date.now() } : x)));
       }
+      // 6) the group distills a memorable shared moment into their history
+      if (loreDue(lore, hist)) {
+        const moment = await generateSharedMoment(living, profile, hist);
+        if (alive && moment) setLore((l) => addLore(l, moment));
+      }
     })();
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -437,9 +443,9 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     // Don't persist on every streamed token — the final setMsgs (after
     // streamingRef flips false) saves the completed turn once.
     if (streamingRef.current) return;
-    onPersist?.({ companions: comps, messages: msgs, chatMode, autoSpeak, trialStart, bonds, voiceCall, pushFrequency: pushFreq, pushSchedule: pushSched, memories: memStore, spacePos, ambientAlerts });
+    onPersist?.({ companions: comps, messages: msgs, chatMode, autoSpeak, trialStart, bonds, voiceCall, pushFrequency: pushFreq, pushSchedule: pushSched, memories: memStore, spacePos, ambientAlerts, lore });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [comps, msgs, chatMode, autoSpeak, bonds, voiceCall, pushFreq, pushSched, memStore, spacePos, ambientAlerts]);
+  }, [comps, msgs, chatMode, autoSpeak, bonds, voiceCall, pushFreq, pushSched, memStore, spacePos, ambientAlerts, lore]);
 
   async function greet() {
     setLoading(true);
@@ -609,6 +615,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         onPositions={(next) => setSpacePos({ ...next })}
         onBonds={setBonds}
         onInteract={(id, kind) => bumpCloseness([id], kind)}
+        lore={lore}
         onOpenProfile={(id) => setPanel({ profile: id })}
         onBack={() => setPanel(null)}
       />

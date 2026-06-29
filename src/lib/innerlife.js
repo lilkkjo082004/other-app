@@ -131,6 +131,22 @@ export function roomMood(comps, history = [], now = Date.now()) {
 
 export function peerViewsDue(comp, now = Date.now()) { return now - (comp?.peerViewsAt || 0) > 5 * DAY; }
 
+// Shared history ("lore") — memorable moments the whole group has been through
+// together, that any of them can reference. Session-level (not per companion).
+export function loreDue(lore, history, now = Date.now()) {
+  const last = lore?.[0]?.ts || 0;
+  const userMsgs = (history || []).filter((m) => m.role === 'user').length;
+  return userMsgs >= 6 && now - last > 24 * 60 * 60 * 1000;
+}
+export function addLore(lore = [], text, now = Date.now()) {
+  return [{ ts: now, text: String(text || '').slice(0, 200) }, ...(lore || [])].slice(0, 20);
+}
+export function loreBlock(lore = [], name) {
+  const items = (lore || []).slice(0, 6);
+  if (!items.length) return '';
+  return `\nYOUR SHARED HISTORY (moments you${name ? ` and ${name}` : ''} have been through together — reference them naturally, "remember when…", don't list them):\n${items.map((l) => `- ${l.text}`).join('\n')}`;
+}
+
 // Group-only block: how this companion privately feels about the others present
 // — warmth, friction, admiration — so they treat each other like people with
 // history, not interchangeable voices.

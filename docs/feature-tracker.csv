@@ -151,3 +151,5 @@ Companion Dynamics,Temporal memory,"Companions reference WHEN things happened (y
 Companion Dynamics,Inter-companion gossip,"Companions share impressions of you with each other (overheard, attributed)",Built,P2,"NEW; gossipPick/absorbOverheard, persona-only, never private facts"
 Companion Dynamics,Peer opinions,"Each companion forms distinct feelings about the others; colors group chat + shown on profile",Built,P2,"NEW; ai.generatePeerViews, peerViewsBlock (group-only)"
 Companion Dynamics,Mood contagion,"The room's collective mood (each companion's state) shapes the group vibe",Built,P2,"NEW; roomMood injected into group prompt"
+Chat System,Group conflict & sides,"Companions form alliances, take sides, playfully spar in group chat",Built,P2,NEW; group MODE guidance + peer opinions
+Companion Dynamics,Shared history timeline,"Group distills memorable moments into lore they reference (remember when)",Built,P2,"NEW; ai.generateSharedMoment, loreBlock, shown in Space"

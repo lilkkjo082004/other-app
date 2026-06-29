@@ -33,7 +33,7 @@ function petStyle(comp) {
 }
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 
-export default function CompanionSpace({ comps, bonds, positions, onPositions, onBonds, onInteract, onBack, onOpenProfile }) {
+export default function CompanionSpace({ comps, bonds, positions, onPositions, onBonds, onInteract, lore, onBack, onOpenProfile }) {
   const living = (comps || []).filter((c) => c.status !== 'deleted');
   const containerRef = useRef(null);
   const dragRef = useRef(null);
@@ -198,6 +198,12 @@ export default function CompanionSpace({ comps, bonds, positions, onPositions, o
             </div>
           );
         })}
+        {Array.isArray(lore) && lore.length > 0 && (
+          <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '10px 16px', background: `linear-gradient(transparent, ${C.void})`, pointerEvents: 'none' }}>
+            <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 3 }}>✦ your story together</div>
+            <div style={{ fontSize: 11.5, color: C.textSoft, fontStyle: 'italic', lineHeight: 1.4 }}>remember when {lore[0].text}</div>
+          </div>
+        )}
       </div>
     </Shell>
   );

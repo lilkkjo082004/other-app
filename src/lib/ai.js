@@ -395,6 +395,19 @@ export async function generatePeerViews(comp, others) {
   } catch (e) { return null; }
 }
 
+/** Distill one memorable shared moment into a short "remember when" phrase. */
+export async function generateSharedMoment(comps, profile, history) {
+  if (!aiEnabled()) return null;
+  const names = (comps || []).filter((c) => c.status !== 'deleted').map((c) => c.name).join(', ');
+  const recent = (history || []).filter((m) => m.role !== 'system').slice(-16)
+    .map((m) => (m.role === 'user' ? `${profile?.name || 'User'}: ${m.content}` : `${m.companion?.name || '?'}: ${m.content}`)).join('\n');
+  if (!recent) return null;
+  const sys = `Distill ONE small, memorable shared moment between ${profile?.name || 'the user'} and their companions (${names}) into a short third-person phrase the group could later reference with "remember when…". Specific and warm or funny. Output only the phrase, no quotes.`;
+  let t;
+  try { t = await rawComplete(sys, `Recent moments:\n${recent}\n\nName one memorable shared moment.`, 150); } catch (e) { return null; }
+  return (t || '').trim().replace(/^["']|["']$/g, '').slice(0, 200) || null;
+}
+
 /** First greeting when a companion comes on screen. */
 export async function greetCompanion(comp, profile, mode, allC) {
   if (aiEnabled()) {
