@@ -633,8 +633,51 @@ General Inquiries: legal@other-app.com
 
 *This Disclaimer is provided in good faith and is not legal advice. We recommend review by qualified legal counsel before commercial launch.*`;
 
+const SAFETY_MD = `Your safety matters to us. This page describes how Other responds when a user expresses thoughts of suicide, self-harm, or being in danger — our "crisis prevention protocol" — and the resources we point to. We publish it openly so users, families, and regulators can see exactly what we do (and to meet requirements such as California SB 243).
+
+**If you are in immediate danger or a medical/mental-health emergency, call your local emergency number now (911 in the US).**
+
+## Get help right now (US, 24/7)
+- **Call or text 988** — Suicide & Crisis Lifeline.
+- **Text HOME to 741741** — Crisis Text Line.
+- **findahelpline.com** — international directory of helplines.
+
+These services are free, confidential, and available around the clock. You do not have to be suicidal to reach out — they help with any kind of emotional distress.
+
+## Our crisis prevention protocol
+
+### Detection
+Every message you send is checked on your device against a deliberately broad set of signals for suicidal ideation and self-harm. We err on the side of caution — we would rather show supportive resources one extra time than miss a moment when someone needs help.
+
+### Response
+When such a signal is detected:
+
+- The app immediately surfaces a **crisis resource card** with the helplines above, shown gently and without alarm.
+- The companions are instructed — in their core system prompt — to take it seriously and with warmth, never to dismiss or minimize it, to stay with you, and to encourage you to reach out to a crisis line (988) or someone you trust. They are instructed never to give instructions that could cause harm.
+- This guidance applies even when the app is offline: the built-in fallback responses also direct you to 988.
+
+### Limitations
+This is automated keyword-based detection, not a clinical assessment. **It will not catch every situation and is not a substitute for professional care or emergency services.** Please do not rely on it as a safety mechanism. Companions are AI, not licensed counselors, and cannot provide crisis intervention. Always contact a qualified professional or emergency services when you or someone else may be at risk.
+
+## Protections for younger users
+- Users under 13 are not permitted to use the app.
+- Users aged 13–17 are limited to friendship-only interactions, with enhanced content filtering.
+- Minors receive a reminder that companions are AI (not human), and a "take a break" reminder at least every three hours of continuous use.
+- AI-disclosure reminders appear for all users and cannot be disabled.
+
+## A note on healthy use
+Companions are designed to feel caring and present, but they are software. If you find the app is affecting your mood, sleep, relationships, or responsibilities, please take a break and, if you need it, talk to a mental-health professional or someone you trust.
+
+## Contact
+Questions about our safety practices: privacy@other-app.com or legal@other-app.com.
+
+Extratac LLC · Attn: Krristen Jones · Douglasville, GA
+
+*This page is provided in good faith and is not legal or medical advice. We recommend review by qualified counsel before commercial launch.*`;
+
 export const LEGAL_DOCS = {
   tos: { key: 'tos', title: 'Terms of Service', effective: 'April 11, 2026', md: TOS_MD, ready: true },
   privacy: { key: 'privacy', title: 'Privacy Policy', effective: 'April 11, 2026', md: PRIVACY_MD, ready: true },
   disclaimer: { key: 'disclaimer', title: 'Disclaimer & Terms of Use', effective: 'April 11, 2026', md: DISCLAIMER_MD, ready: true },
+  safety: { key: 'safety', title: 'Crisis Resources & Safety', effective: 'April 11, 2026', md: SAFETY_MD, ready: true },
 };

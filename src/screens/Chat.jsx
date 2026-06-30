@@ -10,7 +10,8 @@ import { isLimited } from '../lib/entitlements.js';
 import { genComp, freshName } from '../lib/companions.js';
 import { pickSigns } from '../lib/zodiac.js';
 import { detectMood } from '../lib/evolution.js';
-import { DISCLOSURE_TEXT, isAcknowledged, acknowledgeDisclosure, consumeDailyReminder } from '../lib/disclosure.js';
+import { DISCLOSURE_TEXT, BREAK_TEXT, isAcknowledged, acknowledgeDisclosure, consumeDailyReminder, breakReminderDue } from '../lib/disclosure.js';
+import { LegalLink } from './Legal.jsx';
 import { detectCrisis, CRISIS_RESOURCES, CRISIS_INTRO } from '../lib/crisis.js';
 import { isAuthed as apiAuthed, logMood } from '../lib/api.js';
 import { aiEnabled } from '../config.js';
@@ -598,6 +599,16 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   // the very first time, after the user accepted the Terms + Privacy on Welcome.
   const [needsAck, setNeedsAck] = useState(() => !isAcknowledged());
   const ackDisclosure = () => { acknowledgeDisclosure(); setNeedsAck(false); };
+
+  // Minors only: a "take a break" reminder every 3 hours of continuous use, and
+  // that companions are AI (California SB 243). First check starts the clock.
+  useEffect(() => {
+    if (profile?.ageGroup !== 'under18') return;
+    const fire = () => { if (breakReminderDue()) setMsgs((p) => [...p, { role: 'system', kind: 'break', content: BREAK_TEXT }]); };
+    fire();
+    const iv = setInterval(fire, 5 * 60 * 1000);
+    return () => clearInterval(iv);
+  }, [profile?.ageGroup]);
 
   // Only auto-scroll if the user is already near the bottom (don't yank them
   // away while they're reading back).
@@ -1259,7 +1270,7 @@ function CrisisCard() {
             <div style={{ fontSize: 11, color: C.textSoft }}>{r.detail}</div>
           </a>
         ))}
-        <div style={{ fontSize: 9.5, color: C.textDim, marginTop: 4 }}>If you’re in immediate danger, call your local emergency number.</div>
+        <div style={{ fontSize: 9.5, color: C.textDim, marginTop: 4 }}>If you’re in immediate danger, call your local emergency number. <LegalLink docKey="safety" style={{ fontSize: 9.5, color: C.glow2 }}>More resources & our safety policy</LegalLink></div>
       </div>
     </div>
   );

@@ -70,6 +70,7 @@ Emotional Intel,Tone adjustment,Companions shift tone based on mood,Built,P0,
 Emotional Intel,Invisible tracking,User never sees mood data,Built,P0,
 Emotional Intel,Long-term pattern analysis,Track mood across sessions,Built,P1,UPDATED Future->Built; /mood backend + summary
 Emotional Intel,Support escalation,Crisis detection + resources (988),Built,P0,UPDATED Partial->Built; lib/crisis.js
+Compliance,SB 243 companion-chatbot safeguards,"California SB 243 gaps closed: published Crisis Resources & Safety page (crisis-prevention protocol + 988/741741) linked from Settings + crisis card, and a minor-only 'take a break' reminder every 3 hours of continuous use (with AI-not-human reminder)",Built,P0,"NEW; data/legal.js safety doc, disclosure.breakReminderDue, Chat minor effect"
 Emotional Intel,Therapist suggestions,Local mental health providers,Built,P1,"UPDATED; Find nearby maps handoff + location prompt"
 Emotional Intel,Support network referral,Suggest talking to friends/family,Built,P1,UPDATED Future->Built; lib/people.js support-network prompt block
 Location,Location access,Opt-in geolocation or manual area,Built,P1,UPDATED Future->Built; precise stays on-device
