@@ -19,6 +19,10 @@ VAPID_PUBLIC = "BF_oz9i57Om2HKGoM_OFSMagZCD8iUmKzRaYLBRbJwkbbBoBePyoE0OFZjnh54CZ
 VAPID_SUBJECT = "mailto:lilkkjo082004@gmail.com"
 AI_RATE_LIMIT = "30"
 AUTH_RATE_LIMIT = "20"
+# Daily AI caps so a public, keyless endpoint can't run up the owner's bill.
+# Per-IP/day, and an optional global/day ceiling (0 = unlimited).
+AI_DAILY_LIMIT = "200"
+AI_DAILY_TOTAL = "0"
 # Natural voices (ElevenLabs) for POST /tts — optional, off unless set:
 #   ELEVEN_VOICE_IDS = "id1,id2,id3"
 #   ELEVEN_MODEL     = "eleven_turbo_v2_5"

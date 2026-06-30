@@ -4,45 +4,8 @@ import { buildSystemPrompt } from './prompt.js';
 import { detectCrisis } from './crisis.js';
 import { pickAmbientPair } from './relationships.js';
 import { recallBlock } from './recall.js';
-import { byokKey, byokModel } from './byok.js';
 
 const MAX_HISTORY = 30;
-const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
-
-// One transport for every AI call. With a user's own key it goes straight to
-// Anthropic (the key never touches our servers); otherwise it goes through the
-// hosted proxy with the current behaviour. `model` is overridable per-key.
-function postAI(body, signal) {
-  const key = byokKey();
-  if (key) {
-    return fetch(ANTHROPIC_URL, {
-      method: 'POST', signal,
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({ ...body, model: byokModel() || AI_MODEL }),
-    });
-  }
-  return fetch(aiEndpoint(), {
-    method: 'POST', signal,
-    headers: { 'content-type': 'application/json', ...authHeader() },
-    body: JSON.stringify({ ...body, model: AI_MODEL }),
-  });
-}
-
-// Pull the text out of either shape: our proxy's { text } or Anthropic's
-// { content: [{ type:'text', text }] }.
-function parseCompletion(data) {
-  if (data && typeof data.text === 'string' && data.text.trim()) return data.text.trim();
-  if (Array.isArray(data?.content)) {
-    const t = data.content.filter((b) => b?.type === 'text').map((b) => b.text).join('').trim();
-    if (t) return t;
-  }
-  return '';
-}
 
 // ── Real responses via the Cloudflare Worker proxy ──
 // Build the {system, messages} request for one companion from the transcript.
@@ -78,11 +41,20 @@ function buildRequest(comp, profile, msgs, allC, mode) {
 
 async function viaProxy(comp, profile, msgs, allC, mode, signal) {
   const { system, messages } = buildRequest(comp, profile, msgs, allC, mode);
-  const res = await postAI({ max_tokens: 400, system, messages }, signal);
-  if (!res.ok) throw new Error(`ai ${res.status}`);
-  const t = parseCompletion(await res.json());
-  if (!t) throw new Error('empty response');
-  return t;
+  const res = await fetch(aiEndpoint(), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...authHeader() },
+    body: JSON.stringify({ model: AI_MODEL, max_tokens: 400, system, messages }),
+    signal,
+  });
+  if (!res.ok) throw new Error(`proxy ${res.status}`);
+  const data = await res.json();
+  if (typeof data.text === 'string' && data.text.trim()) return data.text.trim();
+  if (Array.isArray(data.content)) {
+    const t = data.content.filter((b) => b?.type === 'text').map((b) => b.text).join('').trim();
+    if (t) return t;
+  }
+  throw new Error('empty response');
 }
 
 // Streaming variant: POSTs with stream:true and calls onDelta(textChunk) as
@@ -90,37 +62,17 @@ async function viaProxy(comp, profile, msgs, allC, mode, signal) {
 // (older) worker that still returns JSON — it emits the whole reply once.
 async function viaProxyStream(comp, profile, msgs, allC, mode, signal, onDelta) {
   const { system, messages } = buildRequest(comp, profile, msgs, allC, mode);
-  const res = await postAI({ max_tokens: 400, system, messages, stream: true }, signal);
-  if (!res.ok) throw new Error(`ai ${res.status}`);
+  const res = await fetch(aiEndpoint(), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...authHeader() },
+    body: JSON.stringify({ model: AI_MODEL, max_tokens: 400, system, messages, stream: true }),
+    signal,
+  });
+  if (!res.ok) throw new Error(`proxy ${res.status}`);
   const ct = res.headers.get('content-type') || '';
-  // Anthropic (BYOK) streams Server-Sent Events; our proxy streams raw text.
-  if (res.body && (byokKey() || ct.includes('text/event-stream'))) {
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buf = '', full = '';
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, { stream: true });
-      let nl;
-      while ((nl = buf.indexOf('\n')) >= 0) {
-        const line = buf.slice(0, nl).trim();
-        buf = buf.slice(nl + 1);
-        if (!line.startsWith('data:')) continue;
-        const payload = line.slice(5).trim();
-        if (!payload || payload === '[DONE]') continue;
-        try {
-          const ev = JSON.parse(payload);
-          if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') { full += ev.delta.text; onDelta?.(ev.delta.text); }
-        } catch (e) { /* ignore keep-alives / partial frames */ }
-      }
-    }
-    full = full.trim();
-    if (!full) throw new Error('empty response');
-    return full;
-  }
   if (!res.body || ct.includes('application/json')) {
-    const text = parseCompletion(await res.json().catch(() => null));
+    const data = await res.json().catch(() => null);
+    const text = data && typeof data.text === 'string' ? data.text.trim() : '';
     if (!text) throw new Error('empty response');
     onDelta?.(text);
     return text;
@@ -278,9 +230,14 @@ export async function proactiveCompanion(comp, profile, mode, allC, history, kin
 // Lightweight one-shot completion through the proxy (used for ambient threads
 // and memory extraction).
 async function rawComplete(system, userText, maxTokens = 240) {
-  const res = await postAI({ max_tokens: maxTokens, system, messages: [{ role: 'user', content: userText }] });
-  if (!res.ok) throw new Error(`ai ${res.status}`);
-  return parseCompletion(await res.json());
+  const res = await fetch(aiEndpoint(), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...authHeader() },
+    body: JSON.stringify({ model: AI_MODEL, max_tokens: maxTokens, system, messages: [{ role: 'user', content: userText }] }),
+  });
+  if (!res.ok) throw new Error(`proxy ${res.status}`);
+  const data = await res.json();
+  return (data.text || '').trim();
 }
 
 const MEMORY_SYS = `You build an evolving understanding of the USER from their chat with AI companion(s) — both the important facts AND the lighter texture of who they are — so the companions can relate to them like a close friend who really gets them. Return ONLY a JSON array, nothing else.

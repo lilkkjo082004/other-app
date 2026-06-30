@@ -60,8 +60,17 @@ export async function handle(request, env) {
       if (limited) return limited;
     }
     if ((p === '/ai' || p === '/tts') && request.method === 'POST') {
-      const limited = await rateLimited(env, `ai:${clientIp(request)}`, numEnv(env.AI_RATE_LIMIT, 30), 60_000);
+      const ip = clientIp(request);
+      // Burst limit (per minute).
+      const limited = await rateLimited(env, `ai:${ip}`, numEnv(env.AI_RATE_LIMIT, 30), 60_000);
       if (limited) return limited;
+      // Daily caps protect the owner's Anthropic bill on a public, keyless
+      // endpoint: a per-IP ceiling and an optional global ceiling across all
+      // users (AI_DAILY_TOTAL=0 disables the global one).
+      const dayLimited = await rateLimited(env, `ai:day:${ip}`, numEnv(env.AI_DAILY_LIMIT, 200), 86_400_000);
+      if (dayLimited) return dayLimited;
+      const totalLimited = await rateLimited(env, 'ai:day:all', numEnv(env.AI_DAILY_TOTAL, 0), 86_400_000);
+      if (totalLimited) return totalLimited;
     }
 
     if (p === '/' || p === '/health') return json({ ok: true, service: 'other-api' }, 200, env);
