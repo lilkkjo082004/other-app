@@ -84,7 +84,7 @@ export async function handle(request, env) {
       const uid = await authUid(request, env);
       if (!uid) return json({ error: 'unauthorized' }, 401, env);
       const { tier } = await tierOf(request, env);
-      return json({ tier, active: tier === 'plus' }, 200, env);
+      return json({ tier, active: tier === 'plus', uid }, 200, env);
     }
 
     if (p === '/state') {

@@ -5,13 +5,20 @@ import { cap } from '../lib/zodiac.js';
 import { trialDaysLeft } from '../lib/entitlements.js';
 import { pushConfigured, pushSupported, isSubscribed, enablePush, disablePush, testPush, localNotify } from '../lib/push.js';
 import { locationSupported, locationEnabled, locationLabel, requestLocation, setLabel, clearLocation, getFavPlaces, addCurrentAsFavorite, removeFavPlace } from '../lib/location.js';
-import { deleteAccount } from '../lib/api.js';
+import { deleteAccount, fetchEntitlement } from '../lib/api.js';
+import { MANAGE_URL } from '../config.js';
 import { loadSession, saveSession } from '../lib/storage.js';
 import { LegalLink } from './Legal.jsx';
+import Paywall from '../components/Paywall.jsx';
 import ProfileEdit from './ProfileEdit.jsx';
 
 export default function Settings({ profile, comps, autoSpeak, trialStart, cloud, authed, email, onSignIn, onSignOut, onAutoSpeak, onUpdateProfile, voiceCall, onVoiceCall, pushFrequency, onPushFrequency, pushSchedule, onPushSchedule, ambientAlerts, onAmbientAlerts, onSleepAll, onWakeAll, onReset, onBack }) {
   const [editing, setEditing] = useState(false);
+  const [ent, setEnt] = useState(null);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const premium = !!ent?.active;
+  const loadEnt = () => fetchEntitlement().then(setEnt).catch(() => {});
+  useEffect(() => { loadEnt(); }, [authed]);
   const living = comps.filter((c) => c.status !== 'deleted');
   const allAwake = living.length > 0 && living.every((c) => c.status === 'awake');
 
@@ -347,6 +354,23 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
         <div style={{ ...card, display: 'flex', gap: 10, alignItems: 'center' }}><span style={{ fontSize: 16 }}>✦</span><span style={{ fontSize: 12, color: C.textSoft, lineHeight: 1.4 }}>{trialLabel()}</span></div>
 
         <div style={{ height: 10 }} />
+        {section('Other Plus')}
+        {premium ? (
+          <div style={{ ...card }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: MANAGE_URL ? 10 : 0 }}>
+              <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 20, background: `${C.glow2}1f`, border: `1px solid ${C.glow2}66`, fontSize: 11, color: C.glow2, fontWeight: 700 }}>✦ Plus</span>
+              <span style={{ fontSize: 12.5, color: C.textSoft }}>Active — premium model unlocked</span>
+            </div>
+            {MANAGE_URL && <a href={MANAGE_URL} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: C.glow1, textDecoration: 'none' }}>Manage subscription ›</a>}
+          </div>
+        ) : (
+          <button onClick={() => setShowPaywall(true)} style={{ ...card, width: '100%', textAlign: 'left', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: `1px solid ${C.glow2}55` }}>
+            <div><div style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>Upgrade to Other Plus</div><div style={{ fontSize: 11, color: C.textDim }}>Smarter companions, unlimited messages, natural voice</div></div>
+            <span style={{ color: C.glow2, fontWeight: 700 }}>›</span>
+          </button>
+        )}
+
+        <div style={{ height: 10 }} />
         {section('Legal')}
         <div style={{ ...card }}>
           <div style={{ fontSize: 13, marginBottom: 4 }}><LegalLink docKey="tos" style={{ textDecoration: 'none', color: C.text }}>Terms of Service ›</LegalLink></div>
@@ -372,6 +396,7 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
         <p style={{ fontSize: 11, color: C.textDim, lineHeight: 1.5, marginTop: 12 }}>Everything is stored locally on your device. Other never keeps your personal data on a server.</p>
         <p style={{ fontSize: 11, color: C.textDim, marginTop: 12 }}>Other · Extratac LLC</p>
       </div>
+      {showPaywall && <Paywall premium={premium} uid={ent?.uid} email={email} onRefresh={loadEnt} onClose={() => setShowPaywall(false)} />}
     </Shell>
   );
 }

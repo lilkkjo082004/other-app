@@ -65,3 +65,10 @@ export async function logMood(mood, { score, companionId } = {}) {
 export async function moodSummary() {
   return call('/mood/summary');
 }
+
+// Current subscription entitlement for the signed-in user. Free for everyone
+// when not signed in / no backend; never throws (best-effort).
+export async function fetchEntitlement() {
+  if (!isAuthed()) return { tier: 'free', active: false };
+  try { return await call('/entitlement'); } catch (e) { return { tier: 'free', active: false }; }
+}

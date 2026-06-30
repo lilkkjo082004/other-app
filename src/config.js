@@ -25,3 +25,11 @@ export const aiEnabled = () => aiEndpoint().length > 0;
 const NATURAL_VOICE = ['1', 'true', 'yes'].includes((import.meta.env.VITE_NATURAL_VOICE || '').toLowerCase());
 export const ttsEndpoint = () => (API_BASE ? API_BASE + '/tts' : '');
 export const naturalVoiceEnabled = () => NATURAL_VOICE && ttsEndpoint().length > 0;
+
+// Subscription billing. Point CHECKOUT_URL at your Stripe/RevenueCat hosted
+// checkout; MANAGE_URL at the customer portal. Until CHECKOUT_URL is set, the
+// paywall shows but upgrade is disabled (so the app ships without billing wired).
+export const CHECKOUT_URL = import.meta.env.VITE_CHECKOUT_URL || '';
+export const MANAGE_URL = import.meta.env.VITE_MANAGE_URL || '';
+export const PLUS_PRICE = import.meta.env.VITE_PLUS_PRICE || '$9.99/mo';
+export const billingEnabled = () => CHECKOUT_URL.length > 0;

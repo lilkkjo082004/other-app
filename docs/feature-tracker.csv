@@ -91,6 +91,7 @@ Monetization,One-time companion purchase,Unlock 2nd/3rd companion,Partial,P0,Sim
 Monetization,Deletion repurchase,New companion costs new purchase,Built,P1,UPDATED Future->Built (simulated)
 Monetization,Memory subscription,Persistent memory tier,Future,P1,TBD
 Monetization,Subscription plan + economics,"Decided tiers (Free vs Other Plus $9.99/mo / $69.99/yr), paid model policy (Sonnet-capped then Haiku), unit-economics + margin sheet, and billing stack (RevenueCat Web Billing + Stripe; Play/Apple via RevenueCat)",Built,P0,"NEW; docs/subscription-plan.md (task #20); implementation pending #21/#22"
+Monetization,Subscription paywall + gating (client),"Other Plus paywall (tier perks + price), entitlement fetched from /entitlement, Settings section (Upgrade / active badge / Manage), hosted-checkout launch carrying uid+email, restore/refresh; upgrade disabled until CHECKOUT_URL configured",Built,P0,"NEW (task #22); components/Paywall.jsx, config CHECKOUT_URL/MANAGE_URL/PLUS_PRICE, api.fetchEntitlement"
 Monetization,Payment integration,Real payments (Stripe/RevenueCat),Future,P0,ON HOLD per owner
 Data/Privacy,Local storage,All data on device by default,Built,P0,UPDATED Partial->Built
 Data/Privacy,Storage safety net,"Warns (with one-tap Export) when device storage is full or the history is getting large, so a long chat history is never silently lost",Built,P1,"NEW; saveSession returns status + sessionBytes(), banner in Chat routes to Settings export"
