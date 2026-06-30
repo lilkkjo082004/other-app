@@ -110,7 +110,7 @@ Visual/UI,Smooth transitions,Fade and slide animations,Built,P0,
 Visual/UI,Companion profile screen,"Identity, traits, bond, appearance, voice",Built,P1,UPDATED Future->Built
 Visual/UI,Settings screen,"Voice, notifications, location, legal, data",Built,P1,UPDATED Future->Built
 Visual/UI,Accessibility,"aria-labels, reduced-motion, focus, contrast",Built,P1,NEW
-Visual/UI,Chat quality-of-life,"Timestamps, copy, scroll-to-bottom, multiline",Built,P1,NEW
+Visual/UI,Chat quality-of-life,"Timestamps, copy, scroll-to-bottom, multiline, sticky-to-bottom while typing (input growth + keyboard never hide new messages)",Built,P1,"UPDATED; pinBottom on input grow/focus + visualViewport resize, gated on at-bottom"
 Visual/UI,Offline awareness,Banner when offline,Built,P2,NEW
 Visual/UI,Rental Body system,Visual avatar customization (hair/clothes),Future,P2,
 Visual/UI,Photo-based appearance,Upload picture for look,Future,P2,

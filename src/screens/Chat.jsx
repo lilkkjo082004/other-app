@@ -602,11 +602,24 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   // Only auto-scroll if the user is already near the bottom (don't yank them
   // away while they're reading back).
   useEffect(() => { if (atBottom) scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); }, [msgs, loading, atBottom]);
+  const atBottomRef = useRef(true);
   const onScroll = () => {
     const el = scrollRef.current;
-    if (el) setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80);
+    if (el) { const at = el.scrollHeight - el.scrollTop - el.clientHeight < 80; atBottomRef.current = at; setAtBottom(at); }
   };
   const scrollToBottom = () => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+  // Instant pin to the latest message — used while typing (the input box grows)
+  // and when the on-screen keyboard opens, so new messages never hide under it.
+  const pinBottom = () => { const el = scrollRef.current; if (el) el.scrollTop = el.scrollHeight; };
+  // The on-screen keyboard (and input growth) resizes the visual viewport; keep
+  // the view pinned to the bottom when the user is already there.
+  useEffect(() => {
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null;
+    if (!vv) return;
+    const onResize = () => { if (atBottomRef.current) requestAnimationFrame(pinBottom); };
+    vv.addEventListener('resize', onResize);
+    return () => vv.removeEventListener('resize', onResize);
+  }, []);
 
   function copyMsg(m, i) {
     const text = `"${m.content}" — ${m.companion?.name || 'a companion'}, an AI companion in Other by Extratac LLC`;
@@ -1139,7 +1152,8 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         ) : (
           <div style={{ display: 'flex', gap: 7, alignItems: 'flex-end' }}>
             <textarea ref={inputRef} value={input} rows={1}
-              onChange={(e) => { setInput(e.target.value); const el = e.target; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px'; }}
+              onChange={(e) => { setInput(e.target.value); const el = e.target; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px'; if (atBottomRef.current) pinBottom(); }}
+              onFocus={() => { if (atBottomRef.current) setTimeout(pinBottom, 100); }}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
               placeholder={priv ? `Message ${priv.name}...` : (directTo ? `Message ${active.find((c) => c.id === directTo)?.name || 'everyone'}...` : 'Message everyone...')}
               style={{ flex: 1, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 18, padding: '10px 14px', fontSize: 13, color: C.text, outline: 'none', resize: 'none', fontFamily: "'DM Sans',sans-serif", lineHeight: 1.4, maxHeight: 120, overflowY: 'auto' }} />
