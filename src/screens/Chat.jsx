@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { C, COMP_COLORS } from '../theme.js';
 import { Shell } from '../components/ui.jsx';
-import { speakAs, useSpeechRec } from '../lib/voice.js';
+import { speakAs, speakAsAsync, stopSpeaking, useSpeechRec } from '../lib/voice.js';
+import CallScreen from '../components/CallScreen.jsx';
 import { genAmbient, bumpBond } from '../lib/relationships.js';
 import { askCompanion, greetCompanion, proactiveCompanion, ambientThreadAI, extractMemories, generateSelf, generateJournalEntry, generateDream, generateWant, generateShift, generateVulnerableShare, generatePeerViews, generateSharedMoment, generateGrowth, generateInsideJoke, generateLetter } from '../lib/ai.js';
 import { withInteraction, journalDue, addJournal, dreamDue, makeDream, closenessStage, stageRank, milestoneLine, wantDue, shiftDue, shouldOpenUp, makeStamped, peerViewsDue, loreDue, addLore, growthDue, addGrowth, knownDuration, jokesDue, addJoke, identityQuestion, letterDue, addLetter } from '../lib/innerlife.js';
@@ -186,6 +187,93 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       setMsgs((p) => p.map((m) => (m.id === sid ? { ...m, content: finalText, ...extra } : m)));
     }
     return finalText;
+  }
+
+  // ── Voice call mode: a hands-free, continuous conversation with one
+  // companion OR all of them (group call). The loop is listen → reply(ies)
+  // streamed into the transcript → speak in turn → listen again. Everything is
+  // saved to the chat for continuity. Participants live in a ref so the loop
+  // isn't tripped by re-renders / stale closures.
+  const [callParty, setCallParty] = useState(null);   // null | { group, comps:[...] }
+  const [callState, setCallState] = useState('listening'); // listening|thinking|speaking|error
+  const [callTranscript, setCallTranscript] = useState('');
+  const [callMuted, setCallMuted] = useState(false);
+  const [callSpeakingId, setCallSpeakingId] = useState(null);
+  const callRef = useRef({ active: false, muted: false, group: false, comps: [], rec: null, abort: null });
+
+  function beginCall(comps, group) {
+    const party = (comps || []).filter((c) => c && c.status === 'awake');
+    if (!party.length) return;
+    callRef.current = { active: true, muted: false, group, comps: party, rec: null, abort: null };
+    setCallParty({ group, comps: party }); setCallMuted(false); setCallTranscript(''); setCallSpeakingId(null);
+    const SR = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
+    if (!SR) { setCallState('error'); return; }
+    setCallState('listening');
+    listenTurn();
+  }
+  function startCall(comp) { beginCall([comp], false); }
+  function startGroupCall() { beginCall(active, true); }
+  function endCall() {
+    callRef.current.active = false;
+    try { callRef.current.rec && callRef.current.rec.stop(); } catch (e) { /* ignore */ }
+    try { callRef.current.abort && callRef.current.abort.abort(); } catch (e) { /* ignore */ }
+    stopSpeaking();
+    setCallParty(null); setCallState('listening'); setCallTranscript(''); setCallSpeakingId(null);
+  }
+  function toggleCallMute() {
+    const next = !callRef.current.muted;
+    callRef.current.muted = next; setCallMuted(next);
+    if (next) { try { callRef.current.rec && callRef.current.rec.stop(); } catch (e) { /* ignore */ } }
+    else if (callRef.current.active) listenTurn();
+  }
+  function listenTurn() {
+    if (!callRef.current.active || callRef.current.muted) return;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { setCallState('error'); return; }
+    let r;
+    try { r = new SR(); } catch (e) { setCallState('error'); return; }
+    r.continuous = false; r.interimResults = false; r.lang = 'en-US';
+    setCallState('listening'); setCallSpeakingId(null);
+    r.onresult = (e) => { const t = e.results[0]?.[0]?.transcript || ''; if (t.trim()) handleCallUtterance(t.trim()); };
+    r.onerror = () => { if (callRef.current.active && !callRef.current.muted) setTimeout(listenTurn, 700); };
+    r.onend = () => { /* next turn is started explicitly after replies */ };
+    callRef.current.rec = r;
+    try { r.start(); } catch (e) { /* already running */ }
+  }
+  async function handleCallUtterance(text) {
+    if (!callRef.current.active) return;
+    const { comps, group } = callRef.current;
+    if (!comps.length) return;
+    setCallTranscript(text);
+    setCallState('thinking');
+    const um = { role: 'user', content: text, ts: Date.now() };
+    setMsgs((p) => [...p, um]);
+    if (detectCrisis(text)) setMsgs((p) => [...p, { role: 'system', kind: 'crisis' }]);
+    // Who answers: solo → the one companion; group → 1–2 of them, so they don't
+    // all talk over each other every turn.
+    let responders = comps;
+    if (group && comps.length > 1) {
+      const shuffled = [...comps].sort(() => Math.random() - 0.5);
+      responders = shuffled.slice(0, Math.random() > 0.5 ? 2 : 1);
+    }
+    bumpCloseness(responders.map((c) => c.id), 'message');
+    const controller = new AbortController();
+    callRef.current.abort = controller;
+    for (const c of responders) {
+      if (!callRef.current.active) return;
+      setCallSpeakingId(c.id); setCallState('thinking');
+      let reply = '';
+      try {
+        reply = await streamReply(c, [...msgsRef.current], group ? 'group' : 'private', controller.signal);
+      } catch (e) {
+        if (callRef.current.active) setTimeout(listenTurn, 500);
+        return;
+      }
+      if (!callRef.current.active) return;
+      setCallState('speaking');
+      try { await speakAsAsync(reply, c); } catch (e) { /* ignore */ }
+    }
+    if (callRef.current.active) listenTurn();
   }
 
   // After enough new turns, extract long-term memories from recent history and
@@ -973,6 +1061,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
           </span>); })()}
           <button aria-label={autoSpeak ? 'Turn off auto-speak' : 'Turn on auto-speak'} aria-pressed={autoSpeak} onClick={() => setAutoSpeak(!autoSpeak)} style={{ background: autoSpeak ? `${C.glow3}22` : 'none', border: `1px solid ${autoSpeak ? C.glow3 : C.border}`, borderRadius: 7, padding: '5px 8px', color: autoSpeak ? C.glow3 : C.textDim, fontSize: 13, cursor: 'pointer' }}>{autoSpeak ? '🔊' : '🔇'}</button>
           {voiceCall && <button aria-label={listening ? 'Listening — tap to stop' : 'Call a companion by voice'} onClick={startListening} style={{ background: listening ? `${C.danger}22` : 'none', border: `1px solid ${listening ? C.danger : C.border}`, borderRadius: 7, padding: '5px 8px', color: listening ? C.danger : C.textDim, fontSize: 13, cursor: 'pointer', animation: listening ? 'micPulse 1.5s infinite' : 'none' }}>🎤</button>}
+          {priv && priv.status === 'awake' && <button aria-label={`Call ${priv.name}`} title={`Call ${priv.name}`} onClick={() => startCall(priv)} style={{ background: 'none', border: `1px solid ${C.border}`, borderRadius: 7, padding: '5px 8px', color: C.textDim, fontSize: 13, cursor: 'pointer' }}>📞</button>}
           <button aria-label="Open the space — where your companions hang out" title="The Space" onClick={() => setPanel('space')} style={{ background: 'none', border: `1px solid ${C.border}`, borderRadius: 7, padding: '5px 8px', color: C.textDim, fontSize: 13, cursor: 'pointer' }}>✦</button>
           <button aria-label="Search messages" onClick={() => setSearch((s) => (s == null ? '' : null))} style={{ background: search != null ? `${C.glow1}22` : 'none', border: `1px solid ${search != null ? C.glow1 : C.border}`, borderRadius: 7, padding: '5px 8px', color: search != null ? C.glow1 : C.textDim, fontSize: 13, cursor: 'pointer' }}>🔍</button>
           <button aria-label="Menu" aria-expanded={showMenu} onClick={() => setShowMenu(!showMenu)} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 16, cursor: 'pointer', padding: 4 }}>☰</button>
@@ -1047,6 +1136,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
                 <button onClick={() => openProfile(c)} style={menuBtn}>Profile</button>
                 {!c.purchased && trialStart && <button onClick={() => setUnlock({ companion: c, onResult: (ok) => { if (ok) markPurchased(c.id); } })} style={{ ...menuBtn, border: `1px solid ${C.glow2}55`, color: C.glow2, fontWeight: 700 }}>Unlock</button>}
                 {c.status === 'awake' && <button onClick={() => { setChatMode(c.id); setShowMenu(false); }} style={menuBtn}>Private</button>}
+                {c.status === 'awake' && <button onClick={() => { setShowMenu(false); setChatMode(c.id); startCall(c); }} style={menuBtn}>📞 Call</button>}
                 <button onClick={() => togSleep(c.id)} style={menuBtn}>{c.status === 'sleeping' ? 'Wake' : 'Sleep'}</button>
                 <button onClick={() => delComp(c.id)} style={{ ...menuBtn, border: `1px solid ${C.danger}33`, color: C.danger }}>Delete</button>
               </div>
@@ -1057,6 +1147,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
           <button onClick={() => { setShowMenu(false); setPanel('story'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📖  Your story so far</button>
           <button onClick={() => { setShowMenu(false); setPanel('places'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📍  Find nearby</button>
           {!focusUntil && active.length > 0 && <button onClick={() => { const buddy = priv || active[0]; setShowMenu(false); startFocus(25, buddy); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🎯  Focus together (25 min)</button>}
+          {active.length > 1 && <button onClick={() => { setShowMenu(false); startGroupCall(); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📞  Group call (everyone)</button>}
           <button onClick={() => { setShowMenu(false); setPanel('settings'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>⚙  Settings</button>
           <button onClick={() => setShowMenu(false)} style={{ width: '100%', background: 'none', border: `1px solid ${C.border}`, borderRadius: 7, padding: '5px', color: C.textSoft, cursor: 'pointer', fontSize: 11, fontFamily: "'DM Sans',sans-serif" }}>Close</button>
         </div>
@@ -1228,6 +1319,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       )}
       {summonCandidate && <div style={{ position: 'fixed', inset: 0, zIndex: 40 }}><WakingUp comp={summonCandidate} onDone={onSummonDone} /></div>}
       {unlock && <UnlockSheet companion={unlock.companion} onClose={(ok) => { const f = unlock.onResult; setUnlock(null); f?.(ok); }} />}
+      {callParty && <CallScreen comps={callParty.comps} group={callParty.group} state={callState} transcript={callTranscript} muted={callMuted} speakingId={callSpeakingId} onToggleMute={toggleCallMute} onEnd={endCall} />}
     </Shell>
   );
 }

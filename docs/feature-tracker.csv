@@ -185,7 +185,7 @@ Location,Weather awareness,"Companions know local weather (Open-Meteo, on-device
 Visual/UI,Story so far panel,"Keepsake view of shared history, inside jokes, and letters",Built,P2,"NEW; screens/StorySoFar.jsx, chat menu"
 Performance,Runtime smoke test,"Verified app boots Welcome->onboarding->Chat with no runtime errors",Built,P1,"Playwright load test of production build"
 Performance,Beat coordinator (polish),"At most one companion-initiated emotional beat per open (3-min cooldown)",Built,P1,"NEW; claimBeat() gates milestone/vulnerability/rift/occasion/curiosity"
-Roadmap,Voice call mode,"Hands-free continuous 'phone call' with a companion — call screen, back-and-forth speech (reuses TTS + speech recognition)",Future,P1,"PLANNED; builds on lib/voice.js"
+Chat System,Voice call mode,"Hands-free continuous 'phone call' — solo OR group call with all companions. Call screen with speaking/listening states; loop is listen->reply(streamed+saved)->speak->listen. Mic mute + end call. Honors Calm Mode",Built,P1,"NEW (task #23); components/CallScreen.jsx, voice.speakAsAsync/stopSpeaking, Chat call state machine; group call per owner request"
 Roadmap,Year-with-you recap,"Periodic companion-narrated relationship recap: milestones, inside jokes, moods, how the bond grew; shareable",Future,P1,"PLANNED; uses lore/jokes/bond/mood already tracked"
 Roadmap,Real-life milestone celebration,"Companion remembers + shows up for the user's real big days (birthday, anniversaries, mentioned events)",Future,P1,"PLANNED; builds on occasion.js + memory"
 Roadmap,Companion cards (shareable image),"Generate a shareable image: companion avatar + a memorable line, with ToS 7.3 attribution baked in (growth loop)",Future,P1,"PLANNED; canvas render of Avatar/SquishyBlob + quote"

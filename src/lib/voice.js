@@ -61,6 +61,22 @@ function speakBrowser(text, comp) {
   window.speechSynthesis.speak(u);
 }
 
+// Promise that resolves when the browser finishes speaking (for call mode).
+function speakBrowserAsync(text, comp) {
+  return new Promise((resolve) => {
+    if (!window.speechSynthesis) { resolve(); return; }
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    const { voice, pitch, rate } = browserVoiceFor(comp);
+    if (voice) u.voice = voice;
+    u.pitch = pitch;
+    u.rate = rate;
+    u.onend = () => resolve();
+    u.onerror = () => resolve();
+    window.speechSynthesis.speak(u);
+  });
+}
+
 let currentAudio = null;
 async function speakNatural(text, comp) {
   const v = comp && typeof comp === 'object' ? comp.voice : null;
@@ -77,9 +93,28 @@ async function speakNatural(text, comp) {
   if (currentAudio) { currentAudio.pause(); currentAudio = null; }
   const url = URL.createObjectURL(new Blob([buf], { type: 'audio/mpeg' }));
   const audio = new Audio(url);
-  audio.onended = () => URL.revokeObjectURL(url);
   currentAudio = audio;
   await audio.play();
+  // Resolve only once playback finishes, so callers (call mode) can wait.
+  await new Promise((resolve) => {
+    audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
+    audio.onerror = () => resolve();
+  });
+}
+
+// Like speakAs, but returns a Promise that resolves when speech finishes.
+export function speakAsAsync(text, comp) {
+  if (naturalVoiceEnabled()) {
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    return speakNatural(text, comp).catch(() => speakBrowserAsync(text, comp));
+  }
+  return speakBrowserAsync(text, comp);
+}
+
+// Stop any in-progress speech (browser or natural).
+export function stopSpeaking() {
+  try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) { /* no-op */ }
+  try { if (currentAudio) { currentAudio.pause(); currentAudio = null; } } catch (e) { /* no-op */ }
 }
 
 // Speak as a companion. `comp` is the companion object (preferred — carries its
