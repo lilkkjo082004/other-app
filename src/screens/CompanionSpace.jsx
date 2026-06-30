@@ -5,6 +5,7 @@ import SquishyBlob from '../components/SquishyBlob.jsx';
 import { genAmbient, bumpBond } from '../lib/relationships.js';
 import { currentActivity } from '../lib/presence.js';
 import { vitality } from '../lib/innerlife.js';
+import { seasonalTheme, seasonalParticles } from '../lib/seasonal.js';
 
 // The "sitting space": awake companions hang out together, drift and mingle on
 // their own (leaning toward each other when they talk), and react when you pet
@@ -40,6 +41,9 @@ const pick = (a) => a[Math.floor(Math.random() * a.length)];
 
 export default function CompanionSpace({ comps, bonds, positions, onPositions, onBonds, onInteract, lore, onBack, onOpenProfile }) {
   const living = (comps || []).filter((c) => c.status !== 'deleted');
+  // Seasonal/holiday ambiance — a tint + drifting particles for the time of year.
+  const theme = seasonalTheme();
+  const particles = seasonalParticles(theme);
   const containerRef = useRef(null);
   const dragRef = useRef(null);
   const [pos, setPos] = useState(() => {
@@ -162,10 +166,19 @@ export default function CompanionSpace({ comps, bonds, positions, onPositions, o
           <div style={{ fontSize: 15, fontWeight: 600 }}>The Space</div>
           <div style={{ fontSize: 10.5, color: C.textDim }}>Touch to squish · drag to move · tap to pet · they mingle on their own</div>
         </div>
+        <span title={theme.holiday || `It's ${theme.label}`} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: theme.accent, background: `${theme.accent}1a`, border: `1px solid ${theme.accent}55`, borderRadius: 50, padding: '4px 11px', textTransform: 'capitalize' }}>
+          <span style={{ fontSize: 12 }}>{theme.glyphs[0]}</span>{theme.label}
+        </span>
       </div>
 
       <div ref={containerRef} onPointerMove={onPointerMove}
         style={{ flex: 1, position: 'relative', overflow: 'hidden', touchAction: 'none', userSelect: 'none' }}>
+        {/* Seasonal ambiance: a soft tint wash + drifting particles behind everyone. */}
+        <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0, background: `radial-gradient(120% 80% at 50% -10%, ${theme.accent}14, transparent 60%)` }}>
+          {particles.map((p, i) => (
+            <span key={i} style={{ position: 'absolute', top: 0, left: `${p.left}%`, fontSize: p.size, color: theme.accent, '--sop': p.op, '--sdrift': `${p.drift}px`, animation: `seasonalDrift ${p.dur}s linear ${p.delay}s infinite`, willChange: 'transform, opacity' }}>{p.glyph}</span>
+          ))}
+        </div>
         {living.length === 0 && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.textDim, fontSize: 13 }}>No companions here yet.</div>
         )}

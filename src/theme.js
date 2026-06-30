@@ -36,6 +36,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}input::placeholder,textar
 @keyframes floatC{0%,100%{transform:translate(0,0)}33%{transform:translate(9px,8px)}66%{transform:translate(-8px,-11px)}}
 @keyframes petPop{0%{transform:scale(1)}30%{transform:scale(1.18)}55%{transform:scale(0.96)}100%{transform:scale(1)}}
 @keyframes heartRise{0%{opacity:0;transform:translateY(0) scale(0.6)}20%{opacity:1}100%{opacity:0;transform:translateY(-46px) scale(1.1)}}
+@keyframes seasonalDrift{0%{transform:translateY(-8vh) translateX(0);opacity:0}12%{opacity:var(--sop,0.4)}88%{opacity:var(--sop,0.4)}100%{transform:translateY(88vh) translateX(var(--sdrift,0px));opacity:0}}
 .bp{background:linear-gradient(135deg,${C.glow1},#9b59f5);color:#fff;border:none;border-radius:50px;padding:14px 40px;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.3s;font-family:'DM Sans',sans-serif}
 .bp:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(124,91,245,0.4)}.bp:disabled{opacity:0.4;cursor:default;transform:none;box-shadow:none}
 .bg2{background:transparent;border:1px solid ${C.border};color:${C.text};border-radius:50px;padding:12px 28px;font-size:14px;font-weight:500;cursor:pointer;transition:all 0.3s;font-family:'DM Sans',sans-serif}

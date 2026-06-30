@@ -4,7 +4,7 @@
 
 const MONTH_DAY = (d) => `${d.getMonth() + 1}-${d.getDate()}`;
 
-function season(m) { // northern-hemisphere approximation
+export function season(m) { // northern-hemisphere approximation
   if (m === 12 || m <= 2) return 'winter';
   if (m <= 5) return 'spring';
   if (m <= 8) return 'summer';
@@ -23,7 +23,7 @@ function nthWeekday(year, month0, weekday, n) {
   const first = new Date(year, month0, 1).getDay();
   return 1 + ((7 + weekday - first) % 7) + (n - 1) * 7;
 }
-function detectHoliday(d) {
+export function detectHoliday(d) {
   const md = MONTH_DAY(d);
   const fixed = {
     '1-1': "New Year's Day", '12-31': "New Year's Eve", '2-14': "Valentine's Day",

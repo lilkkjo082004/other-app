@@ -21,6 +21,7 @@ import { calmEnabled } from '../lib/comfort.js';
 import { scanLocation, shouldNudgePlace, markPlaceNudged, weatherNow } from '../lib/location.js';
 import { parseAction, stripActionPartial, downloadICS, googleCalUrl, formatWhen, actionTitle } from '../lib/actions.js';
 import { birthdayStatus, monthsKnown, pendingMilestones, monthsLabel } from '../lib/occasion.js';
+import { seasonalTheme, seasonalDue, seasonalLine } from '../lib/seasonal.js';
 import Avatar from '../components/Avatar.jsx';
 import UnlockSheet from '../components/UnlockSheet.jsx';
 import Settings from './Settings.jsx';
@@ -727,6 +728,24 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         : `Today’s the day — ${due.text}. I remembered. How are you feeling about it?`;
     setMsgs((p) => [...p, { role: 'assistant', companion: comp, content: line, ts: Date.now() }]);
     try { localStorage.setItem('other_milestones_seen', JSON.stringify([...seen, due.key].slice(-50))); } catch (e) { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comps]);
+
+  // Seasonal & holiday moments: when a new season or holiday arrives, a companion
+  // marks it once in chat (deduped by occasion key). The Space also shifts its
+  // ambiance for the time of year (CompanionSpace). Rare + dated, so like
+  // milestones it fires on its own rather than competing for the shared beat.
+  const seasonalRef = useRef(false);
+  useEffect(() => {
+    if (seasonalRef.current || loadingRef.current) return;
+    let seen = null; try { seen = localStorage.getItem('other_seasonal_seen'); } catch (e) { /* ignore */ }
+    if (!seasonalDue(seen)) { seasonalRef.current = true; return; }
+    const theme = seasonalTheme();
+    const c = comps.find((x) => x.status === 'awake');
+    if (!c) return;
+    seasonalRef.current = true;
+    try { localStorage.setItem('other_seasonal_seen', theme.key); } catch (e) { /* ignore */ }
+    setMsgs((p) => [...p, { role: 'assistant', companion: c, content: seasonalLine(theme), ts: Date.now() }]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comps]);
 
