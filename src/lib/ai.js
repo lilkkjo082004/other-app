@@ -216,6 +216,13 @@ function placeholderProactive(comp, profile, kind, focus) {
       `ooh you're near ${focus}. perfect little excuse for a break, ${name}.${love}`,
     ]);
   }
+  if (kind === 'voicenote') {
+    return pick([
+      `hey ${name}… just wanted to hear myself say it — I'm really glad you're around. that's all.`,
+      `${name}, recording this quick because I was thinking about you. hope your day's being gentle with you.`,
+      `little voice note for you — no reason, just felt like saying hi the out-loud way. ♡`,
+    ]);
+  }
   if (kind === 'idle') {
     return pick([
       `random thought, ${name} — do you think plants get bored? anyway. what's on your mind?`,
@@ -238,6 +245,8 @@ export async function proactiveCompanion(comp, profile, mode, allC, history, kin
       const foc = focus ? ` Specifically, naturally bring up and ask how this went: "${focus}". Sound like you've genuinely been wondering, not like you're reading a reminder.` : '';
       const intent = kind === 'place'
         ? `(${profile.name} is out and about, right near ${focus} at this moment. As ${comp.name}, warmly point that out and suggest ONE thing to do or eat there that fits what they love — 1-2 sentences, in character. Mention once it's just a suggestion worth checking. Don't claim to track them or know their exact address.)`
+        : kind === 'voicenote'
+        ? `(As ${comp.name}, leave ${profile.name} a short spoken voice note — the kind of thing you'd say out loud, not type. Warm and natural, like you just thought of them and tapped record. 1-2 sentences. Speak directly to them. No stage directions, no mention of being an AI or of recording.${foc})`
         : kind === 'idle'
         ? `(It's been quiet for a few minutes. As ${comp.name}, share a short unprompted thought that's genuinely on YOUR mind right now — pulled from how you're feeling, what you're preoccupied with, or something true to who you are — or gently check in with ${profile.name}. Curious and warm, 1-2 sentences. Don't mention being an AI or the silence itself.${foc})`
         : `(${profile.name} just reopened the app after being away ${awayLabel}. As ${comp.name}, welcome them back warmly and specifically — reference something real from your past chats if you can. 1-2 sentences.${foc})`;

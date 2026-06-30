@@ -22,6 +22,7 @@ import { scanLocation, shouldNudgePlace, markPlaceNudged, weatherNow } from '../
 import { parseAction, stripActionPartial, downloadICS, googleCalUrl, formatWhen, actionTitle } from '../lib/actions.js';
 import { birthdayStatus, monthsKnown, pendingMilestones, monthsLabel } from '../lib/occasion.js';
 import { seasonalTheme, seasonalDue, seasonalLine } from '../lib/seasonal.js';
+import { voiceNoteDue, markVoiceNote, waveform } from '../lib/voicenote.js';
 import Avatar from '../components/Avatar.jsx';
 import UnlockSheet from '../components/UnlockSheet.jsx';
 import Settings from './Settings.jsx';
@@ -70,6 +71,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const [journal, setJournal] = useState(restored?.journal || []);
   const [goals, setGoals] = useState(restored?.goals || []);
   const [checkins, setCheckins] = useState(restored?.checkins || { streak: 0, last: '', history: [] });
+  const [playingVN, setPlayingVN] = useState(null);   // ts of the voice note currently playing
   const [weather, setWeather] = useState('');
   const [ambientArriving, setAmbientArriving] = useState(false);
   // Coordinator: at most one companion-initiated "emotional beat" (milestone,
@@ -529,6 +531,18 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
           setMsgs((p) => [...p, { role: 'assistant', companion: c, content: `I made you something — it's in our story. ${icon}`, ts: Date.now() }]);
         }
       }
+      if (voiceNoteDue() && budget()) { // 7e) spoken voice note (occasional)
+        const c = living.find((x) => x.status === 'awake');
+        if (c) {
+          gens++;
+          const t = await proactiveCompanion(c, profFor(c), priv ? 'private' : 'group', comps, hist, 'voicenote');
+          if (alive && t) {
+            markVoiceNote();
+            setMsgs((p) => [...p, { role: 'assistant', companion: c, kind: 'voicenote', content: t.trim(), ts: Date.now() }]);
+            if (autoSpeak && !calmEnabled()) speakAs(t.trim(), c);
+          }
+        }
+      }
       for (const c of living) { // 8) long-term growth
         if (!growthDue(c) || !budget()) continue;
         gens++; const g = await generateGrowth(c, profile, knownDuration(c), closenessStage(c).label);
@@ -797,6 +811,15 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     setCheckins((ci) => recordCheckin(ci, mood.key));
     setMsgs((p) => p.map((mm, k) => (k === i ? { ...mm, resolved: mood.key } : mm)));
     if (apiAuthed()) logMood(mood.key);
+  }
+
+  // Play (or stop) a companion voice note aloud. Only one plays at a time.
+  async function playVoiceNote(m) {
+    if (playingVN === m.ts) { stopSpeaking(); setPlayingVN(null); return; }
+    stopSpeaking();
+    setPlayingVN(m.ts);
+    try { await speakAsAsync(m.content, m.companion); } catch (e) { /* ignore */ }
+    setPlayingVN((cur) => (cur === m.ts ? null : cur));
   }
 
   const goalNudgeRef = useRef(false);
@@ -1324,7 +1347,26 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
                 <span style={{ fontSize: 10, color: C.textDim, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 20, padding: '3px 12px' }}>{dayLabel}</span>
               </div>
             )}
-            {m.kind === 'checkin' ? (
+            {m.kind === 'voicenote' ? (
+              <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 7, animation: 'fadeUp 0.3s both' }}>
+                <div style={{ marginRight: 7, flexShrink: 0, lineHeight: 0 }}><Avatar comp={m.companion} size={24} glow={false} /></div>
+                <div style={{ maxWidth: '82%', minWidth: 200, background: C.surface, border: `1px solid ${m.companion?.color?.primary || C.border}`, borderRadius: 14, padding: '10px 12px' }}>
+                  <div style={{ fontSize: 9.5, color: C.textDim, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 7, display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ color: m.companion?.color?.primary }}>{m.companion?.name}</span> · 🎙️ voice note
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <button aria-label={playingVN === m.ts ? 'Stop voice note' : 'Play voice note'} onClick={() => playVoiceNote(m)} style={{ flexShrink: 0, width: 34, height: 34, borderRadius: '50%', border: 'none', cursor: 'pointer', background: m.companion?.color?.primary || C.glow1, color: '#fff', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{playingVN === m.ts ? '■' : '▶'}</button>
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 2, height: 26 }}>
+                      {waveform(m.content).map((h, k) => (
+                        <div key={k} style={{ flex: 1, height: `${Math.round(h * 100)}%`, minHeight: 2, borderRadius: 2, background: m.companion?.color?.primary || C.glow1, opacity: playingVN === m.ts ? 0.95 : 0.5, animation: playingVN === m.ts ? `pulse 0.9s ${k * 0.04}s ease-in-out infinite` : 'none' }} />
+                      ))}
+                    </div>
+                  </div>
+                  <button onClick={() => setMsgs((p) => p.map((mm) => (mm === m ? { ...mm, showText: !mm.showText } : mm)))} style={{ marginTop: 7, background: 'none', border: 'none', color: C.textDim, fontSize: 10.5, cursor: 'pointer', padding: 0, fontFamily: "'DM Sans',sans-serif" }}>{m.showText ? 'hide transcript' : 'show transcript'}</button>
+                  {m.showText && <div style={{ fontSize: 12.5, color: C.textSoft, lineHeight: 1.5, marginTop: 5, fontStyle: 'italic' }}>{m.content}</div>}
+                </div>
+              </div>
+            ) : m.kind === 'checkin' ? (
               <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 7, animation: 'fadeUp 0.3s both' }}>
                 <div style={{ marginRight: 7, flexShrink: 0, lineHeight: 0 }}><Avatar comp={m.companion} size={24} glow={false} /></div>
                 <div style={{ maxWidth: '82%', background: C.surface, border: `1px solid ${m.companion?.color?.primary || C.border}`, borderRadius: 14, padding: '11px 13px' }}>
