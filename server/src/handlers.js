@@ -340,12 +340,28 @@ async function modelForRequest(request, env) {
 }
 
 // Claude proxy — same contract as worker/ ({model,max_tokens,system,messages} -> {text}).
+function hasImageContent(messages) {
+  for (const m of messages || []) {
+    if (Array.isArray(m?.content) && m.content.some((blk) => blk?.type === 'image')) return true;
+  }
+  return false;
+}
+
 async function ai(request, env) {
   if (!env.ANTHROPIC_API_KEY) return json({ error: 'server missing ANTHROPIC_API_KEY' }, 500, env);
   const model = await modelForRequest(request, env);
   const b = await body(request);
   if (!Array.isArray(b?.messages) || !b.messages.length) {
     return json({ error: 'messages required' }, 400, env);
+  }
+  // Photo moments are a Plus perk (vision adds real cost). Enforce server-side
+  // so the gate is real — but only once billing is configured, so keyless/dev
+  // deployments (with no subscriptions) keep working. Daily caps still apply.
+  if (b.photo || hasImageContent(b.messages)) {
+    if (env.BILLING_WEBHOOK_SECRET) {
+      const { tier } = await tierOf(request, env);
+      if (tier !== 'plus') return json({ error: 'plus_required', feature: 'photo' }, 402, env);
+    }
   }
   const payload = {
     model, // server-decided by tier, not the client's requested model

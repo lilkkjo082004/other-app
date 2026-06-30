@@ -12,6 +12,7 @@ const PLUS_PERKS = [
   'Unlimited messages',
   'All three companions',
   'Natural (lifelike) voices',
+  'Photo moments — share pics your companion can see',
   'Priority responses',
 ];
 

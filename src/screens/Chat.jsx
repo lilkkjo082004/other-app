@@ -4,7 +4,10 @@ import { Shell } from '../components/ui.jsx';
 import { speakAs, speakAsAsync, stopSpeaking, useSpeechRec } from '../lib/voice.js';
 import CallScreen from '../components/CallScreen.jsx';
 import { genAmbient, bumpBond } from '../lib/relationships.js';
-import { askCompanion, greetCompanion, proactiveCompanion, ambientThreadAI, extractMemories, generateSelf, generateJournalEntry, generateDream, generateWant, generateShift, generateVulnerableShare, generatePeerViews, generateSharedMoment, generateGrowth, generateInsideJoke, generateLetter, generateGift } from '../lib/ai.js';
+import { askCompanion, greetCompanion, proactiveCompanion, ambientThreadAI, extractMemories, generateSelf, generateJournalEntry, generateDream, generateWant, generateShift, generateVulnerableShare, generatePeerViews, generateSharedMoment, generateGrowth, generateInsideJoke, generateLetter, generateGift, reactToPhoto, PlusRequiredError } from '../lib/ai.js';
+import { readPhoto, thumbnail } from '../lib/photo.js';
+import Paywall from '../components/Paywall.jsx';
+import { fetchEntitlement } from '../lib/api.js';
 import { withInteraction, journalDue, addJournal, dreamDue, makeDream, closenessStage, stageRank, milestoneLine, wantDue, shiftDue, shouldOpenUp, makeStamped, peerViewsDue, loreDue, addLore, growthDue, addGrowth, knownDuration, jokesDue, addJoke, identityQuestion, letterDue, addLetter, giftDue, giftKindFor, addGift } from '../lib/innerlife.js';
 import { mergeMemories, removeMemory, pendingFollowups, markFollowed, gossipPick, absorbOverheard } from '../lib/memory.js';
 import { isLimited } from '../lib/entitlements.js';
@@ -15,7 +18,7 @@ import { DISCLOSURE_TEXT, BREAK_TEXT, isAcknowledged, acknowledgeDisclosure, con
 import { LegalLink } from './Legal.jsx';
 import { detectCrisis, CRISIS_RESOURCES, CRISIS_INTRO } from '../lib/crisis.js';
 import { isAuthed as apiAuthed, logMood } from '../lib/api.js';
-import { aiEnabled } from '../config.js';
+import { aiEnabled, billingEnabled } from '../config.js';
 import { onDeviceActive } from '../lib/ondevice.js';
 import { calmEnabled } from '../lib/comfort.js';
 import { scanLocation, shouldNudgePlace, markPlaceNudged, weatherNow } from '../lib/location.js';
@@ -72,6 +75,9 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const [goals, setGoals] = useState(restored?.goals || []);
   const [checkins, setCheckins] = useState(restored?.checkins || { streak: 0, last: '', history: [] });
   const [playingVN, setPlayingVN] = useState(null);   // ts of the voice note currently playing
+  const [ent, setEnt] = useState(null);               // subscription entitlement (photo gate)
+  const [showPaywall, setShowPaywall] = useState(false);
+  const photoInputRef = useRef(null);
   const [weather, setWeather] = useState('');
   const [ambientArriving, setAmbientArriving] = useState(false);
   // Coordinator: at most one companion-initiated "emotional beat" (milestone,
@@ -813,6 +819,52 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     if (apiAuthed()) logMood(mood.key);
   }
 
+  // Subscription entitlement — gates Photo moments (a Plus perk). Best-effort.
+  const loadEnt = async () => { try { setEnt(await fetchEntitlement()); } catch (e) { /* stay free */ } };
+  useEffect(() => { loadEnt(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  // Photos require Plus once billing is live; when billing isn't configured
+  // (keyless/dev) the feature is open so it stays testable. Server enforces too.
+  const photosAllowed = () => !billingEnabled() || ent?.tier === 'plus';
+
+  // Photo moments: the user shares a picture and a companion reacts to it (vision).
+  function pickPhoto() {
+    if (loading) return;
+    if (!photosAllowed()) { setShowPaywall(true); return; }
+    photoInputRef.current?.click();
+  }
+  async function onPhotoChosen(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';            // allow re-picking the same file
+    if (!file) return;
+    if (!photosAllowed()) { setShowPaywall(true); return; }
+    let photo;
+    try { photo = await readPhoto(file); } catch (err) { return; }
+    setAtBottom(true);
+    const thumb = await thumbnail(photo.dataUrl);
+    const photoMsg = { role: 'user', kind: 'photo', img: photo.dataUrl, thumb, content: '(shared a photo)', ts: Date.now() };
+    const base = [...msgs, photoMsg];
+    setMsgs(base);
+    setLoading(true);
+    // One companion reacts — private partner, the directed one, or someone awake.
+    const c = priv || (directTo ? active.find((x) => x.id === directTo) : null) || active[0];
+    if (!c) { setLoading(false); return; }
+    bumpCloseness([c.id], 'message');
+    setTyping(c);
+    const controller = new AbortController();
+    abortRef.current = controller;
+    try {
+      const t = await reactToPhoto(c, profFor(c), photo.base64, photo.mediaType, comps, priv ? 'private' : 'group', base, controller.signal);
+      setMsgs((p) => [...p, { role: 'assistant', companion: c, content: t, ts: Date.now() }]);
+      if (autoSpeak && !calmEnabled()) speakAs(t, c);
+    } catch (err) {
+      if (err instanceof PlusRequiredError) { loadEnt(); setShowPaywall(true); }
+    }
+    setTyping(null);
+    abortRef.current = null;
+    setLoading(false);
+    armIdle();
+  }
+
   // Play (or stop) a companion voice note aloud. Only one plays at a time.
   async function playVoiceNote(m) {
     if (playingVN === m.ts) { stopSpeaking(); setPlayingVN(null); return; }
@@ -907,7 +959,10 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     // Don't persist on every streamed token — the final setMsgs (after
     // streamingRef flips false) saves the completed turn once.
     if (streamingRef.current) return;
-    onPersist?.({ companions: comps, messages: msgs, chatMode, autoSpeak, trialStart, bonds, voiceCall, pushFrequency: pushFreq, pushSchedule: pushSched, memories: memStore, spacePos, ambientAlerts, lore, jokes, journal, goals, checkins });
+    // Photos: keep only the tiny thumbnail in the saved session (the full-res
+    // data URL would blow the localStorage budget after a few shares).
+    const persistMsgs = msgs.map((m) => (m.kind === 'photo' ? { ...m, img: m.thumb || undefined } : m));
+    onPersist?.({ companions: comps, messages: persistMsgs, chatMode, autoSpeak, trialStart, bonds, voiceCall, pushFrequency: pushFreq, pushSchedule: pushSched, memories: memStore, spacePos, ambientAlerts, lore, jokes, journal, goals, checkins });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comps, msgs, chatMode, autoSpeak, bonds, voiceCall, pushFreq, pushSched, memStore, spacePos, ambientAlerts, lore, jokes, journal, goals, checkins]);
 
@@ -1347,7 +1402,18 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
                 <span style={{ fontSize: 10, color: C.textDim, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 20, padding: '3px 12px' }}>{dayLabel}</span>
               </div>
             )}
-            {m.kind === 'voicenote' ? (
+            {m.kind === 'photo' ? (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 7, animation: 'fadeUp 0.3s both' }}>
+                <div style={{ maxWidth: '70%', background: C.surfaceUp, border: `1px solid ${C.border}`, borderRadius: '14px 14px 4px 14px', padding: 4 }}>
+                  {m.img ? (
+                    <img src={m.img} alt="Photo you shared" style={{ display: 'block', maxWidth: '100%', width: 200, borderRadius: 11 }} />
+                  ) : (
+                    <div style={{ width: 200, height: 120, borderRadius: 11, background: C.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.textDim, fontSize: 12 }}>📷 photo</div>
+                  )}
+                  <div style={{ fontSize: 9, color: C.textDim, textAlign: 'right', padding: '3px 4px 1px' }}>📷 shared{m.ts ? ` · ${fmtTime(m.ts)}` : ''}</div>
+                </div>
+              </div>
+            ) : m.kind === 'voicenote' ? (
               <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 7, animation: 'fadeUp 0.3s both' }}>
                 <div style={{ marginRight: 7, flexShrink: 0, lineHeight: 0 }}><Avatar comp={m.companion} size={24} glow={false} /></div>
                 <div style={{ maxWidth: '82%', minWidth: 200, background: C.surface, border: `1px solid ${m.companion?.color?.primary || C.border}`, borderRadius: 14, padding: '10px 12px' }}>
@@ -1492,6 +1558,8 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
           <p style={{ textAlign: 'center', color: C.textDim, fontSize: 12, padding: 8 }}>All companions resting 💤</p>
         ) : (
           <div style={{ display: 'flex', gap: 7, alignItems: 'flex-end' }}>
+            <input ref={photoInputRef} type="file" accept="image/*" onChange={onPhotoChosen} style={{ display: 'none' }} />
+            <button aria-label="Share a photo" title="Share a photo" onClick={pickPhoto} disabled={loading} style={{ width: 38, height: 38, borderRadius: '50%', background: 'transparent', border: `1px solid ${C.border}`, color: loading ? C.textDim : C.textSoft, fontSize: 16, cursor: loading ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>📷</button>
             <textarea ref={inputRef} value={input} rows={1}
               onChange={(e) => { setInput(e.target.value); const el = e.target; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px'; if (atBottomRef.current) pinBottom(); }}
               onFocus={() => { if (atBottomRef.current) setTimeout(pinBottom, 100); }}
@@ -1506,6 +1574,8 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
           </div>
         )}
       </div>
+
+      {showPaywall && <Paywall premium={ent?.tier === 'plus'} uid={ent?.uid} email={email} onRefresh={loadEnt} onClose={() => setShowPaywall(false)} />}
 
       {confirmDel && (
         <div onClick={() => setConfirmDel(null)} style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, animation: 'fadeIn 0.2s' }}>

@@ -529,6 +529,54 @@ export async function generateGift(comp, profile, kind = 'poem') {
   return ((t || '').trim().slice(0, 1100)) || offlineGift(comp, name, kind);
 }
 
+// ── Photo moments (vision) ──────────────────────────────────────────────────
+// A companion reacts to a photo the user shares. Builds a one-shot vision turn
+// (image + instruction) on top of the normal system prompt + recent history, so
+// the reaction is in-character and aware of the conversation. On-device models
+// here are text-only, so this always goes through the proxy; a 402 means the
+// account isn't on Plus (the server gates photos to subscribers).
+export class PlusRequiredError extends Error {
+  constructor() { super('Other Plus required for photo moments'); this.code = 'plus'; }
+}
+
+function offlinePhoto(comp, profile) {
+  const name = profile?.name || 'you';
+  return pick([
+    `aw, ${name} — thank you for showing me this. I can't quite make it out from here, but it means a lot that you wanted to share it with me. tell me about it?`,
+    `you shared a photo! I love that. my eyes are a little fuzzy right now though — what am I looking at? walk me through it.`,
+    `${name}, I'm so glad you sent this. describe it to me — I want to see it the way you do.`,
+  ]);
+}
+
+export async function reactToPhoto(comp, profile, base64, mediaType, allC, mode, history = [], signal) {
+  if (!aiEnabled()) { await delay(400); return offlinePhoto(comp, profile); }
+  const name = profile?.name || 'they';
+  const instruction = `${name} just shared this photo with you. React the way ${comp.name} naturally would — warm, present, and specific to what you actually see in it. Talk to ${name} like a friend they just showed something to, not like you're describing an image. 1-3 sentences, in your own voice. Don't mention being an AI.`;
+  try {
+    const { system, systemBlocks, messages } = buildRequest(comp, profile, history, allC, mode);
+    const photoTurn = { role: 'user', content: [
+      { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+      { type: 'text', text: instruction },
+    ] };
+    const res = await fetch(aiEndpoint(), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...authHeader() },
+      body: JSON.stringify({ model: AI_MODEL, max_tokens: 400, system, systemBlocks, messages: [...messages, photoTurn], photo: true }),
+      signal,
+    });
+    if (res.status === 402) throw new PlusRequiredError();
+    if (!res.ok) throw new Error(`proxy ${res.status}`);
+    const data = await res.json();
+    let t = '';
+    if (typeof data.text === 'string') t = data.text.trim();
+    else if (Array.isArray(data.content)) t = data.content.filter((b) => b?.type === 'text').map((b) => b.text).join('').trim();
+    return t || offlinePhoto(comp, profile);
+  } catch (e) {
+    if (e instanceof PlusRequiredError) throw e;
+    return offlinePhoto(comp, profile);
+  }
+}
+
 /** First greeting when a companion comes on screen. */
 export async function greetCompanion(comp, profile, mode, allC) {
   if (aiEnabled()) {

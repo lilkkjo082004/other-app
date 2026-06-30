@@ -166,11 +166,38 @@ console.log('subscriptions');
   await subCall('POST', '/ai', { token: subTok, body: { messages: [{ role: 'user', content: 'hi' }] } }); // 2nd premium call (cap=2)
   await subCall('POST', '/ai', { token: subTok, body: { messages: [{ role: 'user', content: 'hi' }] } }); // 3rd -> over cap
   ok(lastModel === 'claude-haiku-4-5-20251001', 'plus user over the daily premium cap falls back to the free model');
+
+  // Photo moments (vision) are gated to Plus when billing is configured.
+  const imgMsg = [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: 'AAAA' } }, { type: 'text', text: 'react' }] }];
+  let reached = false;
+  const wrap = globalThis.fetch;
+  globalThis.fetch = async (url, opts) => { if (String(url).includes('api.anthropic.com')) reached = true; return wrap(url, opts); };
+  const anonPhoto = await subCall('POST', '/ai', { body: { messages: imgMsg, photo: true } });
+  ok(anonPhoto.status === 402 && !reached, 'photo from a free/anonymous user is blocked (402) when billing is on');
+  reached = false;
+  const plusPhoto = await subCall('POST', '/ai', { token: subTok, body: { messages: imgMsg, photo: true } });
+  ok(plusPhoto.status === 200 && reached, 'photo from a Plus user is allowed through to the vision model');
   globalThis.fetch = origFetch;
 
   w = await subCall('POST', '/billing/webhook', { headers: { authorization: 'Bearer whsec' }, body: { event: { type: 'EXPIRATION', app_user_id: subUser.id } } });
   e = await subCall('GET', '/entitlement', { token: subTok });
   ok(e.data.tier === 'free' && !e.data.active, 'expiration webhook downgrades to free');
+}
+
+console.log('photo moments (billing off)');
+{
+  // With no BILLING_WEBHOOK_SECRET configured (keyless/dev), photos stay open.
+  const env = { store: memoryStore(), SECRET: 'test-secret', ALLOWED_ORIGIN: '*', ANTHROPIC_API_KEY: 'k' };
+  const origFetch = globalThis.fetch;
+  let reached = false;
+  globalThis.fetch = async (url, opts) => {
+    if (String(url).includes('api.anthropic.com')) { reached = true; return new Response(JSON.stringify({ content: [{ type: 'text', text: 'hi' }], stop_reason: 'end_turn' }), { status: 200, headers: { 'content-type': 'application/json' } }); }
+    return origFetch(url, opts);
+  };
+  const imgMsg = [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: 'AAAA' } }, { type: 'text', text: 'react' }] }];
+  const res = await handle(new Request('http://api/ai', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages: imgMsg, photo: true }) }), env);
+  ok(res.status === 200 && reached, 'photo is allowed for everyone when billing is not configured');
+  globalThis.fetch = origFetch;
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);
