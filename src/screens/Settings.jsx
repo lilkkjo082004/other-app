@@ -7,6 +7,7 @@ import { pushConfigured, pushSupported, isSubscribed, enablePush, disablePush, t
 import { locationSupported, locationEnabled, locationLabel, requestLocation, setLabel, clearLocation, getFavPlaces, addCurrentAsFavorite, removeFavPlace } from '../lib/location.js';
 import { deleteAccount, fetchEntitlement } from '../lib/api.js';
 import { MANAGE_URL } from '../config.js';
+import { onDeviceSupported, onDeviceEnabled, setOnDeviceEnabled, preloadEngine, setProgressHandler, ON_DEVICE_LABEL } from '../lib/ondevice.js';
 import { loadSession, saveSession } from '../lib/storage.js';
 import { LegalLink } from './Legal.jsx';
 import Paywall from '../components/Paywall.jsx';
@@ -19,6 +20,18 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
   const premium = !!ent?.active;
   const loadEnt = () => fetchEntitlement().then(setEnt).catch(() => {});
   useEffect(() => { loadEnt(); }, [authed]);
+
+  const odSupported = onDeviceSupported();
+  const [odOn, setOdOn] = useState(onDeviceEnabled());
+  const [odProg, setOdProg] = useState(null);  // { pct, text, error } | null
+  const [odReady, setOdReady] = useState(false);
+  async function toggleOnDevice() {
+    if (odOn) { setOnDeviceEnabled(false); setOdOn(false); setOdProg(null); setOdReady(false); return; }
+    setOnDeviceEnabled(true); setOdOn(true); setOdReady(false); setOdProg({ pct: 0, text: 'Preparing…' });
+    setProgressHandler((p) => setOdProg({ pct: Math.round((p.progress || 0) * 100), text: p.text || 'Downloading model…' }));
+    try { await preloadEngine(); setOdReady(true); setOdProg(null); }
+    catch (e) { setOdProg({ pct: 0, text: 'Could not load the on-device model on this device.', error: true }); }
+  }
   const living = comps.filter((c) => c.status !== 'deleted');
   const allAwake = living.length > 0 && living.every((c) => c.status === 'awake');
 
@@ -369,6 +382,31 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
             <span style={{ color: C.glow2, fontWeight: 700 }}>›</span>
           </button>
         )}
+
+        <div style={{ height: 10 }} />
+        {section('On-device AI')}
+        <div style={{ ...card }}>
+          {!odSupported ? (
+            <div style={{ fontSize: 12, color: C.textSoft, lineHeight: 1.5 }}>This browser can’t run AI on-device (it needs WebGPU). Try Chrome or Edge on desktop, or Chrome on Android.</div>
+          ) : (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <div style={{ textAlign: 'left' }}>
+                  <div style={{ fontSize: 13, color: C.text }}>Run AI on my device</div>
+                  <div style={{ fontSize: 11, color: C.textDim, lineHeight: 1.4 }}>Free & private — works offline. First time downloads ~2GB; replies are a bit slower.</div>
+                </div>
+                <Toggle on={odOn} onClick={toggleOnDevice} label="Run AI on my device" />
+              </div>
+              {odProg && (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ fontSize: 11, color: odProg.error ? C.danger : C.textSoft, marginBottom: 6 }}>{odProg.text}{!odProg.error && odProg.pct ? ` · ${odProg.pct}%` : ''}</div>
+                  {!odProg.error && <div style={{ height: 6, borderRadius: 4, background: C.surfaceUp, overflow: 'hidden' }}><div style={{ width: `${odProg.pct}%`, height: '100%', background: C.glow1, transition: 'width 0.3s' }} /></div>}
+                </div>
+              )}
+              {odReady && <div style={{ fontSize: 11, color: C.glow3, marginTop: 10 }}>✓ {ON_DEVICE_LABEL} ready — companions now reply on your device.</div>}
+            </>
+          )}
+        </div>
 
         <div style={{ height: 10 }} />
         {section('Legal')}

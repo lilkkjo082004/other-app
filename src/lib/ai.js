@@ -4,6 +4,7 @@ import { buildSystemBlocks } from './prompt.js';
 import { detectCrisis } from './crisis.js';
 import { pickAmbientPair } from './relationships.js';
 import { recallBlock } from './recall.js';
+import { onDeviceActive, completeOnDevice } from './ondevice.js';
 
 const MAX_HISTORY = 30;
 
@@ -181,6 +182,16 @@ const delay = (ms) => new Promise((r) => setTimeout(r, ms));
  *  placeholder voice; always falls back to placeholder on error. */
 export async function askCompanion(comp, profile, msgs, allC, mode, signal, onDelta) {
   const lastUser = [...msgs].reverse().find((m) => m.role === 'user');
+  // Preferred: the user's own device (free, private). Falls through on any error.
+  if (onDeviceActive()) {
+    try {
+      const { system, messages } = buildRequest(comp, profile, msgs, allC, mode);
+      return await completeOnDevice(system, messages, { onDelta, signal });
+    } catch (e) {
+      if (e?.name === 'AbortError') throw e;
+      // fall through to proxy / placeholder
+    }
+  }
   if (aiEnabled()) {
     try {
       return onDelta
@@ -231,8 +242,22 @@ export async function proactiveCompanion(comp, profile, mode, allC, history, kin
         ? `(It's been quiet for a few minutes. As ${comp.name}, share a short unprompted thought that's genuinely on YOUR mind right now — pulled from how you're feeling, what you're preoccupied with, or something true to who you are — or gently check in with ${profile.name}. Curious and warm, 1-2 sentences. Don't mention being an AI or the silence itself.${foc})`
         : `(${profile.name} just reopened the app after being away ${awayLabel}. As ${comp.name}, welcome them back warmly and specifically — reference something real from your past chats if you can. 1-2 sentences.${foc})`;
       const seed = [...(history || []).filter((m) => m.role !== 'system'), { role: 'user', content: intent }];
+      if (onDeviceActive()) {
+        const { system, messages } = buildRequest(comp, profile, seed, allC, mode);
+        return await completeOnDevice(system, messages, {});
+      }
       return await viaProxy(comp, profile, seed, allC, mode);
     } catch (e) { return placeholderProactive(comp, profile, kind, focus); }
+  }
+  // No proxy configured, but the device can run a model locally.
+  if (onDeviceActive()) {
+    try {
+      const foc = focus ? ` Naturally ask how this went: "${focus}".` : '';
+      const intent = `(As ${comp.name}, warmly check in with ${profile.name} in 1-2 sentences, in character.${foc})`;
+      const seed = [...(history || []).filter((m) => m.role !== 'system'), { role: 'user', content: intent }];
+      const { system, messages } = buildRequest(comp, profile, seed, allC, mode);
+      return await completeOnDevice(system, messages, {});
+    } catch (e) { /* fall through */ }
   }
   await delay(400);
   return placeholderProactive(comp, profile, kind, focus);

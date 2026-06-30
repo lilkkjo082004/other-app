@@ -15,6 +15,7 @@ import { LegalLink } from './Legal.jsx';
 import { detectCrisis, CRISIS_RESOURCES, CRISIS_INTRO } from '../lib/crisis.js';
 import { isAuthed as apiAuthed, logMood } from '../lib/api.js';
 import { aiEnabled } from '../config.js';
+import { onDeviceActive } from '../lib/ondevice.js';
 import { scanLocation, shouldNudgePlace, markPlaceNudged, weatherNow } from '../lib/location.js';
 import { parseAction, stripActionPartial, downloadICS, googleCalUrl, formatWhen, actionTitle } from '../lib/actions.js';
 import { birthdayStatus, monthsKnown } from '../lib/occasion.js';
@@ -943,9 +944,10 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
           )}
         </div>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          <span title={aiEnabled() ? 'Live AI responses' : 'Offline placeholder replies'} style={{ fontSize: 9, color: aiEnabled() ? C.glow3 : C.textDim, display: 'flex', alignItems: 'center', gap: 3, marginRight: 2 }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: aiEnabled() ? C.glow3 : C.textDim }} />{aiEnabled() ? 'Live' : 'Offline'}
-          </span>
+          {(() => { const live = aiEnabled() || onDeviceActive(); return (
+          <span title={onDeviceActive() ? 'Running on your device' : (live ? 'Live AI responses' : 'Offline placeholder replies')} style={{ fontSize: 9, color: live ? C.glow3 : C.textDim, display: 'flex', alignItems: 'center', gap: 3, marginRight: 2 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: live ? C.glow3 : C.textDim }} />{onDeviceActive() ? 'On-device' : (live ? 'Live' : 'Offline')}
+          </span>); })()}
           <button aria-label={autoSpeak ? 'Turn off auto-speak' : 'Turn on auto-speak'} aria-pressed={autoSpeak} onClick={() => setAutoSpeak(!autoSpeak)} style={{ background: autoSpeak ? `${C.glow3}22` : 'none', border: `1px solid ${autoSpeak ? C.glow3 : C.border}`, borderRadius: 7, padding: '5px 8px', color: autoSpeak ? C.glow3 : C.textDim, fontSize: 13, cursor: 'pointer' }}>{autoSpeak ? '🔊' : '🔇'}</button>
           {voiceCall && <button aria-label={listening ? 'Listening — tap to stop' : 'Call a companion by voice'} onClick={startListening} style={{ background: listening ? `${C.danger}22` : 'none', border: `1px solid ${listening ? C.danger : C.border}`, borderRadius: 7, padding: '5px 8px', color: listening ? C.danger : C.textDim, fontSize: 13, cursor: 'pointer', animation: listening ? 'micPulse 1.5s infinite' : 'none' }}>🎤</button>}
           <button aria-label="Open the space — where your companions hang out" title="The Space" onClick={() => setPanel('space')} style={{ background: 'none', border: `1px solid ${C.border}`, borderRadius: 7, padding: '5px 8px', color: C.textDim, fontSize: 13, cursor: 'pointer' }}>✦</button>
