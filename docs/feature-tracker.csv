@@ -130,6 +130,7 @@ Platforms,iOS (App Store),Stricter content policies,Future,P2,
 Platforms,Desktop,Full desktop experience,Future,P2,
 Backend,API proxy server,Cloudflare Worker + D1,Built,P0,UPDATED Future->Built; server/
 Backend,Real AI responses,Claude API integration,Built,P0,UPDATED Future->Built; offline fallback
+Backend,Bring-your-own-key (BYOK),"User can paste their own Anthropic API key in Settings; app then calls Claude directly (key on-device only, never to our servers) with optional model override. Works with no login and no hosted backend, so the app runs fully standalone; falls back to the hosted proxy then offline replies",Built,P0,"NEW; lib/byok.js, ai.js postAI() transport (SSE for direct), config.aiEnabled() BYOK-aware, Settings AI section"
 Backend,Accounts & auth,Email/password (PBKDF2 + HMAC),Built,P0,NEW
 Backend,Persistent memory,Session blob synced in D1,Built,P1,UPDATED Future->Built
 Backend,Mood tracking database,Long-term emotional storage,Built,P1,UPDATED Future->Built

@@ -7,11 +7,32 @@ import { pushConfigured, pushSupported, isSubscribed, enablePush, disablePush, t
 import { locationSupported, locationEnabled, locationLabel, requestLocation, setLabel, clearLocation, getFavPlaces, addCurrentAsFavorite, removeFavPlace } from '../lib/location.js';
 import { deleteAccount } from '../lib/api.js';
 import { loadSession, saveSession } from '../lib/storage.js';
+import { byokKey, setByokKey, byokModel, setByokModel, looksLikeKey } from '../lib/byok.js';
+import { aiEndpoint, AI_MODEL } from '../config.js';
 import { LegalLink } from './Legal.jsx';
 import ProfileEdit from './ProfileEdit.jsx';
 
 export default function Settings({ profile, comps, autoSpeak, trialStart, cloud, authed, email, onSignIn, onSignOut, onAutoSpeak, onUpdateProfile, voiceCall, onVoiceCall, pushFrequency, onPushFrequency, pushSchedule, onPushSchedule, ambientAlerts, onAmbientAlerts, onSleepAll, onWakeAll, onReset, onBack }) {
   const [editing, setEditing] = useState(false);
+  const [keyDraft, setKeyDraft] = useState(byokKey());
+  const [modelDraft, setModelDraft] = useState(byokModel());
+  const [keySaved, setKeySaved] = useState(false);
+  const [keyErr, setKeyErr] = useState(null);
+  const hostedAI = aiEndpoint().length > 0;
+  function saveKey() {
+    setKeyErr(null);
+    const k = keyDraft.trim();
+    if (k && !looksLikeKey(k)) { setKeyErr('That doesn’t look like an Anthropic key (starts with sk-ant-).'); return; }
+    setByokKey(k);
+    setByokModel(modelDraft.trim());
+    setKeySaved(true);
+    setTimeout(() => setKeySaved(false), 2000);
+  }
+  function clearKey() {
+    setByokKey(''); setByokModel('');
+    setKeyDraft(''); setModelDraft(''); setKeyErr(null);
+    setKeySaved(true); setTimeout(() => setKeySaved(false), 2000);
+  }
   const living = comps.filter((c) => c.status !== 'deleted');
   const allAwake = living.length > 0 && living.every((c) => c.status === 'awake');
 
@@ -345,6 +366,29 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
         <div style={{ height: 10 }} />
         {section('Plan')}
         <div style={{ ...card, display: 'flex', gap: 10, alignItems: 'center' }}><span style={{ fontSize: 16 }}>✦</span><span style={{ fontSize: 12, color: C.textSoft, lineHeight: 1.4 }}>{trialLabel()}</span></div>
+
+        <div style={{ height: 10 }} />
+        {section('AI')}
+        <div style={{ ...card }}>
+          <div style={{ fontSize: 13, color: C.text, marginBottom: 4 }}>{byokKey() ? 'Using your own Anthropic key' : (hostedAI ? 'Using the built-in AI service' : 'No AI configured — offline replies')}</div>
+          <div style={{ fontSize: 11.5, color: C.textSoft, lineHeight: 1.5, marginBottom: 10 }}>
+            Add your own Anthropic API key to run companions on your own account — works even with no sign-in and no built-in service. Your key is stored only on this device and sent only to Anthropic, never to our servers.{hostedAI ? ' Leave blank to use the built-in service.' : ''}
+          </div>
+          <input
+            type="password" value={keyDraft} onChange={(e) => setKeyDraft(e.target.value)}
+            placeholder="sk-ant-..." aria-label="Anthropic API key" autoComplete="off" spellCheck={false}
+            style={{ width: '100%', boxSizing: 'border-box', background: C.surfaceUp, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', fontSize: 12.5, color: C.text, outline: 'none', fontFamily: 'monospace' }} />
+          <input
+            type="text" value={modelDraft} onChange={(e) => setModelDraft(e.target.value)}
+            placeholder={`Model (optional, default ${AI_MODEL})`} aria-label="Model override" autoComplete="off" spellCheck={false}
+            style={{ width: '100%', boxSizing: 'border-box', marginTop: 8, background: C.surfaceUp, border: `1px solid ${C.border}`, borderRadius: 10, padding: '9px 12px', fontSize: 12, color: C.text, outline: 'none', fontFamily: 'monospace' }} />
+          {keyErr && <div style={{ fontSize: 11, color: C.danger, marginTop: 8 }}>{keyErr}</div>}
+          <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'center' }}>
+            <button onClick={saveKey} style={{ flex: 1, background: C.glow1, border: 'none', borderRadius: 10, padding: '10px', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>{keySaved ? 'Saved ✓' : 'Save key'}</button>
+            {byokKey() && <button onClick={clearKey} style={{ background: C.surfaceUp, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 14px', color: C.textSoft, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>Remove</button>}
+          </div>
+          <div style={{ fontSize: 11, color: C.textDim, marginTop: 10, lineHeight: 1.5 }}>Get a key at console.anthropic.com → API Keys. Usage is billed to your Anthropic account. Companions remember this isn’t a human and never give medical, legal, or crisis advice.</div>
+        </div>
 
         <div style={{ height: 10 }} />
         {section('Legal')}
