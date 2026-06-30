@@ -28,6 +28,7 @@ import CompanionProfile from './CompanionProfile.jsx';
 import CompanionSpace from './CompanionSpace.jsx';
 import PlacesNearby from './PlacesNearby.jsx';
 import StorySoFar from './StorySoFar.jsx';
+import Recap from './Recap.jsx';
 import WakingUp from './WakingUp.jsx';
 
 export default function Chat({ companions: init, profile, trialStart, restored, onPersist, onReset, onUpdateProfile, storageWarn, onDismissStorageWarn, cloud, authed, email, onSignIn, onSignOut }) {
@@ -684,6 +685,23 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comps]);
 
+  // Once a month, a companion gently points to the "Your recap" keepsake — only
+  // after you've known each other a while, and gated so it never floods.
+  const recapNudgeRef = useRef(false);
+  useEffect(() => {
+    if (recapNudgeRef.current || loadingRef.current) return;
+    const monthKey = new Date().toISOString().slice(0, 7);
+    let seen = null; try { seen = localStorage.getItem('other_recap_month'); } catch (e) { /* ignore */ }
+    if (seen === monthKey) { recapNudgeRef.current = true; return; }
+    const c = comps.find((x) => x.status === 'awake' && x.bornAt && (Date.now() - x.bornAt) > 25 * 86400000);
+    if (!c) return;
+    if (!claimBeat()) return;
+    recapNudgeRef.current = true;
+    try { localStorage.setItem('other_recap_month', monthKey); } catch (e) { /* ignore */ }
+    setMsgs((p) => [...p, { role: 'assistant', companion: c, content: 'It’s been a while now — I put together a little look back at us. It’s under ✨ Your recap in the menu whenever you want it. ♡', ts: Date.now() }]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comps]);
+
   // Companion-initiated "unprompted thought" after a few minutes of quiet.
   // Re-armed on each send; fires once per idle stretch.
   function armIdle() {
@@ -921,6 +939,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   // ── Panels (full-screen views) ──
   if (panel === 'places') return <PlacesNearby onBack={() => setPanel(null)} />;
   if (panel === 'story') return <StorySoFar lore={lore} jokes={jokes} comps={comps} onBack={() => setPanel(null)} />;
+  if (panel === 'recap') return <Recap comps={comps} lore={lore} jokes={jokes} profile={profile} onBack={() => setPanel(null)} />;
   if (panel === 'space') {
     return (
       <CompanionSpace
@@ -1145,6 +1164,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
           <div style={{ borderTop: `1px solid ${C.border}`, margin: '8px 0' }} />
           {living.length < 3 && <button onClick={summon} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.glow2, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif" }}>✦  Summon a companion</button>}
           <button onClick={() => { setShowMenu(false); setPanel('story'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📖  Your story so far</button>
+          <button onClick={() => { setShowMenu(false); setPanel('recap'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>✨  Your recap</button>
           <button onClick={() => { setShowMenu(false); setPanel('places'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📍  Find nearby</button>
           {!focusUntil && active.length > 0 && <button onClick={() => { const buddy = priv || active[0]; setShowMenu(false); startFocus(25, buddy); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🎯  Focus together (25 min)</button>}
           {active.length > 1 && <button onClick={() => { setShowMenu(false); startGroupCall(); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📞  Group call (everyone)</button>}
