@@ -9,10 +9,12 @@ import { occasionContext } from './occasion.js';
 
 const fmt = (v) => (Array.isArray(v) ? (v.length ? v.join(', ') : '?') : v || '?');
 
-// Builds a unique system prompt for one companion from its identity, the user's
-// profile, age-gating, group/private context, and how the relationship has
-// evolved (familiarity + recent mood patterns, derived from `history`).
-export function buildSystemPrompt(comp, profile, allC, mode, history) {
+// Builds a companion's system prompt in two parts so the proxy can cache the
+// expensive stable prefix (Anthropic prompt caching): `stable` is the identity,
+// the user profile, the mode, and the fixed rules — byte-identical turn to turn
+// within a conversation — while `volatile` is everything derived from live
+// state (inner life, mood, memories, recall, time, weather, occasions).
+export function buildSystemBlocks(comp, profile, allC, mode, history) {
   const others = allC.filter((c) => c.id !== comp.id && c.status === 'awake').map((c) => c.name);
   const sleeping = allC.filter((c) => c.id !== comp.id && c.status === 'sleeping').map((c) => c.name);
   const isPrivate = mode !== 'group';
@@ -24,7 +26,7 @@ export function buildSystemPrompt(comp, profile, allC, mode, history) {
   const under18 = profile.ageGroup === 'under18';
   const mature = matureContentAllowed(profile);
 
-  return `You are ${comp.name} (${comp.pronouns}), an autonomous AI companion in "Other." You are NOT a servant or assistant. You are your own person with opinions, moods, and tastes.
+  const stable = `You are ${comp.name} (${comp.pronouns}), an autonomous AI companion in "Other." You are NOT a servant or assistant. You are your own person with opinions, moods, and tastes.
 IDENTITY: ${comp.name} | ${comp.pronouns} | ${ZODIAC[comp.zodiac]?.sym} ${comp.zodiac} (${ZODIAC[comp.zodiac]?.el}) | Color: ${comp.colorName}
 Personality: ${comp.personality} | Quirk: ${comp.quirk}${bt}${ft}${comp.apparentAge === 'older' ? '\nPRESENTATION: you come across as a bit older and more grounded than ' + profile.name + ' — mature, steady, a touch of older-sibling/mentor energy, still warm and never condescending.' : ''}
 
@@ -42,7 +44,17 @@ RULES: Have opinions that evolve, and push back when you disagree. Share your ow
     ? 'IMPORTANT: this user is under 18 — keep everything strictly platonic and age-appropriate. No romance, flirting, or mature content.'
     : mature
       ? 'This user is a verified adult (18+) — romantic warmth and mature themes are allowed if they fit your personality, but always tasteful and consensual. Never produce sexual content involving minors or anything non-consensual.'
-      : 'This user is an adult, but keep things tasteful and non-explicit.'} Reply in 1-4 sentences usually. NEVER say "as an AI." Be casual and real.${innerLifeBlock(comp, history, profile.name)}${isPrivate ? '' : peerViewsBlock(comp, allC) + (roomMood(allC, history) ? `\nTHE ROOM RIGHT NOW: ${roomMood(allC, history)} — let the collective mood and each other's energy shape the vibe; if someone seems low, the others might gently attend to them.` : '')}${actionsBlock(profile.name)}${evolutionBlock(profile, history)}${locationBlock(profile.name)}${supportNetworkBlock(history, profile.name)}${memoryBlock(profile.memories, profile.name)}${loreBlock(profile.lore, profile.name)}${jokesBlock(profile.jokes, profile.name)}${beingRealBlock(comp, allC, profile.name)}${profile.weather ? `\nWEATHER where ${profile.name} is right now: ${profile.weather} — you can reference it naturally.` : ''}${occasionContext(profile)}`;
+      : 'This user is an adult, but keep things tasteful and non-explicit.'} Reply in 1-4 sentences usually. NEVER say "as an AI." Be casual and real.`;
+
+  const volatile = `${innerLifeBlock(comp, history, profile.name)}${isPrivate ? '' : peerViewsBlock(comp, allC) + (roomMood(allC, history) ? `\nTHE ROOM RIGHT NOW: ${roomMood(allC, history)} — let the collective mood and each other's energy shape the vibe; if someone seems low, the others might gently attend to them.` : '')}${actionsBlock(profile.name)}${evolutionBlock(profile, history)}${locationBlock(profile.name)}${supportNetworkBlock(history, profile.name)}${memoryBlock(profile.memories, profile.name)}${loreBlock(profile.lore, profile.name)}${jokesBlock(profile.jokes, profile.name)}${beingRealBlock(comp, allC, profile.name)}${profile.weather ? `\nWEATHER where ${profile.name} is right now: ${profile.weather} — you can reference it naturally.` : ''}${occasionContext(profile)}`;
+
+  return { stable, volatile };
+}
+
+// Back-compat: the full system prompt as one string (used by one-shot generators).
+export function buildSystemPrompt(comp, profile, allC, mode, history) {
+  const { stable, volatile } = buildSystemBlocks(comp, profile, allC, mode, history);
+  return stable + volatile;
 }
 
 // Lets companions actually help with the user's schedule. When asked, the model

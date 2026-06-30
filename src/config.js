@@ -9,7 +9,7 @@
 // With neither set, the app runs fully on placeholder responses + localStorage.
 export const API_BASE = import.meta.env.VITE_API_BASE || '';
 export const AI_PROXY = import.meta.env.VITE_AI_PROXY || '';
-export const AI_MODEL = import.meta.env.VITE_AI_MODEL || 'claude-opus-4-8';
+export const AI_MODEL = import.meta.env.VITE_AI_MODEL || 'claude-haiku-4-5-20251001';
 
 export const cloudEnabled = () => API_BASE.length > 0;
 

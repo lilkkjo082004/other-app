@@ -131,6 +131,7 @@ Platforms,Desktop,Full desktop experience,Future,P2,
 Backend,API proxy server,Cloudflare Worker + D1,Built,P0,UPDATED Future->Built; server/
 Backend,Real AI responses,"Claude API integration; hosted proxy serves every user with no API key and no login required (owner-funded)",Built,P0,"UPDATED Future->Built; offline fallback; /ai is unauthenticated"
 Backend,AI cost safeguards,"Public keyless /ai protected by per-minute, per-IP/day, and optional global/day caps so it can't run up the owner's bill",Built,P1,"NEW; AI_RATE_LIMIT, AI_DAILY_LIMIT (200), AI_DAILY_TOTAL (0=off) in server"
+Backend,Cost-efficient model + prompt caching,"Default chat model switched from Opus to Haiku 4.5 (~15x cheaper) and the stable system-prompt prefix is sent as a cache_control block so repeated input is prompt-cached; client sends both string + block system for backward compatibility",Built,P0,"NEW; config AI_MODEL, prompt.buildSystemBlocks, ai.js systemBlocks, worker forwards blocks"
 Backend,Accounts & auth,Email/password (PBKDF2 + HMAC),Built,P0,NEW
 Backend,Persistent memory,Session blob synced in D1,Built,P1,UPDATED Future->Built
 Backend,Mood tracking database,Long-term emotional storage,Built,P1,UPDATED Future->Built

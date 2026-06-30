@@ -290,7 +290,12 @@ async function ai(request, env) {
     max_tokens: Math.min(MAX_TOKENS_CAP, Math.max(1, Number(b.max_tokens) || 400)),
     messages: b.messages,
   };
-  if (typeof b.system === 'string' && b.system) payload.system = b.system;
+  // Prefer systemBlocks (Anthropic content blocks with cache_control, so the
+  // stable prefix is prompt-cached); fall back to a plain string system. The
+  // client always sends both, so an older client/worker still works.
+  if (Array.isArray(b.systemBlocks) && b.systemBlocks.length) payload.system = b.systemBlocks;
+  else if (typeof b.system === 'string' && b.system) payload.system = b.system;
+  else if (Array.isArray(b.system) && b.system.length) payload.system = b.system;
 
   // Streaming path: ask Anthropic to stream and re-emit just the text deltas as
   // a plain-text stream the client can append token-by-token.

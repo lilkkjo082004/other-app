@@ -1,6 +1,6 @@
 import { AI_MODEL, aiEnabled, aiEndpoint } from '../config.js';
 import { authHeader } from './api.js';
-import { buildSystemPrompt } from './prompt.js';
+import { buildSystemBlocks } from './prompt.js';
 import { detectCrisis } from './crisis.js';
 import { pickAmbientPair } from './relationships.js';
 import { recallBlock } from './recall.js';
@@ -10,18 +10,29 @@ const MAX_HISTORY = 30;
 // ── Real responses via the Cloudflare Worker proxy ──
 // Build the {system, messages} request for one companion from the transcript.
 function buildRequest(comp, profile, msgs, allC, mode) {
-  let system = buildSystemPrompt(comp, profile, allC, mode, msgs);
+  // Stable prefix is cached by the proxy (Anthropic prompt caching); volatile
+  // tail carries live state and recall, which change turn to turn.
+  const { stable, volatile } = buildSystemBlocks(comp, profile, allC, mode, msgs);
+  let volatileText = volatile;
   // Drop in-app system notes (AI disclosures, crisis cards) — they aren't part
   // of the conversation the model should see.
   const convo = msgs.filter((m) => m.role !== 'system');
   const recent = convo.length > MAX_HISTORY ? convo.slice(convo.length - MAX_HISTORY) : convo;
   // Pull a few relevant messages from before the recent window, keyed off the
-  // user's latest line, and add them to the system prompt as long-term recall.
+  // user's latest line, and add them to the volatile tail as long-term recall.
   if (convo.length > MAX_HISTORY) {
     const lastUser = [...recent].reverse().find((m) => m.role === 'user');
     const block = recallBlock(convo.slice(0, convo.length - MAX_HISTORY), lastUser?.content, profile.name);
-    if (block) system += `\n\n${block}`;
+    if (block) volatileText += `\n\n${block}`;
   }
+  // systemBlocks enables prompt caching on the new worker; `system` (plain
+  // string) is the backward-compatible fallback an older worker still handles,
+  // so a client deploy can never outrun a worker deploy.
+  const systemBlocks = [
+    { type: 'text', text: stable, cache_control: { type: 'ephemeral' } },
+    { type: 'text', text: volatileText },
+  ];
+  const system = stable + volatileText;
   const apiMsgs = recent.map((m) => {
     if (m.role === 'user') {
       return { role: 'user', content: `${profile.name || 'User'}: ${m.content}` };
@@ -36,15 +47,15 @@ function buildRequest(comp, profile, msgs, allC, mode) {
   if (!apiMsgs.length) {
     apiMsgs.push({ role: 'user', content: `${profile.name || 'User'} just opened the chat. Say hello in your own voice.` });
   }
-  return { system, messages: apiMsgs };
+  return { system, systemBlocks, messages: apiMsgs };
 }
 
 async function viaProxy(comp, profile, msgs, allC, mode, signal) {
-  const { system, messages } = buildRequest(comp, profile, msgs, allC, mode);
+  const { system, systemBlocks, messages } = buildRequest(comp, profile, msgs, allC, mode);
   const res = await fetch(aiEndpoint(), {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...authHeader() },
-    body: JSON.stringify({ model: AI_MODEL, max_tokens: 400, system, messages }),
+    body: JSON.stringify({ model: AI_MODEL, max_tokens: 400, system, systemBlocks, messages }),
     signal,
   });
   if (!res.ok) throw new Error(`proxy ${res.status}`);
@@ -61,11 +72,11 @@ async function viaProxy(comp, profile, msgs, allC, mode, signal) {
 // tokens arrive, returning the full text. Gracefully handles a non-streaming
 // (older) worker that still returns JSON — it emits the whole reply once.
 async function viaProxyStream(comp, profile, msgs, allC, mode, signal, onDelta) {
-  const { system, messages } = buildRequest(comp, profile, msgs, allC, mode);
+  const { system, systemBlocks, messages } = buildRequest(comp, profile, msgs, allC, mode);
   const res = await fetch(aiEndpoint(), {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...authHeader() },
-    body: JSON.stringify({ model: AI_MODEL, max_tokens: 400, system, messages, stream: true }),
+    body: JSON.stringify({ model: AI_MODEL, max_tokens: 400, system, systemBlocks, messages, stream: true }),
     signal,
   });
   if (!res.ok) throw new Error(`proxy ${res.status}`);
