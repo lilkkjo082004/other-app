@@ -29,6 +29,7 @@ import CompanionSpace from './CompanionSpace.jsx';
 import PlacesNearby from './PlacesNearby.jsx';
 import StorySoFar from './StorySoFar.jsx';
 import Recap from './Recap.jsx';
+import { makeCardBlob, shareOrDownloadCard } from '../lib/card.js';
 import WakingUp from './WakingUp.jsx';
 
 export default function Chat({ companions: init, profile, trialStart, restored, onPersist, onReset, onUpdateProfile, storageWarn, onDismissStorageWarn, cloud, authed, email, onSignIn, onSignOut }) {
@@ -1266,9 +1267,10 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
                     {searching ? highlight(m.content, q) : m.content}
                   </div>
                   {m.role === 'assistant' && !m.isAmbient && (
-                    <div style={{ position: 'absolute', top: 3, right: -46, display: 'flex', gap: 4 }}>
+                    <div style={{ position: 'absolute', top: 3, right: -68, display: 'flex', gap: 4 }}>
                       <button aria-label="Read this message aloud" onClick={() => speakAs(m.content, m.companion)} style={{ background: 'none', border: 'none', color: C.textDim, fontSize: 12, cursor: 'pointer', opacity: 0.55, padding: 0 }}>🔊</button>
                       <button aria-label="Copy message with attribution" onClick={() => copyMsg(m, i)} style={{ background: 'none', border: 'none', color: copiedIdx === i ? C.glow3 : C.textDim, fontSize: 11, cursor: 'pointer', opacity: copiedIdx === i ? 1 : 0.55, padding: 0 }}>{copiedIdx === i ? '✓' : '⧉'}</button>
+                      <button aria-label="Share as a card" title="Share as a card" onClick={async () => { try { const b = await makeCardBlob({ comp: m.companion, quote: m.content, profileName: profile?.name }); await shareOrDownloadCard(b, m.companion); } catch (e) { /* ignore */ } }} style={{ background: 'none', border: 'none', color: C.textDim, fontSize: 11, cursor: 'pointer', opacity: 0.55, padding: 0 }}>🖼</button>
                     </div>
                   )}
                 </div>
