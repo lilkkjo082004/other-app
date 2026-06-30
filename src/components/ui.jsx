@@ -5,7 +5,7 @@ import { C, CSS } from '../theme.js';
 export const Shell = ({ children }) => (
   <div style={{ background: C.void, minHeight: '100vh', position: 'relative', overflow: 'hidden' }}>
     <style>{CSS}</style>
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0 }}>
+    <div className="cosmic-bg" style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, transition: 'opacity 0.4s' }}>
       <div style={{ position: 'absolute', width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(circle,rgba(124,91,245,0.08),transparent 70%)', top: '-10%', right: '-8%', filter: 'blur(60px)', animation: 'drift1 25s ease-in-out infinite' }} />
       <div style={{ position: 'absolute', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle,rgba(232,67,147,0.06),transparent 70%)', bottom: '-8%', left: '-5%', filter: 'blur(60px)', animation: 'drift2 30s ease-in-out infinite' }} />
     </div>

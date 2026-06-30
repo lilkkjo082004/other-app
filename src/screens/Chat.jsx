@@ -16,6 +16,7 @@ import { detectCrisis, CRISIS_RESOURCES, CRISIS_INTRO } from '../lib/crisis.js';
 import { isAuthed as apiAuthed, logMood } from '../lib/api.js';
 import { aiEnabled } from '../config.js';
 import { onDeviceActive } from '../lib/ondevice.js';
+import { calmEnabled } from '../lib/comfort.js';
 import { scanLocation, shouldNudgePlace, markPlaceNudged, weatherNow } from '../lib/location.js';
 import { parseAction, stripActionPartial, downloadICS, googleCalUrl, formatWhen, actionTitle } from '../lib/actions.js';
 import { birthdayStatus, monthsKnown } from '../lib/occasion.js';
@@ -70,14 +71,36 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const [focusUntil, setFocusUntil] = useState(() => { try { const v = +localStorage.getItem('other_focus_until'); return v && v > Date.now() ? v : null; } catch (e) { return null; } });
   const focusRef = useRef(focusUntil);
   useEffect(() => { focusRef.current = focusUntil; }, [focusUntil]);
+  // Body-doubling: the companion keeping you company during a focus session.
+  const [focusBuddy, setFocusBuddy] = useState(() => { try { const id = localStorage.getItem('other_focus_buddy'); return id ? (init.find((c) => c.id === id) || null) : null; } catch (e) { return null; } });
+  const focusBuddyRef = useRef(focusBuddy);
+  useEffect(() => { focusBuddyRef.current = focusBuddy; }, [focusBuddy]);
   const [, setNowTick] = useState(0);
-  function startFocus(minutes) {
+  function startFocus(minutes, buddy) {
     const m = Math.max(1, Math.min(180, Number(minutes) || 25));
     const until = Date.now() + m * 60000;
     setFocusUntil(until);
     try { localStorage.setItem('other_focus_until', String(until)); } catch (e) { /* ignore */ }
+    if (buddy) {
+      setFocusBuddy(buddy);
+      try { localStorage.setItem('other_focus_buddy', buddy.id); } catch (e) { /* ignore */ }
+      setMsgs((p) => [...p, { role: 'assistant', companion: buddy, content: `I’m right here with you — settle in and start whenever you’re ready. I’ll keep it quiet and stay alongside you the whole ${m} minutes. ✦`, ts: Date.now() }]);
+    }
   }
-  function endFocus() { setFocusUntil(null); try { localStorage.removeItem('other_focus_until'); } catch (e) { /* ignore */ } }
+  function endFocus() {
+    setFocusUntil(null);
+    try { localStorage.removeItem('other_focus_until'); localStorage.removeItem('other_focus_buddy'); } catch (e) { /* ignore */ }
+    const buddy = focusBuddyRef.current;
+    if (buddy) {
+      setFocusBuddy(null);
+      const wrap = [
+        `That’s time. You showed up and stayed with it — that’s the whole thing. Proud of you ✦`,
+        `Done. However much you got through, you did it alongside me — nice work. Stretch a little?`,
+        `Time’s up. Whatever happened in there, you started, and that’s the hard part. ♡`,
+      ][Math.floor(Math.random() * 3)];
+      setMsgs((p) => [...p, { role: 'assistant', companion: buddy, content: wrap, ts: Date.now() }]);
+    }
+  }
   useEffect(() => {
     if (!focusUntil) return;
     const iv = setInterval(() => { if (Date.now() >= focusUntil) { endFocus(); } else { setNowTick((t) => t + 1); } }, 1000);
@@ -154,7 +177,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     const raw = (t && t.trim()) || acc;
     const { clean, action } = parseAction(raw);
     const finalText = clean || raw;
-    if (action?.type === 'focus') startFocus(action.minutes);
+    if (action?.type === 'focus') startFocus(action.minutes, c);
     const extra = action && action.type !== 'focus' ? { action } : {};
     if (sid === null) {
       setTyping(null);
@@ -252,7 +275,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
             const t = await proactiveCompanion(c, profFor(c), 'group', comps, restored.messages || [], 'return', humanizeAway(awayMs), fu?.focus || '');
             setMsgs((p) => [...p, { role: 'assistant', companion: c, content: t, ts: Date.now() }]);
             if (fu) consumeFollowup(c.id, fu.id);
-            if (autoSpeak) speakAs(t, c);
+            if (autoSpeak && !calmEnabled()) speakAs(t, c);
           } catch (e) { /* ignore */ }
           setTyping(null); setLoading(false);
         }
@@ -308,7 +331,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       setTyping(c); setLoading(true);
       try {
         const t = await proactiveCompanion(c, profFor(c), 'group', comps, msgsRef.current, 'place', '', hit.place.name);
-        if (alive) { setMsgs((p) => [...p, { role: 'assistant', companion: c, content: t, ts: Date.now() }]); if (autoSpeak) speakAs(t, c); }
+        if (alive) { setMsgs((p) => [...p, { role: 'assistant', companion: c, content: t, ts: Date.now() }]); if (autoSpeak && !calmEnabled()) speakAs(t, c); }
       } catch (e) { /* ignore */ }
       setTyping(null); setLoading(false);
       placeBusyRef.current = false;
@@ -590,7 +613,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         const t = await proactiveCompanion(c, profFor(c), 'group', comps, msgsRef.current, 'idle', '', fu?.focus || '');
         setMsgs((p) => [...p, { role: 'assistant', companion: c, content: t, ts: Date.now() }]);
         if (fu) consumeFollowup(c.id, fu.id);
-        if (autoSpeak) speakAs(t, c);
+        if (autoSpeak && !calmEnabled()) speakAs(t, c);
       } catch (e) { /* ignore */ }
       setTyping(null); setLoading(false);
     }, 4 * 60 * 1000);
@@ -654,7 +677,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     for (const c of cc) {
       const t = await greetCompanion(c, profFor(c), priv ? 'private' : 'group', comps);
       setMsgs((p) => [...p, { role: 'assistant', companion: c, content: t, ts: Date.now() }]);
-      if (autoSpeak) speakAs(t, c);
+      if (autoSpeak && !calmEnabled()) speakAs(t, c);
     }
     setLoading(false);
   }
@@ -703,7 +726,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         finalText = await streamReply(c, run, priv ? 'private' : 'group', controller.signal);
       } catch (e) { break; } // generation stopped
       run = [...run, { role: 'assistant', companion: c, content: finalText, ts: Date.now() }];
-      if (autoSpeak) speakAs(finalText, c);
+      if (autoSpeak && !calmEnabled()) speakAs(finalText, c);
       if (stopRef.current) break;
     }
     streamingRef.current = false;
@@ -735,7 +758,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     const controller = new AbortController(); abortRef.current = controller;
     try {
       const t = await streamReply(comp, history, priv ? 'private' : 'group', controller.signal);
-      if (autoSpeak) speakAs(t, comp);
+      if (autoSpeak && !calmEnabled()) speakAs(t, comp);
     } catch (e) { /* stopped */ }
     streamingRef.current = false; abortRef.current = null; setTyping(null); setLoading(false);
   }
@@ -961,7 +984,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         const mm = Math.floor(s / 60), ss = s % 60;
         return (
           <div style={{ background: `${C.glow3}14`, borderBottom: `1px solid ${C.glow3}44`, padding: '7px 14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, fontSize: 12, color: C.glow3 }}>
-            <span>🎯 Focus time — {mm}:{String(ss).padStart(2, '0')} left · companions are keeping it quiet</span>
+            <span>🎯 {focusBuddy ? `${focusBuddy.name} is here with you` : 'Focus time'} — {mm}:{String(ss).padStart(2, '0')} left · keeping it quiet</span>
             <button onClick={endFocus} style={{ background: 'none', border: `1px solid ${C.glow3}66`, borderRadius: 7, padding: '2px 10px', color: C.glow3, fontSize: 11, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>End</button>
           </div>
         );
@@ -1033,6 +1056,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
           {living.length < 3 && <button onClick={summon} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.glow2, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif" }}>✦  Summon a companion</button>}
           <button onClick={() => { setShowMenu(false); setPanel('story'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📖  Your story so far</button>
           <button onClick={() => { setShowMenu(false); setPanel('places'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📍  Find nearby</button>
+          {!focusUntil && active.length > 0 && <button onClick={() => { const buddy = priv || active[0]; setShowMenu(false); startFocus(25, buddy); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🎯  Focus together (25 min)</button>}
           <button onClick={() => { setShowMenu(false); setPanel('settings'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>⚙  Settings</button>
           <button onClick={() => setShowMenu(false)} style={{ width: '100%', background: 'none', border: `1px solid ${C.border}`, borderRadius: 7, padding: '5px', color: C.textSoft, cursor: 'pointer', fontSize: 11, fontFamily: "'DM Sans',sans-serif" }}>Close</button>
         </div>

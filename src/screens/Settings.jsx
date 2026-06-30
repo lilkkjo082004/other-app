@@ -8,6 +8,7 @@ import { locationSupported, locationEnabled, locationLabel, requestLocation, set
 import { deleteAccount, fetchEntitlement } from '../lib/api.js';
 import { MANAGE_URL } from '../config.js';
 import { onDeviceSupported, onDeviceEnabled, setOnDeviceEnabled, preloadEngine, setProgressHandler, ON_DEVICE_LABEL } from '../lib/ondevice.js';
+import { calmEnabled, setCalm } from '../lib/comfort.js';
 import { loadSession, saveSession } from '../lib/storage.js';
 import { LegalLink } from './Legal.jsx';
 import Paywall from '../components/Paywall.jsx';
@@ -21,6 +22,8 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
   const loadEnt = () => fetchEntitlement().then(setEnt).catch(() => {});
   useEffect(() => { loadEnt(); }, [authed]);
 
+  const [calm, setCalmState] = useState(calmEnabled());
+  const toggleCalm = () => { const v = !calm; setCalm(v); setCalmState(v); };
   const odSupported = onDeviceSupported();
   const [odOn, setOdOn] = useState(onDeviceEnabled());
   const [odProg, setOdProg] = useState(null);  // { pct, text, error } | null
@@ -382,6 +385,18 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
             <span style={{ color: C.glow2, fontWeight: 700 }}>›</span>
           </button>
         )}
+
+        <div style={{ height: 10 }} />
+        {section('Comfort')}
+        <div style={{ ...card }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontSize: 13, color: C.text }}>Calm Mode</div>
+              <div style={{ fontSize: 11, color: C.textDim, lineHeight: 1.4 }}>Low stimulation — stops background motion, dims the visuals, and mutes auto-speak.</div>
+            </div>
+            <Toggle on={calm} onClick={toggleCalm} label="Calm Mode" />
+          </div>
+        </div>
 
         <div style={{ height: 10 }} />
         {section('On-device AI')}

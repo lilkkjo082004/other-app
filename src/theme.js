@@ -41,4 +41,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}input::placeholder,textar
 .bg2{background:transparent;border:1px solid ${C.border};color:${C.text};border-radius:50px;padding:12px 28px;font-size:14px;font-weight:500;cursor:pointer;transition:all 0.3s;font-family:'DM Sans',sans-serif}
 .bg2:hover{border-color:${C.borderLit};background:${C.surfaceUp}}
 :focus-visible{outline:2px solid ${C.glow1};outline-offset:2px;border-radius:4px}
-@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:0.001ms !important;animation-iteration-count:1 !important;transition-duration:0.001ms !important;scroll-behavior:auto !important}}`;
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:0.001ms !important;animation-iteration-count:1 !important;transition-duration:0.001ms !important;scroll-behavior:auto !important}}
+/* Calm Mode: low-stimulation — stop motion, dim the moving background, soften. */
+.other-calm *,.other-calm *::before,.other-calm *::after{animation-duration:0.001ms !important;animation-iteration-count:1 !important;transition-duration:0.08s !important;scroll-behavior:auto !important}
+.other-calm .cosmic-bg{opacity:0.25;filter:saturate(0.8)}`;
