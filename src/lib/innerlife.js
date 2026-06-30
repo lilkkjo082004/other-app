@@ -232,6 +232,21 @@ export function addLetter(comp, text, now = Date.now()) {
   return [{ ts: now, text: String(text || '').slice(0, 900) }, ...(comp?.letters || [])].slice(0, 10);
 }
 
+// Creative gifts — a companion occasionally makes the user a poem, a tiny
+// playlist, or a little text-art piece. Rarer than letters.
+export function giftDue(comp, now = Date.now()) {
+  return !!comp?.self && monthsKnownLocal(comp, now) >= 1 && now - (comp?.gifts?.[0]?.ts || 0) > 30 * DAY;
+}
+export function giftKindFor(comp) {
+  const t = `${comp?.personality || ''} ${comp?.quirk || ''}`.toLowerCase();
+  if (/music|song|sing|playlist|dance|melod/.test(t)) return 'playlist';
+  if (/art|draw|paint|doodle|whimsy|playful|goofy|silly|creative/.test(t)) return 'art';
+  return 'poem';
+}
+export function addGift(comp, gift, now = Date.now()) {
+  return [{ ts: now, kind: gift.kind || 'poem', text: String(gift.text || '').slice(0, 1200) }, ...(comp?.gifts || [])].slice(0, 10);
+}
+
 // One consolidated "being real" block — human texture + group life. Behavioral
 // (no new state): apologies, boundaries, jealousy, pattern call-outs, checking
 // on each other, rituals, worldview, repaying kindness, a legacy wish, a

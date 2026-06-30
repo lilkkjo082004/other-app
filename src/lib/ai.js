@@ -499,6 +499,27 @@ export async function generateLetter(comp, profile, durationText) {
   return (t || '').trim().slice(0, 900) || null;
 }
 
+function offlineGift(comp, name, kind) {
+  if (kind === 'playlist') return `a little playlist for you ✦\n• "Slow Light" — for the quiet mornings\n• "Hold the Line" — for when it's a lot\n• "Out the Window" — for the good drives\nput it on and think of me, ${name}.`;
+  if (kind === 'art') return `for you, ${name}:\n   . *  ✦ .\n  ( ◠ ◡ ◠ )\n   \\  ~  /\n    \`---\`\na tiny creature who thinks you're doing great.`;
+  return `for ${name} —\nyou move through hard days\nlike water finds the sea:\nnot loud, just sure.\nstill here. still glad it's you.`;
+}
+
+/** A small creative gift (poem | playlist | art) in the companion's voice. */
+export async function generateGift(comp, profile, kind = 'poem') {
+  const name = profile?.name || 'you';
+  if (!aiEnabled()) return offlineGift(comp, name, kind);
+  const what = kind === 'playlist'
+    ? `a tiny playlist (3-4 songs) you'd send ${name} right now — each line "Title — Artist" with a 3-5 word reason, plus one warm closing line`
+    : kind === 'art'
+      ? `a small piece of text/ASCII art (3-5 short lines) plus a one-line caption for ${name}`
+      : `a short, warm poem for ${name} (4-8 short lines)`;
+  const sys = `You are ${comp.name} (${comp.pronouns || 'they/them'}): ${comp.personality}. Make ${what}, in your own voice — heartfelt and specific, not sappy. Output only the gift, no preamble.`;
+  let t;
+  try { t = await rawComplete(sys, 'Make the gift.', 320); } catch (e) { return offlineGift(comp, name, kind); }
+  return ((t || '').trim().slice(0, 1100)) || offlineGift(comp, name, kind);
+}
+
 /** First greeting when a companion comes on screen. */
 export async function greetCompanion(comp, profile, mode, allC) {
   if (aiEnabled()) {

@@ -4,8 +4,8 @@ import { Shell } from '../components/ui.jsx';
 import { speakAs, speakAsAsync, stopSpeaking, useSpeechRec } from '../lib/voice.js';
 import CallScreen from '../components/CallScreen.jsx';
 import { genAmbient, bumpBond } from '../lib/relationships.js';
-import { askCompanion, greetCompanion, proactiveCompanion, ambientThreadAI, extractMemories, generateSelf, generateJournalEntry, generateDream, generateWant, generateShift, generateVulnerableShare, generatePeerViews, generateSharedMoment, generateGrowth, generateInsideJoke, generateLetter } from '../lib/ai.js';
-import { withInteraction, journalDue, addJournal, dreamDue, makeDream, closenessStage, stageRank, milestoneLine, wantDue, shiftDue, shouldOpenUp, makeStamped, peerViewsDue, loreDue, addLore, growthDue, addGrowth, knownDuration, jokesDue, addJoke, identityQuestion, letterDue, addLetter } from '../lib/innerlife.js';
+import { askCompanion, greetCompanion, proactiveCompanion, ambientThreadAI, extractMemories, generateSelf, generateJournalEntry, generateDream, generateWant, generateShift, generateVulnerableShare, generatePeerViews, generateSharedMoment, generateGrowth, generateInsideJoke, generateLetter, generateGift } from '../lib/ai.js';
+import { withInteraction, journalDue, addJournal, dreamDue, makeDream, closenessStage, stageRank, milestoneLine, wantDue, shiftDue, shouldOpenUp, makeStamped, peerViewsDue, loreDue, addLore, growthDue, addGrowth, knownDuration, jokesDue, addJoke, identityQuestion, letterDue, addLetter, giftDue, giftKindFor, addGift } from '../lib/innerlife.js';
 import { mergeMemories, removeMemory, pendingFollowups, markFollowed, gossipPick, absorbOverheard } from '../lib/memory.js';
 import { isLimited } from '../lib/entitlements.js';
 import { genComp, freshName } from '../lib/companions.js';
@@ -510,6 +510,16 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         if (alive && letter) {
           setComps((p) => p.map((x) => (x.id === c.id ? { ...x, letters: addLetter(x, letter) } : x)));
           setMsgs((p) => [...p, { role: 'assistant', companion: c, content: 'I wrote you something — it\'s on my profile. ✉️', ts: Date.now() }]);
+        }
+      }
+      for (const c of living) { // 7d) creative gifts (rare — poem / playlist / art)
+        if (!giftDue(c) || !budget()) continue;
+        const kind = giftKindFor(c);
+        gens++; const gift = await generateGift(c, profile, kind);
+        if (alive && gift) {
+          setComps((p) => p.map((x) => (x.id === c.id ? { ...x, gifts: addGift(x, { kind, text: gift }) } : x)));
+          const icon = kind === 'playlist' ? '🎵' : kind === 'art' ? '🎨' : '✦';
+          setMsgs((p) => [...p, { role: 'assistant', companion: c, content: `I made you something — it's in our story. ${icon}`, ts: Date.now() }]);
         }
       }
       for (const c of living) { // 8) long-term growth
