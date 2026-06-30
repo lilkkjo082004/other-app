@@ -39,6 +39,7 @@ set_secret () {
 set_secret AUTH_SECRET       "long random string for signing tokens"
 set_secret ANTHROPIC_API_KEY "sk-ant-... enables POST /ai"
 set_secret VAPID_PRIVATE     "VAPID private key — enables push check-ins (optional)"
+set_secret BILLING_WEBHOOK_SECRET "shared secret your RevenueCat/Stripe webhook sends (optional)"
 
 echo "==> 4/5  Reminder: set vars in wrangler.toml [vars] before deploying:"
 echo "    ALLOWED_ORIGIN (your web origin), VAPID_PUBLIC, VAPID_SUBJECT,"

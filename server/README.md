@@ -18,11 +18,20 @@ AI-only `../worker/` when you want a full backend.
 | POST   | `/push/subscribe`   | ✓ | `{subscription}` — store a Web Push sub |
 | POST   | `/push/unsubscribe` | ✓ | `{endpoint}` — remove a Web Push sub    |
 | DELETE | `/account`      | ✓    | Erase the user + all server data (ToS §10.1) |
-| POST   | `/ai`           | —    | `{model,system,messages}` → `{text}`      |
+| POST   | `/ai`           | —    | `{system,messages}` → `{text}`. Model is chosen **server-side by tier** (the client's `model` is ignored): free → `FREE_MODEL`, plus → `PLUS_MODEL` up to `PLUS_DAILY_PREMIUM`/day then `FREE_MODEL`. |
 | POST   | `/tts`          | —    | `{text,voiceIdx}` → `audio/mpeg` (ElevenLabs) |
+| GET    | `/entitlement`  | ✓    | `{tier:'free'\|'plus', active}`              |
+| POST   | `/billing/webhook` | — | RevenueCat/Stripe event → upserts the user's entitlement. Verifies `Authorization` against `BILLING_WEBHOOK_SECRET`; body `{event:{type,app_user_id,expiration_at_ms}}` (or a flat shape). |
 
 Auth is a Bearer token (`Authorization: Bearer <token>`) — a stateless
 HMAC-signed `uid.exp.sig`. Passwords are hashed with PBKDF2-SHA256.
+
+### Subscriptions
+Premium is enforced **server-side**: the billing webhook records each user's
+entitlement in D1 (keyed by `app_user_id` = our user id), and `/ai` picks the
+model by tier so a client can't self-upgrade. Free/anonymous users always get
+`FREE_MODEL`. Tunable via `[vars]`: `FREE_MODEL`, `PLUS_MODEL`,
+`PLUS_DAILY_PREMIUM`; plus the `BILLING_WEBHOOK_SECRET` secret.
 
 ## Companion check-ins (Web Push)
 

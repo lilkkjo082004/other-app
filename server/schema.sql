@@ -45,3 +45,14 @@ CREATE TABLE IF NOT EXISTS rate_limits (
   count        INTEGER NOT NULL,
   window_start INTEGER NOT NULL
 );
+
+-- Subscription entitlements (one row per user). tier 'free' | 'plus'. Written
+-- by the billing webhook; read on /ai to pick the model server-side.
+CREATE TABLE IF NOT EXISTS entitlements (
+  user_id    TEXT PRIMARY KEY,
+  tier       TEXT NOT NULL DEFAULT 'free',
+  status     TEXT,
+  provider   TEXT,
+  expires_at INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL
+);

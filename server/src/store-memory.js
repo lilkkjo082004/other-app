@@ -6,6 +6,7 @@ export function memoryStore() {
   const moods = [];
   const pushSubs = new Map(); // endpoint -> sub
   const rl = new Map(); // rate-limit key -> { count, windowStart }
+  const entitlements = new Map(); // uid -> entitlement
   let seq = 1;
 
   return {
@@ -56,6 +57,13 @@ export function memoryStore() {
       states.delete(uid);
       for (let i = moods.length - 1; i >= 0; i--) if (moods[i].user_id === uid) moods.splice(i, 1);
       for (const [ep, s] of pushSubs) if (s.user_id === uid) pushSubs.delete(ep);
+      entitlements.delete(uid);
+    },
+    async getEntitlement(uid) {
+      return entitlements.get(uid) || null;
+    },
+    async setEntitlement(uid, e) {
+      entitlements.set(uid, { user_id: uid, tier: e.tier || 'free', status: e.status || null, provider: e.provider || null, expires_at: e.expires_at || 0, updated_at: Date.now() });
     },
     // Fixed-window counter. Returns { allowed, remaining, retryAfter(seconds) }.
     async rateLimit(key, limit, windowMs) {

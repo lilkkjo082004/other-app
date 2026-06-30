@@ -142,6 +142,7 @@ Backend,TTS proxy,ElevenLabs natural voices via /tts,Partial,P1,NEW; needs key
 Backend,Rate limiting,Per-IP throttle on /ai + auth,Built,P1,NEW
 Backend,Ambient conversation gen,Auto-generate while away,Partial,P1,Client-side; push cron for check-ins
 Backend,Subscription management,Payment processing,Future,P1,ON HOLD
+Backend,Subscription entitlement + model gating,"Billing webhook (RevenueCat/Stripe) records each user's entitlement in D1; GET /entitlement; /ai chooses the model SERVER-SIDE by tier (free=Haiku, plus=Sonnet up to PLUS_DAILY_PREMIUM/day then Haiku) so clients can't self-upgrade; resilient if table unmigrated",Built,P0,"NEW (task #21); entitlements table, store get/setEntitlement, billingWebhook, 7 new server tests"
 Chat System,Companion calendar/reminders,"Companions add calendar events + reminders via .ics + Google Calendar",Built,P1,"NEW; AI action directive -> lib/actions.js, on-device"
 Chat System,Focus time,Companion-set focus timer that quiets nudges,Built,P2,"NEW; [[ACTION focus]], focus banner, suppresses idle/location nudges"
 Companion Dynamics,Deep stable self,"Per-companion character bible (values, fears, dreams, opinions, secret) always in-prompt",Built,P1,"NEW; lib/innerlife.js + ai.generateSelf, one-time, synced"

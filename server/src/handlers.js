@@ -78,6 +78,14 @@ export async function handle(request, env) {
     if (p === '/auth/login' && request.method === 'POST') return login(request, env);
     if (p === '/ai' && request.method === 'POST') return ai(request, env);
     if (p === '/tts' && request.method === 'POST') return tts(request, env);
+    if (p === '/billing/webhook' && request.method === 'POST') return billingWebhook(request, env);
+
+    if (p === '/entitlement' && request.method === 'GET') {
+      const uid = await authUid(request, env);
+      if (!uid) return json({ error: 'unauthorized' }, 401, env);
+      const { tier } = await tierOf(request, env);
+      return json({ tier, active: tier === 'plus' }, 200, env);
+    }
 
     if (p === '/state') {
       const uid = await authUid(request, env);
@@ -278,15 +286,69 @@ async function login(request, env) {
   return json({ token: await signToken(user.id, env.SECRET), email }, 200, env);
 }
 
+// Subscription webhook (RevenueCat by default; also accepts a flat shape for
+// Stripe relays/tests). Verifies a shared secret, then upserts the user's
+// entitlement keyed by app_user_id (which the client sets to our user id).
+async function billingWebhook(request, env) {
+  const secret = env.BILLING_WEBHOOK_SECRET;
+  if (secret) {
+    const auth = request.headers.get('authorization') || '';
+    if (auth !== secret && auth !== `Bearer ${secret}`) return json({ error: 'unauthorized' }, 401, env);
+  }
+  if (!env.store.setEntitlement) return json({ error: 'entitlements unsupported' }, 500, env);
+  const b = await body(request);
+  const ev = b?.event || b || {};
+  const uid = ev.app_user_id || ev.uid || ev.user_id;
+  if (!uid) return json({ error: 'app_user_id required' }, 400, env);
+  const type = String(ev.type || '').toUpperCase();
+  const ENDED = ['EXPIRATION', 'BILLING_ISSUE', 'SUBSCRIPTION_PAUSED', 'REFUND'];
+  let expires_at = Number(ev.expiration_at_ms) || Number(ev.expires_at) || 0;
+  let tier = 'plus';
+  if (ENDED.includes(type)) { tier = 'free'; if (!expires_at) expires_at = Date.now(); }
+  await env.store.setEntitlement(uid, { tier, status: type || 'updated', expires_at, provider: ev.provider || 'revenuecat' });
+  return json({ ok: true }, 200, env);
+}
+
+// Resolve the caller's subscription tier. Anonymous/keyless => free.
+async function tierOf(request, env) {
+  const uid = await authUid(request, env);
+  if (!uid || !env.store.getEntitlement) return { uid: null, tier: 'free' };
+  try {
+    const ent = await env.store.getEntitlement(uid);
+    const active = !!(ent && ent.tier === 'plus' && (!ent.expires_at || ent.expires_at > Date.now()));
+    return { uid, tier: active ? 'plus' : 'free' };
+  } catch (e) {
+    // Entitlements table not migrated yet (or transient) — never break /ai.
+    return { uid, tier: 'free' };
+  }
+}
+
+// The model is chosen SERVER-SIDE by tier so a client can't self-upgrade by
+// changing the requested model. Free => Haiku. Plus => the premium model up to
+// a daily cap, then it gracefully falls back to Haiku (cost protection).
+async function modelForRequest(request, env) {
+  const free = env.FREE_MODEL || 'claude-haiku-4-5-20251001';
+  const plus = env.PLUS_MODEL || 'claude-sonnet-5';
+  const { uid, tier } = await tierOf(request, env);
+  if (tier !== 'plus') return free;
+  const cap = numEnv(env.PLUS_DAILY_PREMIUM, 150);
+  if (env.store.rateLimit && cap > 0) {
+    const r = await env.store.rateLimit(`aiplus:day:${uid}`, cap, 86_400_000);
+    if (r && r.allowed === false) return free;
+  }
+  return plus;
+}
+
 // Claude proxy — same contract as worker/ ({model,max_tokens,system,messages} -> {text}).
 async function ai(request, env) {
   if (!env.ANTHROPIC_API_KEY) return json({ error: 'server missing ANTHROPIC_API_KEY' }, 500, env);
+  const model = await modelForRequest(request, env);
   const b = await body(request);
-  if (!b?.model || !Array.isArray(b.messages) || !b.messages.length) {
-    return json({ error: 'model and messages required' }, 400, env);
+  if (!Array.isArray(b?.messages) || !b.messages.length) {
+    return json({ error: 'messages required' }, 400, env);
   }
   const payload = {
-    model: b.model,
+    model, // server-decided by tier, not the client's requested model
     max_tokens: Math.min(MAX_TOKENS_CAP, Math.max(1, Number(b.max_tokens) || 400)),
     messages: b.messages,
   };

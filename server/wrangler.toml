@@ -23,6 +23,13 @@ AUTH_RATE_LIMIT = "20"
 # Per-IP/day, and an optional global/day ceiling (0 = unlimited).
 AI_DAILY_LIMIT = "200"
 AI_DAILY_TOTAL = "0"
+# Subscription model gating. Free tier => FREE_MODEL; Plus subscribers => PLUS_MODEL
+# up to PLUS_DAILY_PREMIUM calls/day, then they fall back to FREE_MODEL.
+FREE_MODEL = "claude-haiku-4-5-20251001"
+PLUS_MODEL = "claude-sonnet-5"
+PLUS_DAILY_PREMIUM = "150"
+# Set BILLING_WEBHOOK_SECRET as a SECRET (not here): the shared secret your
+# RevenueCat/Stripe webhook sends in its Authorization header.
 # Natural voices (ElevenLabs) for POST /tts — optional, off unless set:
 #   ELEVEN_VOICE_IDS = "id1,id2,id3"
 #   ELEVEN_MODEL     = "eleven_turbo_v2_5"

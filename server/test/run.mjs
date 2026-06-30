@@ -128,5 +128,50 @@ ok(ttsRes.status === 400, 'tts requires text');
 r = await call('GET', '/state', { token: 'garbage.token.here' });
 ok(r.status === 401, 'rejects tampered token');
 
+console.log('subscriptions');
+{
+  const subEnv = { store: memoryStore(), SECRET: 'test-secret', ALLOWED_ORIGIN: '*', BILLING_WEBHOOK_SECRET: 'whsec', ANTHROPIC_API_KEY: 'k', PLUS_DAILY_PREMIUM: '2' };
+  const subCall = async (method, path, { token, body: b, headers: extra } = {}) => {
+    const headers = { ...(extra || {}) };
+    if (b) headers['content-type'] = 'application/json';
+    if (token) headers.authorization = 'Bearer ' + token;
+    const res = await handle(new Request('http://api' + path, { method, headers, body: b ? JSON.stringify(b) : undefined }), subEnv);
+    return { status: res.status, data: await res.json().catch(() => ({})) };
+  };
+  const su = await subCall('POST', '/auth/signup', { body: { email: 'sub@other.app', password: 'hunter2pw' } });
+  const subTok = su.data.token;
+  const subUser = await subEnv.store.getUserByEmail('sub@other.app');
+
+  let w = await subCall('POST', '/billing/webhook', { body: { event: { type: 'INITIAL_PURCHASE', app_user_id: subUser.id, expiration_at_ms: Date.now() + 86400000 } } });
+  ok(w.status === 401, 'billing webhook rejects without the shared secret');
+  w = await subCall('POST', '/billing/webhook', { headers: { authorization: 'Bearer whsec' }, body: { event: { type: 'INITIAL_PURCHASE', app_user_id: subUser.id, expiration_at_ms: Date.now() + 86400000 } } });
+  ok(w.status === 200 && w.data.ok, 'billing webhook grants plus with the secret');
+
+  let e = await subCall('GET', '/entitlement', { token: subTok });
+  ok(e.status === 200 && e.data.tier === 'plus' && e.data.active, 'entitlement reflects active plus');
+
+  const origFetch = globalThis.fetch;
+  let lastModel = null;
+  globalThis.fetch = async (url, opts) => {
+    if (String(url).includes('api.anthropic.com')) {
+      lastModel = JSON.parse(opts.body).model;
+      return new Response(JSON.stringify({ content: [{ type: 'text', text: 'hi' }], stop_reason: 'end_turn' }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    return origFetch(url, opts);
+  };
+  await subCall('POST', '/ai', { body: { model: 'spoofed-premium', messages: [{ role: 'user', content: 'hi' }] } });
+  ok(lastModel === 'claude-haiku-4-5-20251001', 'anonymous request is served the free model (ignores client model)');
+  await subCall('POST', '/ai', { token: subTok, body: { model: 'spoofed', messages: [{ role: 'user', content: 'hi' }] } });
+  ok(lastModel === 'claude-sonnet-5', 'plus user is served the premium model');
+  await subCall('POST', '/ai', { token: subTok, body: { messages: [{ role: 'user', content: 'hi' }] } }); // 2nd premium call (cap=2)
+  await subCall('POST', '/ai', { token: subTok, body: { messages: [{ role: 'user', content: 'hi' }] } }); // 3rd -> over cap
+  ok(lastModel === 'claude-haiku-4-5-20251001', 'plus user over the daily premium cap falls back to the free model');
+  globalThis.fetch = origFetch;
+
+  w = await subCall('POST', '/billing/webhook', { headers: { authorization: 'Bearer whsec' }, body: { event: { type: 'EXPIRATION', app_user_id: subUser.id } } });
+  e = await subCall('GET', '/entitlement', { token: subTok });
+  ok(e.data.tier === 'free' && !e.data.active, 'expiration webhook downgrades to free');
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

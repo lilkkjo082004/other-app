@@ -52,8 +52,18 @@ export function d1Store(DB) {
         DB.prepare('DELETE FROM push_subscriptions WHERE user_id = ?').bind(uid),
         DB.prepare('DELETE FROM mood_events WHERE user_id = ?').bind(uid),
         DB.prepare('DELETE FROM states WHERE user_id = ?').bind(uid),
+        DB.prepare('DELETE FROM entitlements WHERE user_id = ?').bind(uid),
         DB.prepare('DELETE FROM users WHERE id = ?').bind(uid),
       ]);
+    },
+    async getEntitlement(uid) {
+      return await DB.prepare('SELECT user_id, tier, status, provider, expires_at FROM entitlements WHERE user_id = ?').bind(uid).first();
+    },
+    async setEntitlement(uid, e) {
+      await DB.prepare(
+        'INSERT INTO entitlements (user_id, tier, status, provider, expires_at, updated_at) VALUES (?, ?, ?, ?, ?, ?) ' +
+        'ON CONFLICT(user_id) DO UPDATE SET tier = excluded.tier, status = excluded.status, provider = excluded.provider, expires_at = excluded.expires_at, updated_at = excluded.updated_at'
+      ).bind(uid, e.tier || 'free', e.status || null, e.provider || null, e.expires_at || 0, Date.now()).run();
     },
     // Atomic fixed-window counter (upsert resets the window when it has elapsed).
     async rateLimit(key, limit, windowMs) {
