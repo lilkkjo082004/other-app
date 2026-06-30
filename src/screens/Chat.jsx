@@ -30,6 +30,8 @@ import PlacesNearby from './PlacesNearby.jsx';
 import StorySoFar from './StorySoFar.jsx';
 import Recap from './Recap.jsx';
 import Journal from './Journal.jsx';
+import Goals from './Goals.jsx';
+import { goalToNudge, markNudged } from '../lib/goals.js';
 import { makeCardBlob, shareOrDownloadCard } from '../lib/card.js';
 import WakingUp from './WakingUp.jsx';
 
@@ -63,6 +65,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const [lore, setLore] = useState(restored?.lore || []);
   const [jokes, setJokes] = useState(restored?.jokes || []);
   const [journal, setJournal] = useState(restored?.journal || []);
+  const [goals, setGoals] = useState(restored?.goals || []);
   const [weather, setWeather] = useState('');
   const [ambientArriving, setAmbientArriving] = useState(false);
   // Coordinator: at most one companion-initiated "emotional beat" (milestone,
@@ -741,6 +744,34 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comps]);
 
+  // Goals: celebrate a newly-completed goal, and gently check in on an active
+  // one now and then. Celebrations bypass the shared beat (rare + earned).
+  const goalsDoneSeen = useRef(new Set((restored?.goals || []).filter((g) => g.done).map((g) => g.id)));
+  useEffect(() => {
+    const awake = comps.filter((c) => c.status === 'awake');
+    const c = awake[0];
+    for (const g of goals) {
+      if (g.done && !goalsDoneSeen.current.has(g.id)) {
+        goalsDoneSeen.current.add(g.id);
+        if (c) setMsgs((p) => [...p, { role: 'assistant', companion: c, content: `you did it — “${g.text}.” I saw you working toward that. proud of you. ✦`, ts: Date.now() }]);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [goals]);
+  const goalNudgeRef = useRef(false);
+  useEffect(() => {
+    if (goalNudgeRef.current || loadingRef.current) return;
+    const g = goalToNudge(goals);
+    if (!g) return;
+    const c = comps.filter((x) => x.status === 'awake')[0];
+    if (!c) return;
+    if (!claimBeat()) return;
+    goalNudgeRef.current = true;
+    setGoals((list) => markNudged(list, g.id));
+    setMsgs((p) => [...p, { role: 'assistant', companion: c, content: `hey — how’s “${g.text}” coming along? no pressure, I’m just here for it. ✦`, ts: Date.now() }]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comps]);
+
   // Companion-initiated "unprompted thought" after a few minutes of quiet.
   // Re-armed on each send; fires once per idle stretch.
   function armIdle() {
@@ -812,9 +843,9 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     // Don't persist on every streamed token — the final setMsgs (after
     // streamingRef flips false) saves the completed turn once.
     if (streamingRef.current) return;
-    onPersist?.({ companions: comps, messages: msgs, chatMode, autoSpeak, trialStart, bonds, voiceCall, pushFrequency: pushFreq, pushSchedule: pushSched, memories: memStore, spacePos, ambientAlerts, lore, jokes, journal });
+    onPersist?.({ companions: comps, messages: msgs, chatMode, autoSpeak, trialStart, bonds, voiceCall, pushFrequency: pushFreq, pushSchedule: pushSched, memories: memStore, spacePos, ambientAlerts, lore, jokes, journal, goals });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [comps, msgs, chatMode, autoSpeak, bonds, voiceCall, pushFreq, pushSched, memStore, spacePos, ambientAlerts, lore, jokes, journal]);
+  }, [comps, msgs, chatMode, autoSpeak, bonds, voiceCall, pushFreq, pushSched, memStore, spacePos, ambientAlerts, lore, jokes, journal, goals]);
 
   async function greet() {
     setLoading(true);
@@ -980,6 +1011,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   if (panel === 'story') return <StorySoFar lore={lore} jokes={jokes} comps={comps} onBack={() => setPanel(null)} />;
   if (panel === 'recap') return <Recap comps={comps} lore={lore} jokes={jokes} profile={profile} onBack={() => setPanel(null)} />;
   if (panel === 'journal') return <Journal entries={journal} onChange={setJournal} onBack={() => setPanel(null)} />;
+  if (panel === 'goals') return <Goals goals={goals} onChange={setGoals} onBack={() => setPanel(null)} />;
   if (panel === 'space') {
     return (
       <CompanionSpace
@@ -1206,6 +1238,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
           <button onClick={() => { setShowMenu(false); setPanel('story'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📖  Your story so far</button>
           <button onClick={() => { setShowMenu(false); setPanel('recap'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>✨  Your recap</button>
           <button onClick={() => { setShowMenu(false); setPanel('journal'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📓  Journal</button>
+          <button onClick={() => { setShowMenu(false); setPanel('goals'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🌱  Goals</button>
           <button onClick={() => { setShowMenu(false); setPanel('places'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📍  Find nearby</button>
           {!focusUntil && active.length > 0 && <button onClick={() => { const buddy = priv || active[0]; setShowMenu(false); startFocus(25, buddy); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🎯  Focus together (25 min)</button>}
           {active.length > 1 && <button onClick={() => { setShowMenu(false); startGroupCall(); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📞  Group call (everyone)</button>}
