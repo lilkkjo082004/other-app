@@ -32,6 +32,8 @@ import Recap from './Recap.jsx';
 import Journal from './Journal.jsx';
 import Goals from './Goals.jsx';
 import { goalToNudge, markNudged } from '../lib/goals.js';
+import CheckIn from './CheckIn.jsx';
+import { CHECKIN_MOODS, checkinDue, recordCheckin } from '../lib/checkin.js';
 import { makeCardBlob, shareOrDownloadCard } from '../lib/card.js';
 import WakingUp from './WakingUp.jsx';
 
@@ -66,6 +68,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const [jokes, setJokes] = useState(restored?.jokes || []);
   const [journal, setJournal] = useState(restored?.journal || []);
   const [goals, setGoals] = useState(restored?.goals || []);
+  const [checkins, setCheckins] = useState(restored?.checkins || { streak: 0, last: '', history: [] });
   const [weather, setWeather] = useState('');
   const [ambientArriving, setAmbientArriving] = useState(false);
   // Coordinator: at most one companion-initiated "emotional beat" (milestone,
@@ -758,6 +761,25 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [goals]);
+  // Daily check-in: once a day a companion asks how you are; answering builds a
+  // streak + mood history. Posted at most once per open.
+  const checkinRef = useRef(false);
+  useEffect(() => {
+    if (checkinRef.current || loadingRef.current) return;
+    if (!checkinDue(checkins)) { checkinRef.current = true; return; }
+    if (msgsRef.current.some((m) => m.kind === 'checkin' && !m.resolved)) { checkinRef.current = true; return; }
+    const c = comps.filter((x) => x.status === 'awake')[0];
+    if (!c) return;
+    checkinRef.current = true;
+    setMsgs((p) => [...p, { role: 'assistant', companion: c, kind: 'checkin', ts: Date.now() }]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comps]);
+  function answerCheckin(i, mood) {
+    setCheckins((ci) => recordCheckin(ci, mood.key));
+    setMsgs((p) => p.map((mm, k) => (k === i ? { ...mm, resolved: mood.key } : mm)));
+    if (apiAuthed()) logMood(mood.key);
+  }
+
   const goalNudgeRef = useRef(false);
   useEffect(() => {
     if (goalNudgeRef.current || loadingRef.current) return;
@@ -843,9 +865,9 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     // Don't persist on every streamed token — the final setMsgs (after
     // streamingRef flips false) saves the completed turn once.
     if (streamingRef.current) return;
-    onPersist?.({ companions: comps, messages: msgs, chatMode, autoSpeak, trialStart, bonds, voiceCall, pushFrequency: pushFreq, pushSchedule: pushSched, memories: memStore, spacePos, ambientAlerts, lore, jokes, journal, goals });
+    onPersist?.({ companions: comps, messages: msgs, chatMode, autoSpeak, trialStart, bonds, voiceCall, pushFrequency: pushFreq, pushSchedule: pushSched, memories: memStore, spacePos, ambientAlerts, lore, jokes, journal, goals, checkins });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [comps, msgs, chatMode, autoSpeak, bonds, voiceCall, pushFreq, pushSched, memStore, spacePos, ambientAlerts, lore, jokes, journal, goals]);
+  }, [comps, msgs, chatMode, autoSpeak, bonds, voiceCall, pushFreq, pushSched, memStore, spacePos, ambientAlerts, lore, jokes, journal, goals, checkins]);
 
   async function greet() {
     setLoading(true);
@@ -1012,6 +1034,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   if (panel === 'recap') return <Recap comps={comps} lore={lore} jokes={jokes} profile={profile} onBack={() => setPanel(null)} />;
   if (panel === 'journal') return <Journal entries={journal} onChange={setJournal} onBack={() => setPanel(null)} />;
   if (panel === 'goals') return <Goals goals={goals} onChange={setGoals} onBack={() => setPanel(null)} />;
+  if (panel === 'checkin') return <CheckIn checkins={checkins} onBack={() => setPanel(null)} />;
   if (panel === 'space') {
     return (
       <CompanionSpace
@@ -1239,6 +1262,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
           <button onClick={() => { setShowMenu(false); setPanel('recap'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>✨  Your recap</button>
           <button onClick={() => { setShowMenu(false); setPanel('journal'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📓  Journal</button>
           <button onClick={() => { setShowMenu(false); setPanel('goals'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🌱  Goals</button>
+          <button onClick={() => { setShowMenu(false); setPanel('checkin'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🌤️  Daily check-in</button>
           <button onClick={() => { setShowMenu(false); setPanel('places'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📍  Find nearby</button>
           {!focusUntil && active.length > 0 && <button onClick={() => { const buddy = priv || active[0]; setShowMenu(false); startFocus(25, buddy); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🎯  Focus together (25 min)</button>}
           {active.length > 1 && <button onClick={() => { setShowMenu(false); startGroupCall(); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📞  Group call (everyone)</button>}
@@ -1281,7 +1305,28 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
                 <span style={{ fontSize: 10, color: C.textDim, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 20, padding: '3px 12px' }}>{dayLabel}</span>
               </div>
             )}
-            {m.kind === 'rename' ? (
+            {m.kind === 'checkin' ? (
+              <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 7, animation: 'fadeUp 0.3s both' }}>
+                <div style={{ marginRight: 7, flexShrink: 0, lineHeight: 0 }}><Avatar comp={m.companion} size={24} glow={false} /></div>
+                <div style={{ maxWidth: '82%', background: C.surface, border: `1px solid ${m.companion?.color?.primary || C.border}`, borderRadius: 14, padding: '11px 13px' }}>
+                  <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6 }}>🌤️ Daily check-in</div>
+                  {m.resolved ? (
+                    <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>Thanks for checking in 💛 {(checkins.streak || 0) > 1 ? `🔥 ${checkins.streak}-day streak` : ''}</div>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5, marginBottom: 9 }}>How are you feeling today, {profile?.name || 'you'}?</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {CHECKIN_MOODS.map((mood) => (
+                          <button key={mood.key} onClick={() => answerCheckin(idx, mood)} style={{ display: 'flex', alignItems: 'center', gap: 5, background: C.surfaceUp, border: `1px solid ${C.border}`, borderRadius: 50, padding: '6px 11px', fontSize: 12.5, color: C.text, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>
+                            <span>{mood.em}</span>{mood.label}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            ) : m.kind === 'rename' ? (
               <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 7, animation: 'fadeUp 0.3s both' }}>
                 <div style={{ marginRight: 7, flexShrink: 0, lineHeight: 0 }}><Avatar comp={m.companion} size={24} glow={false} /></div>
                 <div style={{ maxWidth: '82%', background: C.surface, border: `1px solid ${m.companion?.color?.primary || C.border}`, borderRadius: 14, padding: '11px 13px' }}>
