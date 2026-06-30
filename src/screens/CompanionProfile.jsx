@@ -16,6 +16,14 @@ export default function CompanionProfile({ companion: c, trialStart, history, co
   const col = c.color.primary;
   const z = ZODIAC[c.zodiac];
   const sleeping = c.status === 'sleeping';
+  const [editingName, setEditingName] = React.useState(false);
+  const [draftName, setDraftName] = React.useState(c.name);
+  const canEdit = onCustomize && c.status !== 'deleted';
+  const saveName = () => {
+    const n = draftName.trim().slice(0, 24);
+    if (n && n !== c.name) onCustomize({ name: n });
+    setEditingName(false);
+  };
 
   const ownership = () => {
     if (c.purchased) return 'Yours · free companion';
@@ -46,7 +54,20 @@ export default function CompanionProfile({ companion: c, trialStart, history, co
           <SquishyBlob comp={c} size={120} interactive vitality={sleeping ? 0.3 : vitality(c, history || [])} softness={typeof c.blob === 'number' ? c.blob : null} />
         </div>
         <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 2 }}>Touch and drag {c.name} — they're squishy ✦</div>
-        <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 30, fontWeight: 700, margin: '18px 0 0' }}>{c.name}</h1>
+        {editingName ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, margin: '16px 0 0' }}>
+            <input autoFocus value={draftName} maxLength={24}
+              onChange={(e) => setDraftName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') saveName(); if (e.key === 'Escape') { setDraftName(c.name); setEditingName(false); } }}
+              style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 26, fontWeight: 700, textAlign: 'center', background: C.surface, border: `1px solid ${col}88`, borderRadius: 10, color: C.text, padding: '4px 10px', width: 200, outline: 'none' }} />
+            <button aria-label="Save name" onClick={saveName} style={{ background: `${col}22`, border: `1px solid ${col}`, color: col, borderRadius: 8, padding: '6px 8px', cursor: 'pointer', fontSize: 14 }}>✓</button>
+          </div>
+        ) : (
+          <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 30, fontWeight: 700, margin: '18px 0 0', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            {c.name}
+            {canEdit && <button aria-label={`Rename ${c.name}`} onClick={() => { setDraftName(c.name); setEditingName(true); }} style={{ background: 'none', border: 'none', color: C.textDim, fontSize: 15, cursor: 'pointer', padding: 2 }}>✎</button>}
+          </h1>
+        )}
         <p style={{ fontSize: 13, color: C.textSoft }}>{c.pronouns}</p>
         <div style={{ display: 'inline-block', margin: '8px 0 24px', padding: '4px 12px', borderRadius: 20, background: `${col}1f`, border: `1px solid ${col}66`, fontSize: 11, color: col, fontWeight: 600 }}>{sleeping ? '💤 Sleeping' : (c.status === 'deleted' ? 'Gone' : '● Awake')}</div>
 

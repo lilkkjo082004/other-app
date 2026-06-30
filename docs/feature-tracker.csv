@@ -30,7 +30,8 @@ Companion Gen,Surprise Me path,Pure zodiac-based generation,Built,P0,
 Companion Gen,Guide Me builder,Grouped multi-select trait seeds,Built,P0,2 screens
 Companion Gen,Optional free text,Additional vibe description,Built,P0,
 Companion Gen,Waking up sequence,Companions discover themselves live,Built,P0,
-Companion Gen,Self-naming,Companions choose their own names,Built,P0,
+Companion Gen,Self-naming,Companions choose their own names,Built,P0,"UPDATED; ~30 names per element (120 total) in companions.js"
+Companion Gen,Renaming later,"User can rename a companion anytime (profile ✎); companions may also propose a new self-chosen name once close, with accept/keep buttons",Built,P1,"NEW; CompanionProfile inline edit + Chat rename-proposal card; freshName() in companions.js; persists comp.name/renameAsked"
 Companion Gen,Self-pronouns,Companions choose he/she/they,Built,P0,
 Companion Gen,Color identity,Distinct color per companion,Built,P0,8-color palette
 Companion Gen,Companion selection,Choose 1 (free) or all 3 (trial),Built,P0,

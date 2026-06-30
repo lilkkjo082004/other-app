@@ -1,13 +1,27 @@
 import { ZODIAC } from './zodiac.js';
 import { COMP_COLORS } from '../theme.js';
 
-// Self-chosen name pools by zodiac element.
+// Self-chosen name pools by zodiac element. Evocative, mostly gender-neutral
+// (pronouns are chosen separately) and on-theme for a cosmic companion.
 const NP = {
-  fire: ['Blaze', 'Phoenix', 'Soleil', 'Kindle', 'Nova', 'Ash', 'Flare', 'Ember'],
-  earth: ['Sage', 'Terra', 'Briar', 'Onyx', 'Clay', 'Fern', 'Jasper', 'Moss'],
-  air: ['Zephyr', 'Lyra', 'Echo', 'Aero', 'Sky', 'Mist', 'Cirrus', 'Aria'],
-  water: ['Tide', 'Luna', 'Coral', 'Rain', 'Brook', 'Pearl', 'Drift', 'Marisol'],
+  fire: ['Blaze', 'Phoenix', 'Soleil', 'Kindle', 'Nova', 'Ash', 'Flare', 'Ember', 'Cinder', 'Ignis', 'Solene', 'Helio', 'Seraph', 'Aurelio', 'Vesta', 'Pyra', 'Ravi', 'Cael', 'Torin', 'Scarlet', 'Sunny', 'Dahlia', 'Aiden', 'Sol', 'Calla', 'Brand', 'Tindra', 'Surya', 'Roan', 'Amaris'],
+  earth: ['Sage', 'Terra', 'Briar', 'Onyx', 'Clay', 'Fern', 'Jasper', 'Moss', 'Hazel', 'Slate', 'Linden', 'Reed', 'Olive', 'Bracken', 'Cobalt', 'Juniper', 'Flint', 'Rowan', 'Bay', 'Marlow', 'Garnet', 'Dune', 'Ivy', 'Bramble', 'Heath', 'Cedar', 'Vale', 'Thorne', 'Petra', 'Aspen'],
+  air: ['Zephyr', 'Lyra', 'Echo', 'Aero', 'Sky', 'Mist', 'Cirrus', 'Aria', 'Caelum', 'Wren', 'Vesper', 'Nimbus', 'Halcyon', 'Aura', 'Sora', 'Iris', 'Lark', 'Gale', 'Cielo', 'Astra', 'Storm', 'Wisp', 'Breeze', 'Sylph', 'Cyan', 'Skylar', 'Vela', 'Zenith', 'Calliope'],
+  water: ['Tide', 'Luna', 'Coral', 'Rain', 'Brook', 'Pearl', 'Drift', 'Marisol', 'Nerissa', 'Kai', 'Marina', 'River', 'Delta', 'Cove', 'Ondine', 'Mira', 'Maren', 'Naia', 'Caspian', 'Meridian', 'Shore', 'Lir', 'Selkie', 'Nixie', 'Wade', 'Lake', 'Galene', 'Tallulah', 'Nerida'],
 };
+
+// Every name across all elements, for "is this taken?" checks during a rename.
+export const ALL_NAMES = [...new Set(Object.values(NP).flat())];
+
+// Pick a fresh self-chosen name for a companion (e.g. when they rename
+// themselves) — drawn from their element first, never matching a name already
+// in use or their current one. Falls back across all elements if needed.
+export function freshName(comp, used = []) {
+  const taken = new Set([...(used || []), comp?.name].filter(Boolean));
+  const el = ZODIAC[comp?.zodiac]?.el?.toLowerCase();
+  const tryFrom = (arr) => { const a = arr.filter((n) => !taken.has(n)); return a.length ? a[Math.floor(Math.random() * a.length)] : null; };
+  return tryFrom(NP[el] || []) || tryFrom(ALL_NAMES) || comp?.name || 'Nova';
+}
 
 const PSEED = [
   { p: 'fiercely loyal with a sharp wit and a soft center', q: 'collects weird facts and drops them at the worst times' },

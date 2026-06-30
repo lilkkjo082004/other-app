@@ -7,7 +7,7 @@ import { askCompanion, greetCompanion, proactiveCompanion, ambientThreadAI, extr
 import { withInteraction, journalDue, addJournal, dreamDue, makeDream, closenessStage, stageRank, milestoneLine, wantDue, shiftDue, shouldOpenUp, makeStamped, peerViewsDue, loreDue, addLore, growthDue, addGrowth, knownDuration, jokesDue, addJoke, identityQuestion, letterDue, addLetter } from '../lib/innerlife.js';
 import { mergeMemories, removeMemory, pendingFollowups, markFollowed, gossipPick, absorbOverheard } from '../lib/memory.js';
 import { isLimited } from '../lib/entitlements.js';
-import { genComp } from '../lib/companions.js';
+import { genComp, freshName } from '../lib/companions.js';
 import { pickSigns } from '../lib/zodiac.js';
 import { detectMood } from '../lib/evolution.js';
 import { DISCLOSURE_TEXT, isAcknowledged, acknowledgeDisclosure, consumeDailyReminder } from '../lib/disclosure.js';
@@ -426,6 +426,39 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comps]);
+
+  // Self-chosen names: once a companion is genuinely close, they may decide a
+  // different name feels more like them and ask if they can go by it. The user
+  // stays in control (accept / keep). Asked at most once per companion.
+  const renameRef = useRef(false);
+  useEffect(() => {
+    if (renameRef.current || loadingRef.current) return;
+    if (msgsRef.current.some((m) => m.kind === 'rename' && !m.resolved)) { renameRef.current = true; return; }
+    for (const c of comps) {
+      if (c.status !== 'awake' || c.renameAsked) continue;
+      if (stageRank(closenessStage(c).key) < stageRank('close')) continue;
+      if (Math.random() > 0.5) continue;          // only sometimes, when eligible
+      if (!claimBeat()) break;
+      renameRef.current = true;
+      const newName = freshName(c, comps.filter((x) => x.status !== 'deleted').map((x) => x.name));
+      setComps((p) => p.map((x) => (x.id === c.id ? { ...x, renameAsked: true } : x)));
+      setMsgs((p) => [...p, { role: 'assistant', companion: c, kind: 'rename', oldName: c.name, newName, ts: Date.now() }]);
+      break;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comps]);
+
+  function acceptRename(i) {
+    const m = msgs[i]; if (!m || m.resolved) return;
+    setComps((p) => p.map((x) => (x.id === m.companion.id ? { ...x, name: m.newName, growth: addGrowth(x, `chose a new name: ${m.newName} (was ${m.oldName})`) } : x)));
+    setMsgs((p) => p.map((mm, k) => (k === i ? { ...mm, resolved: 'accepted' } : mm)));
+    setMsgs((p) => [...p, { role: 'assistant', companion: { ...m.companion, name: m.newName }, content: `Thank you. ${m.newName} feels like me. ♡`, ts: Date.now() }]);
+  }
+  function declineRename(i) {
+    const m = msgs[i]; if (!m || m.resolved) return;
+    setMsgs((p) => p.map((mm, k) => (k === i ? { ...mm, resolved: 'kept' } : mm)));
+    setMsgs((p) => [...p, { role: 'assistant', companion: m.companion, content: `That's okay — I'll keep being ${m.oldName}. ♡`, ts: Date.now() }]);
+  }
 
   // Vulnerability at depth: once a companion feels close, they open up about
   // something tender — once. Fires at most once per session.
@@ -1001,7 +1034,27 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
                 <span style={{ fontSize: 10, color: C.textDim, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 20, padding: '3px 12px' }}>{dayLabel}</span>
               </div>
             )}
-            {m.role === 'system' ? (
+            {m.kind === 'rename' ? (
+              <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 7, animation: 'fadeUp 0.3s both' }}>
+                <div style={{ marginRight: 7, flexShrink: 0, lineHeight: 0 }}><Avatar comp={m.companion} size={24} glow={false} /></div>
+                <div style={{ maxWidth: '82%', background: C.surface, border: `1px solid ${m.companion?.color?.primary || C.border}`, borderRadius: 14, padding: '11px 13px' }}>
+                  <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4 }}>✦ A new name</div>
+                  {m.resolved === 'accepted' ? (
+                    <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>You now call them <strong style={{ color: m.companion?.color?.primary }}>{m.newName}</strong>.</div>
+                  ) : m.resolved === 'kept' ? (
+                    <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>They’re staying <strong>{m.oldName}</strong>.</div>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: 13.5, color: C.text, lineHeight: 1.5 }}>I’ve been sitting with something… <strong style={{ color: m.companion?.color?.primary }}>{m.newName}</strong> feels more like who I’m becoming. Would it be okay to go by that?</div>
+                      <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                        <button onClick={() => acceptRename(idx)} style={{ flex: 1, padding: '8px 0', borderRadius: 9, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", fontSize: 12.5, fontWeight: 700, background: `${m.companion?.color?.primary || C.glow1}22`, border: `1px solid ${m.companion?.color?.primary || C.glow1}`, color: m.companion?.color?.primary || C.glow1 }}>Call you {m.newName}</button>
+                        <button onClick={() => declineRename(idx)} style={{ padding: '8px 12px', borderRadius: 9, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", fontSize: 12.5, fontWeight: 600, background: 'transparent', border: `1px solid ${C.border}`, color: C.textSoft }}>Keep {m.oldName}</button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            ) : m.role === 'system' ? (
               m.kind === 'crisis' ? <CrisisCard /> : <DisclosureNote text={m.content} />
             ) : (
             <div ref={(el) => { if (idx != null && idx >= 0) { if (el) msgRefs.current.set(idx, el); else msgRefs.current.delete(idx); } }} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', marginBottom: 7, animation: 'fadeUp 0.3s both', borderRadius: 14, boxShadow: flashIdx === idx ? `0 0 0 2px ${C.glow1}aa` : 'none', transition: 'box-shadow 0.6s ease' }}>
