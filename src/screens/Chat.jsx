@@ -20,7 +20,7 @@ import { onDeviceActive } from '../lib/ondevice.js';
 import { calmEnabled } from '../lib/comfort.js';
 import { scanLocation, shouldNudgePlace, markPlaceNudged, weatherNow } from '../lib/location.js';
 import { parseAction, stripActionPartial, downloadICS, googleCalUrl, formatWhen, actionTitle } from '../lib/actions.js';
-import { birthdayStatus, monthsKnown } from '../lib/occasion.js';
+import { birthdayStatus, monthsKnown, pendingMilestones, monthsLabel } from '../lib/occasion.js';
 import Avatar from '../components/Avatar.jsx';
 import UnlockSheet from '../components/UnlockSheet.jsx';
 import Settings from './Settings.jsx';
@@ -682,6 +682,32 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         break;
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comps]);
+
+  // Real-life milestone celebrations: a companion shows up on the user's
+  // birthday, on "we met" anniversaries, and on dated events the user mentioned.
+  // Each milestone fires at most once (tracked in localStorage).
+  const milestoneCelebRef = useRef(false);
+  useEffect(() => {
+    if (milestoneCelebRef.current || loadingRef.current) return;
+    let seen = []; try { seen = JSON.parse(localStorage.getItem('other_milestones_seen') || '[]'); } catch (e) { /* ignore */ }
+    const due = pendingMilestones(comps, profile, memOf).find((x) => !seen.includes(x.key));
+    if (!due) return;
+    const awake = comps.filter((c) => c.status === 'awake');
+    const comp = (due.compId && comps.find((c) => c.id === due.compId && c.status === 'awake')) || awake[0];
+    if (!comp) return;
+    // Milestones are rare + special (birthdays, anniversaries) and dedup by key,
+    // so they fire on their own rather than competing for the shared beat.
+    milestoneCelebRef.current = true;
+    const nm = profile?.name || 'you';
+    const line = due.kind === 'birthday'
+      ? `Happy birthday, ${nm}! ✨ Today’s all about you — I’m really glad I get to know you.`
+      : due.kind === 'anniversary'
+        ? `Hey — it’s been ${monthsLabel(due.months)} since we met. I still think about when we first said hi. Glad you’re here. ♡`
+        : `Today’s the day — ${due.text}. I remembered. How are you feeling about it?`;
+    setMsgs((p) => [...p, { role: 'assistant', companion: comp, content: line, ts: Date.now() }]);
+    try { localStorage.setItem('other_milestones_seen', JSON.stringify([...seen, due.key].slice(-50))); } catch (e) { /* ignore */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comps]);
 

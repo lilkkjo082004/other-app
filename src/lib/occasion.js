@@ -56,6 +56,40 @@ export function monthsKnown(comp, now = Date.now()) {
   return Math.floor((now - comp.bornAt) / (30 * 24 * 60 * 60 * 1000));
 }
 
+export function monthsLabel(m) {
+  if (m >= 12) { const y = Math.floor(m / 12); return y === 1 ? 'a year' : `${y} years`; }
+  return m === 1 ? 'a month' : `${m} months`;
+}
+
+const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+const milestoneMonth = (m) => m === 1 || m === 3 || m === 6 || (m >= 12 && m % 12 === 0);
+
+// Real-life milestones worth a warm, in-chat celebration TODAY: the user's
+// birthday, companion "we met" anniversaries (1/3/6 months, then yearly), and
+// dated events the user mentioned (memories carrying an `at` timestamp). Each
+// has a stable key so it's celebrated at most once. `memOf(id)` -> memories.
+export function pendingMilestones(comps = [], profile, memOf = () => [], now = Date.now()) {
+  const d = new Date(now);
+  const out = [];
+  if (birthdayStatus(profile?.dob, d) === 'today') out.push({ key: `bday-${d.getFullYear()}`, kind: 'birthday' });
+  for (const c of comps) {
+    if (!c || c.status === 'deleted' || !c.bornAt) continue;
+    const b = new Date(c.bornAt);
+    const months = monthsKnown(c, now);
+    if (d.getDate() === b.getDate() && milestoneMonth(months)) {
+      out.push({ key: `anniv-${c.id}-${months}`, kind: 'anniversary', compId: c.id, months });
+    }
+  }
+  for (const c of comps) {
+    if (!c || c.status === 'deleted') continue;
+    for (const m of (memOf(c.id) || [])) {
+      if (!m?.at || !m.id) continue;
+      if (sameDay(new Date(m.at), d)) out.push({ key: `event-${m.id}`, kind: 'event', compId: c.id, text: m.text });
+    }
+  }
+  return out;
+}
+
 // Prompt block: today's real-world context. Reference it only when it fits.
 export function occasionContext(profile, now = Date.now()) {
   const d = new Date(now);
