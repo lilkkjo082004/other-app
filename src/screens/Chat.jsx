@@ -29,6 +29,7 @@ import CompanionSpace from './CompanionSpace.jsx';
 import PlacesNearby from './PlacesNearby.jsx';
 import StorySoFar from './StorySoFar.jsx';
 import Recap from './Recap.jsx';
+import Journal from './Journal.jsx';
 import { makeCardBlob, shareOrDownloadCard } from '../lib/card.js';
 import WakingUp from './WakingUp.jsx';
 
@@ -61,6 +62,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const [ambientAlerts, setAmbientAlerts] = useState(restored?.ambientAlerts !== false);
   const [lore, setLore] = useState(restored?.lore || []);
   const [jokes, setJokes] = useState(restored?.jokes || []);
+  const [journal, setJournal] = useState(restored?.journal || []);
   const [weather, setWeather] = useState('');
   const [ambientArriving, setAmbientArriving] = useState(false);
   // Coordinator: at most one companion-initiated "emotional beat" (milestone,
@@ -800,9 +802,9 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     // Don't persist on every streamed token — the final setMsgs (after
     // streamingRef flips false) saves the completed turn once.
     if (streamingRef.current) return;
-    onPersist?.({ companions: comps, messages: msgs, chatMode, autoSpeak, trialStart, bonds, voiceCall, pushFrequency: pushFreq, pushSchedule: pushSched, memories: memStore, spacePos, ambientAlerts, lore, jokes });
+    onPersist?.({ companions: comps, messages: msgs, chatMode, autoSpeak, trialStart, bonds, voiceCall, pushFrequency: pushFreq, pushSchedule: pushSched, memories: memStore, spacePos, ambientAlerts, lore, jokes, journal });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [comps, msgs, chatMode, autoSpeak, bonds, voiceCall, pushFreq, pushSched, memStore, spacePos, ambientAlerts, lore, jokes]);
+  }, [comps, msgs, chatMode, autoSpeak, bonds, voiceCall, pushFreq, pushSched, memStore, spacePos, ambientAlerts, lore, jokes, journal]);
 
   async function greet() {
     setLoading(true);
@@ -967,6 +969,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   if (panel === 'places') return <PlacesNearby onBack={() => setPanel(null)} />;
   if (panel === 'story') return <StorySoFar lore={lore} jokes={jokes} comps={comps} onBack={() => setPanel(null)} />;
   if (panel === 'recap') return <Recap comps={comps} lore={lore} jokes={jokes} profile={profile} onBack={() => setPanel(null)} />;
+  if (panel === 'journal') return <Journal entries={journal} onChange={setJournal} onBack={() => setPanel(null)} />;
   if (panel === 'space') {
     return (
       <CompanionSpace
@@ -1192,6 +1195,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
           {living.length < 3 && <button onClick={summon} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.glow2, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif" }}>✦  Summon a companion</button>}
           <button onClick={() => { setShowMenu(false); setPanel('story'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📖  Your story so far</button>
           <button onClick={() => { setShowMenu(false); setPanel('recap'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>✨  Your recap</button>
+          <button onClick={() => { setShowMenu(false); setPanel('journal'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📓  Journal</button>
           <button onClick={() => { setShowMenu(false); setPanel('places'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📍  Find nearby</button>
           {!focusUntil && active.length > 0 && <button onClick={() => { const buddy = priv || active[0]; setShowMenu(false); startFocus(25, buddy); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🎯  Focus together (25 min)</button>}
           {active.length > 1 && <button onClick={() => { setShowMenu(false); startGroupCall(); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📞  Group call (everyone)</button>}
