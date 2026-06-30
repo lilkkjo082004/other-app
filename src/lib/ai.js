@@ -3,17 +3,25 @@ import { authHeader } from './api.js';
 import { buildSystemPrompt } from './prompt.js';
 import { detectCrisis } from './crisis.js';
 import { pickAmbientPair } from './relationships.js';
+import { recallBlock } from './recall.js';
 
-const MAX_HISTORY = 24;
+const MAX_HISTORY = 30;
 
 // ── Real responses via the Cloudflare Worker proxy ──
 // Build the {system, messages} request for one companion from the transcript.
 function buildRequest(comp, profile, msgs, allC, mode) {
-  const system = buildSystemPrompt(comp, profile, allC, mode, msgs);
+  let system = buildSystemPrompt(comp, profile, allC, mode, msgs);
   // Drop in-app system notes (AI disclosures, crisis cards) — they aren't part
   // of the conversation the model should see.
   const convo = msgs.filter((m) => m.role !== 'system');
   const recent = convo.length > MAX_HISTORY ? convo.slice(convo.length - MAX_HISTORY) : convo;
+  // Pull a few relevant messages from before the recent window, keyed off the
+  // user's latest line, and add them to the system prompt as long-term recall.
+  if (convo.length > MAX_HISTORY) {
+    const lastUser = [...recent].reverse().find((m) => m.role === 'user');
+    const block = recallBlock(convo.slice(0, convo.length - MAX_HISTORY), lastUser?.content, profile.name);
+    if (block) system += `\n\n${block}`;
+  }
   const apiMsgs = recent.map((m) => {
     if (m.role === 'user') {
       return { role: 'user', content: `${profile.name || 'User'}: ${m.content}` };

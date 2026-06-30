@@ -26,7 +26,7 @@ import PlacesNearby from './PlacesNearby.jsx';
 import StorySoFar from './StorySoFar.jsx';
 import WakingUp from './WakingUp.jsx';
 
-export default function Chat({ companions: init, profile, trialStart, restored, onPersist, onReset, onUpdateProfile, cloud, authed, email, onSignIn, onSignOut }) {
+export default function Chat({ companions: init, profile, trialStart, restored, onPersist, onReset, onUpdateProfile, storageWarn, onDismissStorageWarn, cloud, authed, email, onSignIn, onSignOut }) {
   const [comps, setComps] = useState(init.map((c) => ({ ...c, status: c.status || 'awake' })));
   const [msgs, setMsgs] = useState(restored ? restored.messages || [] : []);
   const [input, setInput] = useState('');
@@ -955,6 +955,18 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       })()}
 
       {!online && <div style={{ background: `${C.danger}15`, borderBottom: `1px solid ${C.danger}33`, padding: '6px 14px', textAlign: 'center', fontSize: 11, color: C.danger }}>You're offline — messages will send once you're back online.</div>}
+
+      {storageWarn && (
+        <div style={{ background: storageWarn === 'full' ? `${C.danger}1a` : `${C.glow2}14`, borderBottom: `1px solid ${storageWarn === 'full' ? `${C.danger}44` : `${C.glow2}44`}`, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 11.5, color: storageWarn === 'full' ? C.danger : C.textSoft }}>
+          <span style={{ flex: 1, lineHeight: 1.4 }}>
+            {storageWarn === 'full'
+              ? "This device's storage is full — new messages may not be saved. Export a backup so nothing is lost."
+              : 'Your history is getting large for this device. Export a backup to keep it safe.'}
+          </span>
+          <button onClick={() => { setPanel('settings'); onDismissStorageWarn?.(); }} style={{ flexShrink: 0, background: 'transparent', border: `1px solid ${storageWarn === 'full' ? C.danger : C.glow2}`, color: storageWarn === 'full' ? C.danger : C.glow2, borderRadius: 7, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>Export</button>
+          <button aria-label="Dismiss" onClick={() => onDismissStorageWarn?.()} style={{ flexShrink: 0, background: 'none', border: 'none', color: C.textDim, fontSize: 15, cursor: 'pointer', lineHeight: 1 }}>×</button>
+        </div>
+      )}
 
       {listening && <div style={{ background: `${C.danger}15`, borderBottom: `1px solid ${C.danger}33`, padding: '6px 14px', textAlign: 'center', fontSize: 11, color: C.danger }}>🎤 Say a companion's name or speak your message</div>}
 

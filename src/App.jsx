@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getUserAstro, pickSigns } from './lib/zodiac.js';
 import { genComp } from './lib/companions.js';
-import { loadSession, saveSession, clearSession } from './lib/storage.js';
+import { loadSession, saveSession, clearSession, STORAGE_SOFT_LIMIT } from './lib/storage.js';
 import { cloudEnabled } from './config.js';
 import { withAgeVerification } from './lib/age.js';
 import * as api from './lib/api.js';
@@ -32,6 +32,7 @@ export default function App() {
   );
   const [authed, setAuthed] = useState(api.isAuthed());
   const [email, setEmailState] = useState(api.getEmail());
+  const [storageWarn, setStorageWarn] = useState(null);   // 'full' | 'near' | null
 
   // Returning authed users: pull the cloud session and resume from it.
   useEffect(() => {
@@ -78,7 +79,8 @@ export default function App() {
   const persist = (chatState) => {
     if (!profile) return;
     const session = { profile, ...chatState };
-    saveSession(session);
+    const r = saveSession(session);
+    setStorageWarn(!r.ok ? 'full' : (r.bytes > STORAGE_SOFT_LIMIT ? 'near' : null));
     if (cloudEnabled() && api.isAuthed()) api.pushState(session).catch(() => {});
   };
 
@@ -130,7 +132,7 @@ export default function App() {
   };
 
   if (screen === 'auth') return <Auth onAuthed={onAuthed} onBack={() => setScreen(profile ? 'chat' : 'welcome')} />;
-  if (screen === 'chat') return <Chat companions={selC} profile={profile} trialStart={trialStart} restored={restored} onPersist={persist} onReset={reset} onUpdateProfile={updateProfile} {...accountProps} />;
+  if (screen === 'chat') return <Chat companions={selC} profile={profile} trialStart={trialStart} restored={restored} onPersist={persist} onReset={reset} onUpdateProfile={updateProfile} storageWarn={storageWarn} onDismissStorageWarn={() => setStorageWarn(null)} {...accountProps} />;
   if (screen === 'welcome') return <Welcome onStart={() => setScreen('onboarding')} onSignIn={cloudEnabled() ? () => setScreen('auth') : undefined} />;
   if (screen === 'onboarding') return <Onboarding onComplete={handleOB} />;
   if (screen === 'zodiac') return <ZodiacReveal profile={profile} onContinue={() => setScreen('preference')} />;

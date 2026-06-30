@@ -64,6 +64,7 @@ Companion Dynamics,Companion deletion,Permanent removal + in-app confirm,Built,P
 Companion Dynamics,Companion replacement,Summon a new companion after deletion,Built,P1,UPDATED Future->Built; free if none owned else unlock
 Companion Dynamics,Role adaptation,Shift roles based on needs,Built,P0,UPDATED Partial->Built; role-adaptation in prompt RULES
 Companion Dynamics,Long-term memory,"Remembers facts (job, pets, events) + follows up across sessions",Built,P0,"NEW; lib/memory.js, AI extraction, synced, user-forgettable"
+Companion Dynamics,Deeper long-term recall,"Beyond the recent window, on-topic older messages are recalled by keyword overlap with the user's latest line and injected into the prompt, so companions can reference exchanges from weeks/months ago",Built,P1,"NEW; lib/recall.js, used in ai.js buildRequest; recent window also 24->30"
 Emotional Intel,Mood detection,Detect stress/excitement in messages,Built,P0,Keyword-based
 Emotional Intel,Tone adjustment,Companions shift tone based on mood,Built,P0,
 Emotional Intel,Invisible tracking,User never sees mood data,Built,P0,
@@ -90,6 +91,7 @@ Monetization,Deletion repurchase,New companion costs new purchase,Built,P1,UPDAT
 Monetization,Memory subscription,Persistent memory tier,Future,P1,TBD
 Monetization,Payment integration,Real payments (Stripe/RevenueCat),Future,P0,ON HOLD per owner
 Data/Privacy,Local storage,All data on device by default,Built,P0,UPDATED Partial->Built
+Data/Privacy,Storage safety net,"Warns (with one-tap Export) when device storage is full or the history is getting large, so a long chat history is never silently lost",Built,P1,"NEW; saveSession returns status + sessionBytes(), banner in Chat routes to Settings export"
 Data/Privacy,Cloud sync / backup,Account sync + JSON export/import,Built,P1,UPDATED Future->Built; NEW export/import
 Data/Privacy,Full data reset,Wipe everything,Built,P1,UPDATED Future->Built
 Data/Privacy,Account & data deletion,DELETE /account erases all server data,Built,P0,NEW; ToS 10.1 / GDPR
