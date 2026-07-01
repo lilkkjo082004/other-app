@@ -1,13 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { C } from '../theme.js';
 import { Shell, Checks, Pills } from '../components/ui.jsx';
 import { ACTIVITIES, CUISINES, DIETARY, VIBES, COMMUNICATION, RELATIONSHIP, LOVE_LANG, NEEDS, SOCIAL_ID } from '../data/onboarding.js';
+import { readAvatar } from '../lib/photo.js';
 
 // Edit your profile after onboarding — without a reset. Changing the birthday
 // re-derives astrology and re-checks the age gate (handled in App.updateProfile).
 export default function ProfileEdit({ profile, onSave, onBack }) {
   const [f, setF] = useState({ ...profile });
+  const photoRef = useRef(null);
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
+  async function onPhoto(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try { set('photo', await readAvatar(file)); } catch (err) { /* ignore bad image */ }
+  }
+  const initial = (f.name || '?').trim().charAt(0).toUpperCase();
   const toggle = (k, v) => setF((p) => {
     const cur = Array.isArray(p[k]) ? p[k] : [];
     return { ...p, [k]: cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v] };
@@ -32,6 +41,20 @@ export default function ProfileEdit({ profile, onSave, onBack }) {
         <button onClick={() => onSave(f)} disabled={!f.name?.trim()} style={{ background: C.glow1, border: 'none', borderRadius: 20, color: '#fff', fontSize: 13, fontWeight: 600, padding: '7px 16px', cursor: f.name?.trim() ? 'pointer' : 'default', opacity: f.name?.trim() ? 1 : 0.5, fontFamily: "'DM Sans',sans-serif" }}>Save</button>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 40px' }}>
+        <div style={{ ...card, display: 'flex', alignItems: 'center', gap: 14 }}>
+          <input ref={photoRef} type="file" accept="image/*" onChange={onPhoto} style={{ display: 'none' }} />
+          <button aria-label="Change your photo" onClick={() => photoRef.current?.click()} style={{ flexShrink: 0, width: 64, height: 64, borderRadius: '50%', border: `1px solid ${C.border}`, background: f.photo ? `center/cover no-repeat url(${f.photo})` : C.bg, color: C.textSoft, cursor: 'pointer', fontSize: 22, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+            {!f.photo && initial}
+          </button>
+          <div style={{ flex: 1 }}>
+            <div style={label}>Your photo</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => photoRef.current?.click()} style={{ background: C.surfaceUp, border: `1px solid ${C.border}`, borderRadius: 9, padding: '7px 12px', fontSize: 12.5, color: C.text, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>{f.photo ? 'Change' : 'Upload'}</button>
+              {f.photo && <button onClick={() => set('photo', '')} style={{ background: 'none', border: `1px solid ${C.border}`, borderRadius: 9, padding: '7px 12px', fontSize: 12.5, color: C.textSoft, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>Remove</button>}
+            </div>
+            <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 6 }}>Stays on your device / your account. Optional.</div>
+          </div>
+        </div>
         <div style={card}>
           <div style={label}>Name</div>
           <input value={f.name || ''} onChange={(e) => set('name', e.target.value)} style={input} />

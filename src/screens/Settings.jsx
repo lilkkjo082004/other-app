@@ -178,7 +178,12 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 40px' }}>
         {section('You')}
-        <div style={{ ...card, display: 'flex', justifyContent: 'space-between' }}><span style={{ color: C.textSoft, fontSize: 13 }}>Name</span><span style={{ fontSize: 13, fontWeight: 500 }}>{profile.name}</span></div>
+        <div style={{ ...card, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ flexShrink: 0, width: 48, height: 48, borderRadius: '50%', border: `1px solid ${C.border}`, background: profile.photo ? `center/cover no-repeat url(${profile.photo})` : C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.textSoft, fontSize: 18, fontWeight: 600, overflow: 'hidden' }}>
+            {!profile.photo && (profile.name || '?').trim().charAt(0).toUpperCase()}
+          </div>
+          <div><div style={{ fontSize: 14, fontWeight: 600 }}>{profile.name}</div>{profile.occupation && <div style={{ fontSize: 11.5, color: C.textDim }}>{profile.occupation}</div>}</div>
+        </div>
         {profile.astrology && <div style={{ ...card, display: 'flex', justifyContent: 'space-between' }}><span style={{ color: C.textSoft, fontSize: 13 }}>Stars</span><span style={{ fontSize: 13, fontWeight: 500 }}>{profile.astrology.westernData.sym} {cap(profile.astrology.western)}</span></div>}
         <div style={{ ...card, display: 'flex', justifyContent: 'space-between' }}><span style={{ color: C.textSoft, fontSize: 13 }}>Mode</span><span style={{ fontSize: 13, fontWeight: 500 }}>{profile.ageGroup === 'under18' ? 'Under 18 (friendship only)' : (profile.ageVerified ? '18+ · verified' : '18+')}</span></div>
         {onUpdateProfile && (

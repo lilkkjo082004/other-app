@@ -30,6 +30,33 @@ export function readPhoto(file) {
   });
 }
 
+// Read a picked image into a small SQUARE avatar (center-cropped) — for the
+// user's profile photo. Kept small (default 256px JPEG) so it can live on the
+// persisted/synced profile without bloating it.
+export function readAvatar(file, edge = 256) {
+  return new Promise((resolve, reject) => {
+    if (!file || !file.type?.startsWith('image/')) { reject(new Error('not an image')); return; }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const side = Math.min(img.width, img.height);
+        const sx = (img.width - side) / 2;
+        const sy = (img.height - side) / 2;
+        const canvas = document.createElement('canvas');
+        canvas.width = edge; canvas.height = edge;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, edge, edge);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        URL.revokeObjectURL(url);
+        resolve(dataUrl);
+      } catch (e) { URL.revokeObjectURL(url); reject(e); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('could not load image')); };
+    img.src = url;
+  });
+}
+
 // A tiny thumbnail (data URL) to keep in the persisted session so the photo
 // bubble survives a reload without bloating localStorage.
 export function thumbnail(dataUrl, edge = 120) {

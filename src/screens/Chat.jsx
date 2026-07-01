@@ -1509,6 +1509,9 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
                   <button onClick={regenerateLast} aria-label="Regenerate this reply" style={{ background: 'none', border: 'none', color: C.textDim, fontSize: 10.5, cursor: 'pointer', padding: '2px 0', fontFamily: "'DM Sans',sans-serif" }}>↻ Regenerate</button>
                 )}
               </div>
+              {m.role === 'user' && profile?.photo && (
+                <div style={{ marginLeft: 7, flexShrink: 0, width: 24, height: 24, borderRadius: '50%', background: `center/cover no-repeat url(${profile.photo})`, border: `1px solid ${C.border}` }} aria-hidden />
+              )}
             </div>
             )}
           </React.Fragment>
