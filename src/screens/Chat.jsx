@@ -49,6 +49,7 @@ import Vault from './Vault.jsx';
 import MoodInsights from './MoodInsights.jsx';
 import DuoCompat from './DuoCompat.jsx';
 import Timeline from './Timeline.jsx';
+import Cowork from './Cowork.jsx';
 import WakingUp from './WakingUp.jsx';
 
 export default function Chat({ companions: init, profile, trialStart, restored, onPersist, onReset, onUpdateProfile, storageWarn, onDismissStorageWarn, cloud, authed, email, onSignIn, onSignOut }) {
@@ -105,23 +106,24 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const focusBuddyRef = useRef(focusBuddy);
   useEffect(() => { focusBuddyRef.current = focusBuddy; }, [focusBuddy]);
   const [, setNowTick] = useState(0);
-  function startFocus(minutes, buddy) {
-    const m = Math.max(1, Math.min(180, Number(minutes) || 25));
+  function startFocus(minutes, buddy, opts = {}) {
+    const m = Math.max(1, Math.min(300, Number(minutes) || 25));
     const until = Date.now() + m * 60000;
     setFocusUntil(until);
     try { localStorage.setItem('other_focus_until', String(until)); } catch (e) { /* ignore */ }
     if (buddy) {
       setFocusBuddy(buddy);
       try { localStorage.setItem('other_focus_buddy', buddy.id); } catch (e) { /* ignore */ }
-      setMsgs((p) => [...p, { role: 'assistant', companion: buddy, content: `I’m right here with you — settle in and start whenever you’re ready. I’ll keep it quiet and stay alongside you the whole ${m} minutes. ✦`, ts: Date.now() }]);
+      // Cowork posts its own start/end lines, so it opts out of the generic ones.
+      if (!opts.silent) setMsgs((p) => [...p, { role: 'assistant', companion: buddy, content: `I’m right here with you — settle in and start whenever you’re ready. I’ll keep it quiet and stay alongside you the whole ${m} minutes. ✦`, ts: Date.now() }]);
     }
   }
-  function endFocus() {
+  function endFocus(opts = {}) {
     setFocusUntil(null);
     try { localStorage.removeItem('other_focus_until'); localStorage.removeItem('other_focus_buddy'); } catch (e) { /* ignore */ }
     const buddy = focusBuddyRef.current;
-    if (buddy) {
-      setFocusBuddy(null);
+    setFocusBuddy(null);
+    if (buddy && !opts.silent) {
       const wrap = [
         `That’s time. You showed up and stayed with it — that’s the whole thing. Proud of you ✦`,
         `Done. However much you got through, you did it alongside me — nice work. Stretch a little?`,
@@ -1200,6 +1202,11 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   if (panel === 'vault') return <Vault onBack={() => setPanel('you')} />;
   if (panel === 'duo') return <DuoCompat profile={profile} onBack={() => setPanel('you')} />;
   if (panel === 'timeline') return <Timeline comps={comps} lore={lore} jokes={jokes} messages={msgs} onBack={() => setPanel(null)} />;
+  if (panel === 'cowork') return <Cowork comps={comps} profile={profile}
+    onFocus={(mins, buddy) => startFocus(mins, buddy, { silent: true })}
+    onEndFocus={() => endFocus({ silent: true })}
+    onSay={(comp, text) => setMsgs((p) => [...p, { role: 'assistant', companion: comp, content: text, ts: Date.now() }])}
+    onBack={() => setPanel(null)} />;
   if (panel === 'space') {
     return (
       <CompanionSpace
@@ -1431,7 +1438,8 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
           <button onClick={() => { setShowMenu(false); setPanel('goals'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🌱  Goals</button>
           <button onClick={() => { setShowMenu(false); setPanel('checkin'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🌤️  Daily check-in</button>
           <button onClick={() => { setShowMenu(false); setPanel('places'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📍  Find nearby</button>
-          {!focusUntil && active.length > 0 && <button onClick={() => { const buddy = priv || active[0]; setShowMenu(false); startFocus(25, buddy); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🎯  Focus together (25 min)</button>}
+          {active.length > 0 && <button onClick={() => { setShowMenu(false); setPanel('cowork'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🧑‍💻  Cowork station</button>}
+          {!focusUntil && active.length > 0 && <button onClick={() => { const buddy = priv || active[0]; setShowMenu(false); startFocus(25, buddy); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🎯  Quick focus (25 min)</button>}
           {active.length > 1 && <button onClick={() => { setShowMenu(false); startGroupCall(); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📞  Group call (everyone)</button>}
           <button onClick={() => { setShowMenu(false); setPanel('settings'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>⚙  Settings</button>
           <button onClick={() => setShowMenu(false)} style={{ width: '100%', background: 'none', border: `1px solid ${C.border}`, borderRadius: 7, padding: '5px', color: C.textSoft, cursor: 'pointer', fontSize: 11, fontFamily: "'DM Sans',sans-serif" }}>Close</button>
