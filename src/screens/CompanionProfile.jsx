@@ -73,7 +73,7 @@ export default function CompanionProfile({ companion: c, trialStart, history, co
 
         <div style={card}><div style={label}>Astrology</div><div style={{ fontSize: 14 }}>{z.sym} {cap(c.zodiac)}</div><div style={{ fontSize: 12, color: C.textSoft }}>{z.el} · {z.trait}</div></div>
         {c.status !== 'deleted' && <div style={card}><div style={label}>Right now</div><div style={{ fontSize: 14, fontStyle: 'italic' }}>{c.name} is {currentActivity(c)}.</div></div>}
-        {sleeping && c.dream?.text && <div style={card}><div style={label}>Dreaming</div><div style={{ fontSize: 13.5, fontStyle: 'italic', lineHeight: 1.5, color: C.textSoft }}>💤 {c.dream.text}</div></div>}
+        {c.dream?.text && <div style={card}><div style={label}>{sleeping ? 'Dreaming' : 'Last dream'}</div><div style={{ fontSize: 13.5, fontStyle: 'italic', lineHeight: 1.5, color: C.textSoft }}>💤 {c.dream.text}</div></div>}
         {c.self && (
           <div style={card}>
             <div style={label}>Who {c.name} is</div>

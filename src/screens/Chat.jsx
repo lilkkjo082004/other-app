@@ -47,6 +47,8 @@ import Rituals from './Rituals.jsx';
 import Values from './Values.jsx';
 import Vault from './Vault.jsx';
 import MoodInsights from './MoodInsights.jsx';
+import DuoCompat from './DuoCompat.jsx';
+import Timeline from './Timeline.jsx';
 import WakingUp from './WakingUp.jsx';
 
 export default function Chat({ companions: init, profile, trialStart, restored, onPersist, onReset, onUpdateProfile, storageWarn, onDismissStorageWarn, cloud, authed, email, onSignIn, onSignOut }) {
@@ -984,6 +986,47 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     setLoading(false);
   }
 
+  // Ask the room: pose a question and have EVERY awake companion weigh in with
+  // their own take (they already disagree per personality). A group-only action.
+  async function askRoom() {
+    if (!input.trim() || loading) return;
+    const room = active;
+    if (room.length < 2) { send(); return; }
+    const u = input.trim();
+    setInput('');
+    if (inputRef.current) inputRef.current.style.height = 'auto';
+    setAtBottom(true);
+    const nm = [...msgs, { role: 'user', content: u, ts: Date.now() }];
+    setMsgs(nm);
+    setLoading(true);
+    if (detectCrisis(u)) setMsgs((p) => [...p, { role: 'system', kind: 'crisis' }]);
+    const mood = detectMood(u);
+    if (mood && apiAuthed()) logMood(mood);
+    bumpCloseness(room.map((c) => c.id), 'message');
+    stopRef.current = false;
+    streamingRef.current = true;
+    // Ephemeral framing (used for generation, not persisted) nudging distinct takes.
+    let run = [...nm, { role: 'user', content: `(${profile?.name || 'They'} is asking the whole room. As each of you, give your own honest take in 1-2 sentences — it's good to build on or disagree with what the others just said, in your own voice.)` }];
+    for (const c of room) {
+      if (stopRef.current) break;
+      const controller = new AbortController();
+      abortRef.current = controller;
+      let finalText;
+      try { finalText = await streamReply(c, run, 'group', controller.signal); }
+      catch (e) { break; }
+      run = [...run, { role: 'assistant', companion: c, content: finalText, ts: Date.now() }];
+      if (autoSpeak && !calmEnabled()) speakAs(finalText, c);
+      if (stopRef.current) break;
+    }
+    streamingRef.current = false;
+    abortRef.current = null;
+    setTyping(null);
+    setLoading(false);
+    inputRef.current?.focus();
+    armIdle();
+    maybeExtractMemories(run);
+  }
+
   async function send() {
     if (!input.trim() || loading) return;
     const u = input.trim();
@@ -1148,13 +1191,15 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   if (panel === 'checkin') return <CheckIn checkins={checkins} onBack={() => setPanel(null)} />;
   // "For you" hub + its user-centric tools. The hub's card tile shares a
   // cosmic-profile image; the rest open their own panel and return to the hub.
-  if (panel === 'you') return <ForYou profile={profile} onNav={(k) => { if (k === 'card') shareCosmicCard(); else setPanel(k); }} onBack={() => setPanel(null)} />;
+  if (panel === 'you') return <ForYou profile={profile} comps={comps} onNav={(k) => { if (k === 'card') shareCosmicCard(); else setPanel(k); }} onOpenCompanion={(id) => setPanel({ profile: id })} onBack={() => setPanel(null)} />;
   if (panel === 'today') return <Today profile={profile} onBack={() => setPanel('you')} />;
   if (panel === 'mood') return <MoodInsights checkins={checkins} onBack={() => setPanel('you')} />;
   if (panel === 'breathe') return <Breathe onBack={() => setPanel('you')} />;
   if (panel === 'rituals') return <Rituals onBack={() => setPanel('you')} />;
   if (panel === 'values') return <Values onBack={() => setPanel('you')} />;
   if (panel === 'vault') return <Vault onBack={() => setPanel('you')} />;
+  if (panel === 'duo') return <DuoCompat profile={profile} onBack={() => setPanel('you')} />;
+  if (panel === 'timeline') return <Timeline comps={comps} lore={lore} jokes={jokes} messages={msgs} onBack={() => setPanel(null)} />;
   if (panel === 'space') {
     return (
       <CompanionSpace
@@ -1380,6 +1425,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
           <button onClick={() => { setShowMenu(false); setPanel('you'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.glow3, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🧭  For you</button>
           {living.length < 3 && <button onClick={summon} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.glow2, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif" }}>✦  Summon a companion</button>}
           <button onClick={() => { setShowMenu(false); setPanel('story'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📖  Your story so far</button>
+          <button onClick={() => { setShowMenu(false); setPanel('timeline'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🕰️  Timeline</button>
           <button onClick={() => { setShowMenu(false); setPanel('recap'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>✨  Your recap</button>
           <button onClick={() => { setShowMenu(false); setPanel('journal'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📓  Journal</button>
           <button onClick={() => { setShowMenu(false); setPanel('goals'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🌱  Goals</button>
@@ -1587,6 +1633,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
           <div style={{ display: 'flex', gap: 7, alignItems: 'flex-end' }}>
             <input ref={photoInputRef} type="file" accept="image/*" onChange={onPhotoChosen} style={{ display: 'none' }} />
             <button aria-label="Share a photo" title="Share a photo" onClick={pickPhoto} disabled={loading} style={{ width: 38, height: 38, borderRadius: '50%', background: 'transparent', border: `1px solid ${C.border}`, color: loading ? C.textDim : C.textSoft, fontSize: 16, cursor: loading ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>📷</button>
+            {chatMode === 'group' && active.length > 1 && <button aria-label="Ask the room — everyone weighs in" title="Ask the room" onClick={askRoom} disabled={loading || !input.trim()} style={{ width: 38, height: 38, borderRadius: '50%', background: 'transparent', border: `1px solid ${C.border}`, color: (loading || !input.trim()) ? C.textDim : C.textSoft, fontSize: 15, cursor: (loading || !input.trim()) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>🗣</button>}
             <textarea ref={inputRef} value={input} rows={1}
               onChange={(e) => { setInput(e.target.value); const el = e.target; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px'; if (atBottomRef.current) pinBottom(); }}
               onFocus={() => { if (atBottomRef.current) setTimeout(pinBottom, 100); }}

@@ -54,6 +54,25 @@ export function dailyGuidance(sign, ts = Date.now()) {
   };
 }
 
+// Companion of the day — deterministically rotate through the living companions
+// by date, with a short glanceable note tinted by the user's daily guidance.
+const NOTES = [
+  'is thinking about you today.',
+  'has a little extra warmth for you today.',
+  'is in a curious, talkative mood.',
+  'wants to hear how you’re really doing.',
+  'is feeling especially close today.',
+  'saved a thought just for you.',
+];
+export function companionOfDay(comps = [], sign, ts = Date.now()) {
+  const living = comps.filter((c) => c && c.status !== 'deleted');
+  if (!living.length) return null;
+  const dnum = Math.floor(ts / DAY);
+  const comp = living[dnum % living.length];
+  const g = dailyGuidance(sign, ts);
+  return { comp, note: NOTES[dnum % NOTES.length], focus: g.focus, accent: comp.color?.primary || g.accent };
+}
+
 // A 7-day outlook (today + next 6) as compact bars for the weekly view.
 export function weeklyOutlook(sign, ts = Date.now()) {
   const out = [];
