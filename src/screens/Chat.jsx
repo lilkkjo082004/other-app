@@ -830,6 +830,11 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     setMsgs((p) => p.map((mm, k) => (k === i ? { ...mm, resolved: mood.key } : mm)));
     if (apiAuthed()) logMood(mood.key);
   }
+  // Check-in from the CheckIn screen (mood + optional note).
+  function logCheckin(moodKey, note) {
+    setCheckins((ci) => recordCheckin(ci, moodKey, note));
+    if (apiAuthed()) logMood(moodKey);
+  }
 
   // Subscription entitlement — gates Photo moments (a Plus perk). Best-effort.
   const loadEnt = async () => { try { setEnt(await fetchEntitlement()); } catch (e) { /* stay free */ } };
@@ -1204,7 +1209,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   if (panel === 'recap') return <Recap comps={comps} lore={lore} jokes={jokes} profile={profile} onBack={() => setPanel(null)} />;
   if (panel === 'journal') return <Journal entries={journal} onChange={setJournal} onBack={() => setPanel(null)} />;
   if (panel === 'goals') return <Goals goals={goals} onChange={setGoals} onBack={() => setPanel(null)} />;
-  if (panel === 'checkin') return <CheckIn checkins={checkins} onBack={() => setPanel(null)} />;
+  if (panel === 'checkin') return <CheckIn checkins={checkins} profile={profile} onCheckIn={logCheckin} onBack={() => setPanel(null)} />;
   // "For you" hub + its user-centric tools. The hub's card tile shares a
   // cosmic-profile image; the rest open their own panel and return to the hub.
   if (panel === 'you') return <ForYou profile={profile} comps={comps} onNav={(k) => { if (k === 'card') shareCosmicCard(); else setPanel(k); }} onOpenCompanion={(id) => setPanel({ profile: id })} onBack={() => setPanel(null)} />;

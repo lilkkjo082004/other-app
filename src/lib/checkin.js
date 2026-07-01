@@ -15,11 +15,14 @@ export const moodColor = (k) => (CHECKIN_MOODS.find((m) => m.key === k)?.color |
 
 export function checkinDue(ci) { return (ci?.last || '') !== dayStr(); }
 
-export function recordCheckin(ci, mood, now = Date.now()) {
+export function recordCheckin(ci, mood, note = '', now = Date.now()) {
   const today = dayStr(now);
   const yesterday = dayStr(now - DAY);
   const prev = ci?.last || '';
+  // Re-checking the same day updates today's entry without inflating the streak.
   const streak = prev === today ? (ci?.streak || 1) : prev === yesterday ? (ci?.streak || 0) + 1 : 1;
-  const history = [{ d: today, mood }, ...((ci?.history) || []).filter((h) => h.d !== today)].slice(0, 60);
+  const entry = { d: today, mood };
+  if (note && note.trim()) entry.note = note.trim().slice(0, 300);
+  const history = [entry, ...((ci?.history) || []).filter((h) => h.d !== today)].slice(0, 60);
   return { last: today, streak, history };
 }
