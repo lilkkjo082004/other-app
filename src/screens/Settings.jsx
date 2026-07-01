@@ -11,7 +11,7 @@ import { onDeviceSupported, onDeviceEnabled, setOnDeviceEnabled, preloadEngine, 
 import { calmEnabled, setCalm } from '../lib/comfort.js';
 import { loadSession, saveSession } from '../lib/storage.js';
 import { downloadReadableExport } from '../lib/dataexport.js';
-import { AMBIANCES, currentAmbiance, setAmbiance, playAmbiance, stopAmbiance, isCustom, listCustom, addCustom, removeCustom } from '../lib/ambiance.js';
+import { AMBIANCES, currentAmbiance, setAmbiance, playAmbiance, stopAmbiance, isCustom, listCustom, addCustom, removeCustom, ambianceVolume, setAmbianceVolume } from '../lib/ambiance.js';
 import { LegalLink } from './Legal.jsx';
 import Paywall from '../components/Paywall.jsx';
 import ProfileEdit from './ProfileEdit.jsx';
@@ -27,10 +27,14 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
   const [calm, setCalmState] = useState(calmEnabled());
   const toggleCalm = () => { const v = !calm; setCalm(v); setCalmState(v); };
   const [amb, setAmb] = useState(currentAmbiance());
+  const [ambVol, setAmbVol] = useState(ambianceVolume());
   const [customSounds, setCustomSounds] = useState([]);
   const [ambErr, setAmbErr] = useState(null);
   const ambFileRef = useRef(null);
   useEffect(() => { listCustom().then(setCustomSounds).catch(() => {}); }, []);
+  // Ambiance previews here play as you pick; stop them when you leave Settings so
+  // the sound only lingers where it belongs — in The Space.
+  useEffect(() => () => stopAmbiance(), []);
   const chooseAmb = (k) => { setAmb(k); setAmbiance(k); if (k === 'off') stopAmbiance(); else playAmbiance(k); };
   async function uploadAmb(file) {
     setAmbErr(null);
@@ -472,7 +476,16 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
           </div>
           <input ref={ambFileRef} type="file" accept="audio/*" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) uploadAmb(f); }} style={{ display: 'none' }} />
           {ambErr && <div style={{ fontSize: 11, color: C.danger, marginTop: 8 }}>{ambErr}</div>}
-          <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 8 }}>Your uploads stay on this device (up to 20 MB each) and loop softly.</div>
+          {amb !== 'off' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 14 }}>
+              <span style={{ fontSize: 13 }} aria-hidden>🔈</span>
+              <input type="range" min="0" max="1" step="0.05" value={ambVol} aria-label="Ambiance volume"
+                onChange={(e) => { const v = parseFloat(e.target.value); setAmbVol(v); setAmbianceVolume(v); }}
+                style={{ flex: 1, accentColor: C.glow1, cursor: 'pointer' }} />
+              <span style={{ fontSize: 13 }} aria-hidden>🔊</span>
+            </div>
+          )}
+          <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 8 }}>Plays in The Space. Your uploads stay on this device (up to 20 MB each) and loop softly.</div>
         </div>
 
         <div style={{ height: 10 }} />

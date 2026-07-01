@@ -12,11 +12,24 @@ export const AMBIANCES = [
   { key: 'forest', label: 'Forest', em: '🌲' },
 ];
 
+const VOL_KEY = 'other_ambiance_vol';
+
 export function currentAmbiance() {
   try { return localStorage.getItem(KEY) || 'off'; } catch (e) { return 'off'; }
 }
 export function setAmbiance(key) {
   try { localStorage.setItem(KEY, key); } catch (e) { /* ignore */ }
+}
+export function ambianceVolume() {
+  try { const v = parseFloat(localStorage.getItem(VOL_KEY)); return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0.5; }
+  catch (e) { return 0.5; }
+}
+export function setAmbianceVolume(v) {
+  const vol = Math.max(0, Math.min(1, v));
+  try { localStorage.setItem(VOL_KEY, String(vol)); } catch (e) { /* ignore */ }
+  // Apply live to whatever's currently playing.
+  if (master) { try { master.gain.value = vol; } catch (e) { /* ignore */ } }
+  if (audioEl) { try { audioEl.volume = vol; } catch (e) { /* ignore */ } }
 }
 export const isCustom = (key) => typeof key === 'string' && key.startsWith('custom:');
 
@@ -61,7 +74,7 @@ async function getCustomBlob(id) {
   return rec?.blob || null;
 }
 
-let ctx = null, nodes = [], timer = null;
+let ctx = null, nodes = [], timer = null, master = null;
 let audioEl = null, audioUrl = null;   // for custom uploaded sounds
 let playingKey = null;                 // the ambiance currently sounding, if any
 
@@ -94,14 +107,14 @@ function noiseBuffer(c, seconds = 2) {
   return buf;
 }
 
-function noiseSource(c, { lp = 1000, hp = 0, gain = 0.15 } = {}) {
+function noiseSource(c, dest, { lp = 1000, hp = 0, gain = 0.15 } = {}) {
   const src = c.createBufferSource();
   src.buffer = noiseBuffer(c);
   src.loop = true;
   let node = src;
   if (hp) { const f = c.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = hp; node.connect(f); node = f; }
   const lpf = c.createBiquadFilter(); lpf.type = 'lowpass'; lpf.frequency.value = lp; node.connect(lpf);
-  const g = c.createGain(); g.gain.value = gain; lpf.connect(g); g.connect(c.destination);
+  const g = c.createGain(); g.gain.value = gain; lpf.connect(g); g.connect(dest);
   src.start();
   return { src, g, lpf };
 }
@@ -110,6 +123,7 @@ export function stopAmbiance() {
   if (timer) { clearInterval(timer); timer = null; }
   for (const n of nodes) { try { n.src?.stop?.(); } catch (e) { /* ignore */ } try { n.osc?.stop?.(); } catch (e) { /* ignore */ } }
   nodes = [];
+  if (master) { try { master.disconnect(); } catch (e) { /* ignore */ } master = null; }
   if (audioEl) { try { audioEl.pause(); audioEl.src = ''; } catch (e) { /* ignore */ } audioEl = null; }
   if (audioUrl) { try { URL.revokeObjectURL(audioUrl); } catch (e) { /* ignore */ } audioUrl = null; }
   playingKey = null;
@@ -126,7 +140,7 @@ async function playCustom(id) {
     audioUrl = URL.createObjectURL(blob);
     audioEl = new Audio(audioUrl);
     audioEl.loop = true;
-    audioEl.volume = 0.5;
+    audioEl.volume = ambianceVolume();
     await audioEl.play().catch(() => {});
   } catch (e) { /* ignore */ }
 }
@@ -140,11 +154,15 @@ export function playAmbiance(key) {
   if (isCustom(key)) { playCustom(key.slice(7)); return; }
   const c = ac();
   if (!c) return;
+  // All synthesized voices route through a master gain so the volume slider (and
+  // future fades) can control the whole soundscape at once.
+  master = c.createGain(); master.gain.value = ambianceVolume(); master.connect(c.destination);
+  const dest = master;
 
   if (key === 'rain') {
-    nodes.push(noiseSource(c, { lp: 3200, hp: 400, gain: 0.10 }));
+    nodes.push(noiseSource(c, dest, { lp: 3200, hp: 400, gain: 0.10 }));
   } else if (key === 'waves') {
-    const n = noiseSource(c, { lp: 900, gain: 0.02 });
+    const n = noiseSource(c, dest, { lp: 900, gain: 0.02 });
     nodes.push(n);
     // Slow swell in and out like surf.
     let up = true;
@@ -159,19 +177,19 @@ export function playAmbiance(key) {
     // Low drone: two detuned sine oscillators + a faint noise wash.
     for (const freq of [55, 82.5]) {
       const osc = c.createOscillator(); osc.type = 'sine'; osc.frequency.value = freq;
-      const g = c.createGain(); g.gain.value = 0.05; osc.connect(g); g.connect(c.destination); osc.start();
+      const g = c.createGain(); g.gain.value = 0.05; osc.connect(g); g.connect(dest); osc.start();
       nodes.push({ osc, g });
     }
-    nodes.push(noiseSource(c, { lp: 500, gain: 0.02 }));
+    nodes.push(noiseSource(c, dest, { lp: 500, gain: 0.02 }));
   } else if (key === 'forest') {
-    nodes.push(noiseSource(c, { lp: 6000, hp: 2500, gain: 0.015 })); // airy leaves
+    nodes.push(noiseSource(c, dest, { lp: 6000, hp: 2500, gain: 0.015 })); // airy leaves
     // Occasional soft bird-like chirps.
     timer = setInterval(() => {
       if (Math.random() > 0.55) return;
       const osc = c.createOscillator(); osc.type = 'sine';
       const base = 1600 + Math.random() * 1400;
       const g = c.createGain(); g.gain.value = 0.0001;
-      osc.connect(g); g.connect(c.destination);
+      osc.connect(g); g.connect(dest);
       const t = c.currentTime;
       osc.frequency.setValueAtTime(base, t);
       osc.frequency.linearRampToValueAtTime(base + 300, t + 0.12);

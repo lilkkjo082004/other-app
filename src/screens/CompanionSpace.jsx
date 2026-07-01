@@ -6,7 +6,7 @@ import { genAmbient, bumpBond } from '../lib/relationships.js';
 import { currentActivity } from '../lib/presence.js';
 import { vitality } from '../lib/innerlife.js';
 import { seasonalTheme, seasonalParticles } from '../lib/seasonal.js';
-import { resumeAmbiance } from '../lib/ambiance.js';
+import { resumeAmbiance, stopAmbiance } from '../lib/ambiance.js';
 
 // The "sitting space": awake companions hang out together, drift and mingle on
 // their own (leaning toward each other when they talk), and react when you pet
@@ -57,14 +57,14 @@ export default function CompanionSpace({ comps, bonds, positions, onPositions, o
   const bondsRef = useRef(bonds);
   useEffect(() => { bondsRef.current = bonds; }, [bonds]);
 
-  // Resume the user's chosen ambiance when they enter The Space. Autoplay needs
-  // a user gesture, so try immediately (works if we're still within the tap that
-  // opened this screen) and also arm the first tap inside as a fallback.
+  // Ambiance is the soundscape *for The Space*: resume the user's chosen sound on
+  // entry (autoplay needs a gesture, so try now and also on the first tap inside
+  // as a fallback), and stop it when they leave.
   useEffect(() => {
     resumeAmbiance();
     const onFirst = () => resumeAmbiance();
     window.addEventListener('pointerdown', onFirst, { once: true });
-    return () => window.removeEventListener('pointerdown', onFirst);
+    return () => { window.removeEventListener('pointerdown', onFirst); stopAmbiance(); };
   }, []);
 
   const [dragId, setDragId] = useState(null);
