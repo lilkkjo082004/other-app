@@ -1,6 +1,7 @@
-// Ambiance packs — gentle ambient soundscapes for The Space, synthesized live
-// with the Web Audio API (no audio files, no network). Each is a soft loop the
-// user can turn on for a calmer, more present feel. The chosen pack persists.
+// Ambiance packs — gentle ambient soundscapes for The Space. The built-ins are
+// synthesized live with the Web Audio API (no files, no network). Users can also
+// upload their OWN sound (any audio the browser plays), stored on-device in
+// IndexedDB and looped. The chosen pack persists; custom keys are `custom:<id>`.
 const KEY = 'other_ambiance_v1';
 
 export const AMBIANCES = [
@@ -17,8 +18,51 @@ export function currentAmbiance() {
 export function setAmbiance(key) {
   try { localStorage.setItem(KEY, key); } catch (e) { /* ignore */ }
 }
+export const isCustom = (key) => typeof key === 'string' && key.startsWith('custom:');
+
+// ── Custom uploaded sounds (IndexedDB) ──────────────────────────────────────
+// Audio files can be several MB, so they live in IndexedDB (as Blobs), not
+// localStorage. Device-local only — never uploaded anywhere.
+const DB = 'other-ambiance', STORE = 'clips';
+function openDB() {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) { reject(new Error('no IndexedDB')); return; }
+    const r = indexedDB.open(DB, 1);
+    r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains(STORE)) r.result.createObjectStore(STORE, { keyPath: 'id' }); };
+    r.onsuccess = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+  });
+}
+function reqP(req) { return new Promise((res, rej) => { req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error); }); }
+
+export async function listCustom() {
+  try {
+    const db = await openDB();
+    const all = await reqP(db.transaction(STORE, 'readonly').objectStore(STORE).getAll());
+    return (all || []).map((c) => ({ id: c.id, name: c.name })).sort((a, b) => (a.name > b.name ? 1 : -1));
+  } catch (e) { return []; }
+}
+export async function addCustom(file) {
+  if (!file || !/^audio\//.test(file.type)) throw new Error('Please choose an audio file.');
+  if (file.size > 20 * 1024 * 1024) throw new Error('That file is over 20 MB — please pick a smaller clip.');
+  const id = 'c' + Math.abs((file.size * 2654435761) ^ file.name.length).toString(36) + file.name.length;
+  const db = await openDB();
+  const t = db.transaction(STORE, 'readwrite');
+  t.objectStore(STORE).put({ id, name: file.name.replace(/\.[a-z0-9]+$/i, '').slice(0, 40), blob: file });
+  await new Promise((res, rej) => { t.oncomplete = res; t.onerror = () => rej(t.error); });
+  return { id, name: file.name };
+}
+export async function removeCustom(id) {
+  try { const db = await openDB(); const t = db.transaction(STORE, 'readwrite'); t.objectStore(STORE).delete(id); await new Promise((r) => { t.oncomplete = r; t.onerror = r; }); } catch (e) { /* ignore */ }
+}
+async function getCustomBlob(id) {
+  const db = await openDB();
+  const rec = await reqP(db.transaction(STORE, 'readonly').objectStore(STORE).get(id));
+  return rec?.blob || null;
+}
 
 let ctx = null, nodes = [], timer = null;
+let audioEl = null, audioUrl = null;   // for custom uploaded sounds
 
 function ac() {
   if (!ctx) { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null; ctx = new AC(); }
@@ -55,13 +99,32 @@ export function stopAmbiance() {
   if (timer) { clearInterval(timer); timer = null; }
   for (const n of nodes) { try { n.src?.stop?.(); } catch (e) { /* ignore */ } try { n.osc?.stop?.(); } catch (e) { /* ignore */ } }
   nodes = [];
+  if (audioEl) { try { audioEl.pause(); audioEl.src = ''; } catch (e) { /* ignore */ } audioEl = null; }
+  if (audioUrl) { try { URL.revokeObjectURL(audioUrl); } catch (e) { /* ignore */ } audioUrl = null; }
+}
+
+// Loop a user-uploaded clip via an <audio> element (handles any format the
+// browser supports, including long files, without decoding it all into memory).
+async function playCustom(id) {
+  try {
+    const blob = await getCustomBlob(id);
+    if (!blob) return;
+    // A newer selection may have superseded this one while we were loading.
+    if (currentAmbiance() !== `custom:${id}`) return;
+    audioUrl = URL.createObjectURL(blob);
+    audioEl = new Audio(audioUrl);
+    audioEl.loop = true;
+    audioEl.volume = 0.5;
+    await audioEl.play().catch(() => {});
+  } catch (e) { /* ignore */ }
 }
 
 // Start (or switch to) a soundscape. Must be called from a user gesture the
-// first time so the AudioContext is allowed to run.
+// first time so audio is allowed to play.
 export function playAmbiance(key) {
   stopAmbiance();
   if (!key || key === 'off') return;
+  if (isCustom(key)) { playCustom(key.slice(7)); return; }
   const c = ac();
   if (!c) return;
 

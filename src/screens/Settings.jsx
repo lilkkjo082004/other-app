@@ -11,7 +11,7 @@ import { onDeviceSupported, onDeviceEnabled, setOnDeviceEnabled, preloadEngine, 
 import { calmEnabled, setCalm } from '../lib/comfort.js';
 import { loadSession, saveSession } from '../lib/storage.js';
 import { downloadReadableExport } from '../lib/dataexport.js';
-import { AMBIANCES, currentAmbiance, setAmbiance, playAmbiance, stopAmbiance } from '../lib/ambiance.js';
+import { AMBIANCES, currentAmbiance, setAmbiance, playAmbiance, stopAmbiance, isCustom, listCustom, addCustom, removeCustom } from '../lib/ambiance.js';
 import { LegalLink } from './Legal.jsx';
 import Paywall from '../components/Paywall.jsx';
 import ProfileEdit from './ProfileEdit.jsx';
@@ -27,7 +27,21 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
   const [calm, setCalmState] = useState(calmEnabled());
   const toggleCalm = () => { const v = !calm; setCalm(v); setCalmState(v); };
   const [amb, setAmb] = useState(currentAmbiance());
+  const [customSounds, setCustomSounds] = useState([]);
+  const [ambErr, setAmbErr] = useState(null);
+  const ambFileRef = useRef(null);
+  useEffect(() => { listCustom().then(setCustomSounds).catch(() => {}); }, []);
   const chooseAmb = (k) => { setAmb(k); setAmbiance(k); if (k === 'off') stopAmbiance(); else playAmbiance(k); };
+  async function uploadAmb(file) {
+    setAmbErr(null);
+    try { const c = await addCustom(file); const list = await listCustom(); setCustomSounds(list); chooseAmb(`custom:${c.id}`); }
+    catch (e) { setAmbErr(String(e.message || e)); }
+  }
+  async function deleteAmb(id) {
+    await removeCustom(id);
+    const list = await listCustom(); setCustomSounds(list);
+    if (amb === `custom:${id}`) chooseAmb('off');
+  }
   const odSupported = onDeviceSupported();
   const [odOn, setOdOn] = useState(onDeviceEnabled());
   const [odProg, setOdProg] = useState(null);  // { pct, text, error } | null
@@ -439,13 +453,26 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
         </div>
         <div style={{ ...card }}>
           <div style={{ fontSize: 13, marginBottom: 2 }}>Ambiance</div>
-          <div style={{ fontSize: 11, color: C.textDim, marginBottom: 12 }}>A soft ambient soundscape for The Space. Synthesized on your device.</div>
+          <div style={{ fontSize: 11, color: C.textDim, marginBottom: 12 }}>A soft ambient soundscape for The Space — ours, or upload your own.</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
             {AMBIANCES.map((a) => {
               const on = amb === a.key;
               return <button key={a.key} onClick={() => chooseAmb(a.key)} style={{ background: on ? `${C.glow1}22` : C.surfaceUp, border: `1px solid ${on ? C.glow1 : C.border}`, color: on ? C.glow1 : C.textSoft, borderRadius: 50, padding: '7px 13px', fontSize: 12.5, fontWeight: on ? 600 : 400, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>{a.em} {a.label}</button>;
             })}
+            {customSounds.map((s) => {
+              const k = `custom:${s.id}`; const on = amb === k;
+              return (
+                <span key={s.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: on ? `${C.glow1}22` : C.surfaceUp, border: `1px solid ${on ? C.glow1 : C.border}`, borderRadius: 50, padding: '5px 8px 5px 13px' }}>
+                  <button onClick={() => chooseAmb(k)} style={{ background: 'none', border: 'none', color: on ? C.glow1 : C.textSoft, fontSize: 12.5, fontWeight: on ? 600 : 400, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", padding: 0, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>🎵 {s.name}</button>
+                  <button aria-label={`Remove ${s.name}`} onClick={() => deleteAmb(s.id)} style={{ background: 'none', border: 'none', color: on ? C.glow1 : C.textDim, fontSize: 15, lineHeight: 1, cursor: 'pointer', padding: '0 2px' }}>×</button>
+                </span>
+              );
+            })}
+            <button onClick={() => ambFileRef.current?.click()} style={{ background: 'transparent', border: `1px dashed ${C.border}`, color: C.textSoft, borderRadius: 50, padding: '7px 13px', fontSize: 12.5, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>＋ Upload your own</button>
           </div>
+          <input ref={ambFileRef} type="file" accept="audio/*" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) uploadAmb(f); }} style={{ display: 'none' }} />
+          {ambErr && <div style={{ fontSize: 11, color: C.danger, marginTop: 8 }}>{ambErr}</div>}
+          <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 8 }}>Your uploads stay on this device (up to 20 MB each) and loop softly.</div>
         </div>
 
         <div style={{ height: 10 }} />
