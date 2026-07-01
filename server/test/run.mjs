@@ -2,6 +2,7 @@
 // global Web APIs (Request/Response/fetch/crypto). No network or D1 needed.
 import { handle } from '../src/handlers.js';
 import { memoryStore } from '../src/store-memory.js';
+import { inQuietHours, scheduleDue } from '../src/worker.js';
 
 const env = { store: memoryStore(), SECRET: 'test-secret', ALLOWED_ORIGIN: '*' };
 let passed = 0, failed = 0;
@@ -198,6 +199,19 @@ console.log('photo moments (billing off)');
   const res = await handle(new Request('http://api/ai', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages: imgMsg, photo: true }) }), env);
   ok(res.status === 200 && reached, 'photo is allowed for everyone when billing is not configured');
   globalThis.fetch = origFetch;
+}
+
+console.log('quiet hours (check-in scheduling)');
+{
+  // 2026-07-01 06:00 UTC. A window 22:00→07:00 (UTC) should be quiet at 06:00.
+  const now = Date.parse('2026-07-01T06:00:00Z');
+  ok(inQuietHours({ tz: 'UTC', quietStart: '22:00', quietEnd: '07:00' }, now) === true, 'inside a midnight-wrapping quiet window is quiet');
+  ok(inQuietHours({ tz: 'UTC', quietStart: '08:00', quietEnd: '09:00' }, now) === false, 'outside the quiet window is not quiet');
+  ok(inQuietHours({ tz: 'UTC' }, now) === false, 'no quiet window set → never quiet');
+  // scheduleDue must respect quiet hours: a 05:00 time already passed by 06:00,
+  // but 22:00→07:00 quiet should suppress it.
+  ok(scheduleDue({ tz: 'UTC', times: ['05:00'] }, 0, now) === true, 'a passed time is due when not in quiet hours');
+  ok(scheduleDue({ tz: 'UTC', times: ['05:00'], quietStart: '22:00', quietEnd: '07:00' }, 0, now) === false, 'quiet hours suppress an otherwise-due check-in');
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

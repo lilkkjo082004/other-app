@@ -37,9 +37,27 @@ function instantForTime(baseMs, hhmm, tz) {
   return wallToInstant(+m.year, +m.month, +m.day, h, mi, tz);
 }
 
+// True if `now` falls inside the user's quiet-hours window (their local tz).
+// Handles windows that wrap past midnight (e.g. 22:00 → 07:00).
+export function inQuietHours(sched, now) {
+  const qs = sched.quietStart, qe = sched.quietEnd;
+  if (!/^\d{2}:\d{2}$/.test(qs || '') || !/^\d{2}:\d{2}$/.test(qe || '') || qs === qe) return false;
+  const tz = sched.tz || 'UTC';
+  let cur;
+  try {
+    const m = new Intl.DateTimeFormat('en-US', { timeZone: tz, hour12: false, hour: '2-digit', minute: '2-digit' }).format(new Date(now));
+    const [h, mi] = m.replace(/[^\d:]/g, '').split(':').map(Number);
+    cur = h * 60 + mi;
+  } catch (e) { return false; }
+  const toM = (s) => { const [h, mi] = s.split(':').map(Number); return h * 60 + mi; };
+  const s = toM(qs), e = toM(qe);
+  return s < e ? (cur >= s && cur < e) : (cur >= s || cur < e);
+}
+
 // Due if the most recent scheduled instant (today or yesterday, in the user's
 // tz) has passed and is newer than the last notification we sent.
-function scheduleDue(sched, lastNotified, now) {
+export function scheduleDue(sched, lastNotified, now) {
+  if (inQuietHours(sched, now)) return false;      // respect do-not-disturb
   const times = (sched.times || []).filter((t) => /^\d{2}:\d{2}$/.test(t));
   if (!times.length) return false;
   const tz = sched.tz || 'UTC';

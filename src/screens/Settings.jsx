@@ -10,6 +10,8 @@ import { MANAGE_URL } from '../config.js';
 import { onDeviceSupported, onDeviceEnabled, setOnDeviceEnabled, preloadEngine, setProgressHandler, ON_DEVICE_LABEL } from '../lib/ondevice.js';
 import { calmEnabled, setCalm } from '../lib/comfort.js';
 import { loadSession, saveSession } from '../lib/storage.js';
+import { downloadReadableExport } from '../lib/dataexport.js';
+import { AMBIANCES, currentAmbiance, setAmbiance, playAmbiance, stopAmbiance } from '../lib/ambiance.js';
 import { LegalLink } from './Legal.jsx';
 import Paywall from '../components/Paywall.jsx';
 import ProfileEdit from './ProfileEdit.jsx';
@@ -24,6 +26,8 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
 
   const [calm, setCalmState] = useState(calmEnabled());
   const toggleCalm = () => { const v = !calm; setCalm(v); setCalmState(v); };
+  const [amb, setAmb] = useState(currentAmbiance());
+  const chooseAmb = (k) => { setAmb(k); setAmbiance(k); if (k === 'off') stopAmbiance(); else playAmbiance(k); };
   const odSupported = onDeviceSupported();
   const [odOn, setOdOn] = useState(onDeviceEnabled());
   const [odProg, setOdProg] = useState(null);  // { pct, text, error } | null
@@ -58,7 +62,14 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
   const localTz = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch (e) { return 'UTC'; } };
   const times = pushSchedule?.times || [];
   const [newTime, setNewTime] = useState('09:00');
-  const saveTimes = (next) => onPushSchedule?.({ times: [...new Set(next)].sort(), tz: localTz() });
+  // Merge-preserve the rest of the schedule (quiet hours, tone) when saving.
+  const savePush = (patch) => onPushSchedule?.({
+    times: [...new Set(times)].sort(), tz: localTz(),
+    quietStart: pushSchedule?.quietStart || '', quietEnd: pushSchedule?.quietEnd || '',
+    tone: pushSchedule?.tone || 'standard',
+    ...patch,
+  });
+  const saveTimes = (next) => savePush({ times: [...new Set(next)].sort() });
   const addTime = () => { if (/^\d{2}:\d{2}$/.test(newTime) && !times.includes(newTime)) saveTimes([...times, newTime]); };
   const removeTime = (t) => saveTimes(times.filter((x) => x !== t));
   const fmtTime = (t) => { const [h, m] = t.split(':').map(Number); const ap = h < 12 ? 'AM' : 'PM'; return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${ap}`; };
@@ -291,6 +302,30 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
                 <Toggle on={ambientAlerts !== false} onClick={() => onAmbientAlerts(!(ambientAlerts !== false))} />
               </div>
             )}
+            {pushOn && (
+              <div style={{ ...card }}>
+                <div style={{ fontSize: 13, marginBottom: 2 }}>Quiet hours</div>
+                <div style={{ fontSize: 11, color: C.textDim, marginBottom: 12 }}>No check-ins during this window (your local time). Great for sleep.</div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input type="time" aria-label="Quiet hours start" value={pushSchedule?.quietStart || ''} onChange={(e) => savePush({ quietStart: e.target.value })} style={{ flex: 1, padding: '9px 10px', borderRadius: 9, background: C.surface, border: `1px solid ${C.border}`, color: C.text, fontFamily: "'DM Sans',sans-serif", fontSize: 13, colorScheme: 'dark' }} />
+                  <span style={{ fontSize: 12, color: C.textDim }}>to</span>
+                  <input type="time" aria-label="Quiet hours end" value={pushSchedule?.quietEnd || ''} onChange={(e) => savePush({ quietEnd: e.target.value })} style={{ flex: 1, padding: '9px 10px', borderRadius: 9, background: C.surface, border: `1px solid ${C.border}`, color: C.text, fontFamily: "'DM Sans',sans-serif", fontSize: 13, colorScheme: 'dark' }} />
+                  {(pushSchedule?.quietStart || pushSchedule?.quietEnd) && <button onClick={() => savePush({ quietStart: '', quietEnd: '' })} aria-label="Clear quiet hours" style={{ background: 'none', border: 'none', color: C.textDim, fontSize: 16, cursor: 'pointer' }}>×</button>}
+                </div>
+              </div>
+            )}
+            {pushOn && (
+              <div style={{ ...card }}>
+                <div style={{ fontSize: 13, marginBottom: 10 }}>Tone</div>
+                <div style={{ display: 'flex', gap: 7 }}>
+                  {[['gentle', 'Gentle'], ['standard', 'Standard'], ['chatty', 'Chatty']].map(([k, lbl]) => {
+                    const on = (pushSchedule?.tone || 'standard') === k;
+                    return <button key={k} onClick={() => savePush({ tone: k })} style={{ flex: 1, padding: '9px 0', borderRadius: 9, border: `1px solid ${on ? C.glow1 : C.border}`, background: on ? `${C.glow1}1f` : 'transparent', color: on ? C.glow1 : C.textSoft, fontSize: 12.5, fontWeight: on ? 700 : 500, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>{lbl}</button>;
+                  })}
+                </div>
+                <div style={{ fontSize: 11, color: C.textDim, marginTop: 8 }}>How often and how warmly your companions reach out.</div>
+              </div>
+            )}
           </>
         )}
 
@@ -402,6 +437,16 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
             <Toggle on={calm} onClick={toggleCalm} label="Calm Mode" />
           </div>
         </div>
+        <div style={{ ...card }}>
+          <div style={{ fontSize: 13, marginBottom: 2 }}>Ambiance</div>
+          <div style={{ fontSize: 11, color: C.textDim, marginBottom: 12 }}>A soft ambient soundscape for The Space. Synthesized on your device.</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+            {AMBIANCES.map((a) => {
+              const on = amb === a.key;
+              return <button key={a.key} onClick={() => chooseAmb(a.key)} style={{ background: on ? `${C.glow1}22` : C.surfaceUp, border: `1px solid ${on ? C.glow1 : C.border}`, color: on ? C.glow1 : C.textSoft, borderRadius: 50, padding: '7px 13px', fontSize: 12.5, fontWeight: on ? 600 : 400, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>{a.em} {a.label}</button>;
+            })}
+          </div>
+        </div>
 
         <div style={{ height: 10 }} />
         {section('On-device AI')}
@@ -446,6 +491,10 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
         </div>
         {impErr && <div style={{ fontSize: 11, color: C.danger, margin: '0 2px 8px' }}>{impErr}</div>}
         <p style={{ fontSize: 11, color: C.textDim, lineHeight: 1.5, margin: '0 2px 8px' }}>Download your companions & history as a file, or restore from one. Works without an account.</p>
+        <button onClick={() => { try { downloadReadableExport(loadSession() || {}); } catch (e) { setImpErr('Export failed'); } }} style={{ ...card, width: '100%', textAlign: 'left', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div><div style={{ fontSize: 13, fontWeight: 500 }}>📄 Download my data (readable)</div><div style={{ fontSize: 11, color: C.textDim }}>Profile, chats, journals, moods & more as a document (vault excluded)</div></div>
+          <span style={{ color: C.textSoft }}>›</span>
+        </button>
 
         <button onClick={onReset} style={{ ...card, width: '100%', textAlign: 'left', cursor: 'pointer', border: `1px solid ${C.danger}44`, fontFamily: "'DM Sans',sans-serif", display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div><div style={{ fontSize: 13, color: C.danger, fontWeight: 500 }}>Reset everything</div><div style={{ fontSize: 11, color: C.textDim }}>Wipe your profile, companions, and all history</div></div>
