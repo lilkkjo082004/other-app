@@ -50,6 +50,7 @@ import MoodInsights from './MoodInsights.jsx';
 import DuoCompat from './DuoCompat.jsx';
 import Timeline from './Timeline.jsx';
 import Cowork from './Cowork.jsx';
+import Home from './Home.jsx';
 import WakingUp from './WakingUp.jsx';
 
 export default function Chat({ companions: init, profile, trialStart, restored, onPersist, onReset, onUpdateProfile, storageWarn, onDismissStorageWarn, cloud, authed, email, onSignIn, onSignOut }) {
@@ -61,7 +62,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const [chatMode, setChatMode] = useState(restored?.chatMode || 'group');
   const [showMenu, setShowMenu] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(restored?.autoSpeak || false);
-  const [panel, setPanel] = useState(null);            // null | 'settings' | { profile: id }
+  const [panel, setPanel] = useState('home');          // 'home' | null (chat) | 'settings' | { profile: id } | ...
   const [ambient, setAmbient] = useState([]);          // ephemeral "while you were away" thread
   const [bonds, setBonds] = useState(restored?.bonds || {});
   const [voiceCall, setVoiceCall] = useState(restored?.voiceCall !== false);   // call-by-name on by default
@@ -1197,6 +1198,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   }
 
   // ── Panels (full-screen views) ──
+  if (panel === 'home') return <Home profile={profile} comps={comps} checkins={checkins} onOpenChat={() => setPanel(null)} onNav={(k) => setPanel(k)} />;
   if (panel === 'places') return <PlacesNearby onBack={() => setPanel(null)} />;
   if (panel === 'story') return <StorySoFar lore={lore} jokes={jokes} comps={comps} onBack={() => setPanel(null)} />;
   if (panel === 'recap') return <Recap comps={comps} lore={lore} jokes={jokes} profile={profile} onBack={() => setPanel(null)} />;
@@ -1360,6 +1362,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
           <button aria-label={autoSpeak ? 'Turn off auto-speak' : 'Turn on auto-speak'} aria-pressed={autoSpeak} onClick={() => setAutoSpeak(!autoSpeak)} style={{ background: autoSpeak ? `${C.glow3}22` : 'none', border: `1px solid ${autoSpeak ? C.glow3 : C.border}`, borderRadius: 7, padding: '5px 8px', color: autoSpeak ? C.glow3 : C.textDim, fontSize: 13, cursor: 'pointer' }}>{autoSpeak ? '🔊' : '🔇'}</button>
           {voiceCall && <button aria-label={listening ? 'Listening — tap to stop' : 'Call a companion by voice'} onClick={startListening} style={{ background: listening ? `${C.danger}22` : 'none', border: `1px solid ${listening ? C.danger : C.border}`, borderRadius: 7, padding: '5px 8px', color: listening ? C.danger : C.textDim, fontSize: 13, cursor: 'pointer', animation: listening ? 'micPulse 1.5s infinite' : 'none' }}>🎤</button>}
           {priv && priv.status === 'awake' && <button aria-label={`Call ${priv.name}`} title={`Call ${priv.name}`} onClick={() => startCall(priv)} style={{ background: 'none', border: `1px solid ${C.border}`, borderRadius: 7, padding: '5px 8px', color: C.textDim, fontSize: 13, cursor: 'pointer' }}>📞</button>}
+          <button aria-label="Home" title="Home" onClick={() => setPanel('home')} style={{ background: 'none', border: `1px solid ${C.border}`, borderRadius: 7, padding: '5px 8px', color: C.textDim, fontSize: 13, cursor: 'pointer' }}>🏠</button>
           <button aria-label="Open the space — where your companions hang out" title="The Space" onClick={() => setPanel('space')} style={{ background: 'none', border: `1px solid ${C.border}`, borderRadius: 7, padding: '5px 8px', color: C.textDim, fontSize: 13, cursor: 'pointer' }}>✦</button>
           <button aria-label="Search messages" onClick={() => setSearch((s) => (s == null ? '' : null))} style={{ background: search != null ? `${C.glow1}22` : 'none', border: `1px solid ${search != null ? C.glow1 : C.border}`, borderRadius: 7, padding: '5px 8px', color: search != null ? C.glow1 : C.textDim, fontSize: 13, cursor: 'pointer' }}>🔍</button>
           <button aria-label="Menu" aria-expanded={showMenu} onClick={() => setShowMenu(!showMenu)} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 16, cursor: 'pointer', padding: 4 }}>☰</button>
