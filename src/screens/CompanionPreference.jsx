@@ -29,7 +29,7 @@ export default function CompanionPreference({ onChoice, ageGroup }) {
 
   if (!mode) {
     return (
-      <Shell>
+      <Shell fill>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: 32, textAlign: 'center' }}>
           <div style={{ fontSize: 28, marginBottom: 12 }}>✦</div>
           <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 24, fontWeight: 600, marginBottom: 8 }}>How do you want to meet your companions?</h2>

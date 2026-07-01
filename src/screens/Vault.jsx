@@ -41,7 +41,7 @@ export default function Vault({ onBack }) {
 
   if (mode !== 'open') {
     return (
-      <Shell>
+      <Shell fill>
         {header('Private vault')}
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '30px 22px 44px', textAlign: 'center' }}>
           <div style={{ fontSize: 42, marginBottom: 10 }}>🔒</div>

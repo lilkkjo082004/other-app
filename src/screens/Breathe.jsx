@@ -81,7 +81,7 @@ export default function Breathe({ onBack }) {
     <button onClick={() => setTab(k)} style={{ flex: 1, padding: '9px 0', borderRadius: 10, border: `1px solid ${tab === k ? C.glow1 : C.border}`, background: tab === k ? `${C.glow1}1f` : 'transparent', color: tab === k ? C.glow1 : C.textSoft, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>{label}</button>
   );
   return (
-    <Shell>
+    <Shell fill>
       <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: `1px solid ${C.border}` }}>
         <button aria-label="Back" onClick={onBack} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 20, cursor: 'pointer' }}>←</button>
         <span style={{ fontSize: 15, fontWeight: 600 }}>Breathe</span>

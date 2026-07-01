@@ -17,7 +17,7 @@ export default function Values({ onBack }) {
   const save = () => { saveValues(v); setSaved(true); setTimeout(() => setSaved(false), 1600); };
 
   return (
-    <Shell>
+    <Shell fill>
       <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${C.border}` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button aria-label="Back" onClick={onBack} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 20, cursor: 'pointer' }}>←</button>

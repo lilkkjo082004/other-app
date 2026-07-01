@@ -138,7 +138,7 @@ export default function Cowork({ comps, profile, onFocus, onEndFocus, onSay, onB
   const modeBtn = (k, label) => <button onClick={() => setMode(k)} style={{ flex: 1, padding: '9px 0', borderRadius: 10, border: `1px solid ${mode === k ? C.glow1 : C.border}`, background: mode === k ? `${C.glow1}1f` : 'transparent', color: mode === k ? C.glow1 : C.textSoft, fontSize: 13, fontWeight: mode === k ? 700 : 500, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>{label}</button>;
 
   return (
-    <Shell>
+    <Shell fill>
       <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: `1px solid ${C.border}`, position: 'relative', zIndex: 3 }}>
         <button aria-label="Back" onClick={onBack} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 20, cursor: 'pointer' }}>←</button>
         <span style={{ fontSize: 15, fontWeight: 600 }}>Cowork</span>

@@ -18,7 +18,7 @@ export default function StorySoFar({ lore = [], jokes = [], comps = [], onBack }
   const empty = !lore.length && !jokes.length && !letters.length && !gifts.length;
 
   return (
-    <Shell>
+    <Shell fill>
       <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: `1px solid ${C.border}` }}>
         <button aria-label="Back" onClick={onBack} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 20, cursor: 'pointer' }}>←</button>
         <span style={{ fontSize: 15, fontWeight: 600 }}>Your story so far</span>

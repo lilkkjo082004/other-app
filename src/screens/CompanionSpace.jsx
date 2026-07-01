@@ -170,7 +170,7 @@ export default function CompanionSpace({ comps, bonds, positions, onPositions, o
   }
 
   return (
-    <Shell>
+    <Shell fill>
       <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: `1px solid ${C.border}`, position: 'relative', zIndex: 5 }}>
         <button aria-label="Back" onClick={onBack} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 20, cursor: 'pointer' }}>←</button>
         <div style={{ flex: 1 }}>

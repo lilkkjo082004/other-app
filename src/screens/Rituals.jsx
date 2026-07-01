@@ -13,7 +13,7 @@ export default function Rituals({ onBack }) {
   const add = (t, em) => { setList((p) => addRitual(p, t, em)); setText(''); };
 
   return (
-    <Shell>
+    <Shell fill>
       <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: `1px solid ${C.border}` }}>
         <button aria-label="Back" onClick={onBack} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 20, cursor: 'pointer' }}>←</button>
         <div style={{ flex: 1 }}>

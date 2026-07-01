@@ -54,7 +54,7 @@ export default function Onboarding({ onComplete }) {
   const taStyle = { width: '100%', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, fontSize: 13, color: C.text, outline: 'none', resize: 'none', lineHeight: 1.5 };
 
   const W = (ch) => (
-    <Shell>
+    <Shell fill>
       <Prog s={step} t={STEPS.length} />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 22px 22px', opacity: anim ? 0 : 1, transform: anim ? `translateX(${sx})` : 'none', transition: 'all 0.2s', overflowY: 'auto' }}>{ch}</div>
     </Shell>
