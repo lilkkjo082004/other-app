@@ -63,6 +63,17 @@ async function getCustomBlob(id) {
 
 let ctx = null, nodes = [], timer = null;
 let audioEl = null, audioUrl = null;   // for custom uploaded sounds
+let playingKey = null;                 // the ambiance currently sounding, if any
+
+export function isAmbiancePlaying() { return !!playingKey; }
+
+// Resume the saved ambiance if one is set and it isn't already sounding. Call
+// this from a user gesture (browsers block audio without one) — e.g. the first
+// tap inside The Space after a reload.
+export function resumeAmbiance() {
+  const k = currentAmbiance();
+  if (k && k !== 'off' && playingKey !== k) playAmbiance(k);
+}
 
 function ac() {
   if (!ctx) { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null; ctx = new AC(); }
@@ -101,6 +112,7 @@ export function stopAmbiance() {
   nodes = [];
   if (audioEl) { try { audioEl.pause(); audioEl.src = ''; } catch (e) { /* ignore */ } audioEl = null; }
   if (audioUrl) { try { URL.revokeObjectURL(audioUrl); } catch (e) { /* ignore */ } audioUrl = null; }
+  playingKey = null;
 }
 
 // Loop a user-uploaded clip via an <audio> element (handles any format the
@@ -124,6 +136,7 @@ async function playCustom(id) {
 export function playAmbiance(key) {
   stopAmbiance();
   if (!key || key === 'off') return;
+  playingKey = key;
   if (isCustom(key)) { playCustom(key.slice(7)); return; }
   const c = ac();
   if (!c) return;
