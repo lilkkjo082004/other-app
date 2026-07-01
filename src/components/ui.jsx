@@ -2,14 +2,18 @@ import React from 'react';
 import { C, CSS } from '../theme.js';
 
 // Cosmic background frame used by every screen.
-export const Shell = ({ children }) => (
-  <div style={{ background: C.void, minHeight: '100vh', position: 'relative', overflow: 'hidden' }}>
+// `fill` bounds the shell to the viewport height (dynamic vh) so an inner
+// `flex:1; overflow:auto` region becomes the real scroller instead of growing
+// the whole page — used by the chat so it always opens at the latest message.
+// Browsers without dvh fall back to the previous page-growing behavior.
+export const Shell = ({ children, fill }) => (
+  <div style={{ background: C.void, minHeight: '100vh', ...(fill ? { height: '100dvh', maxHeight: '100dvh' } : null), position: 'relative', overflow: 'hidden' }}>
     <style>{CSS}</style>
     <div className="cosmic-bg" style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, transition: 'opacity 0.4s' }}>
       <div style={{ position: 'absolute', width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(circle,rgba(124,91,245,0.08),transparent 70%)', top: '-10%', right: '-8%', filter: 'blur(60px)', animation: 'drift1 25s ease-in-out infinite' }} />
       <div style={{ position: 'absolute', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle,rgba(232,67,147,0.06),transparent 70%)', bottom: '-8%', left: '-5%', filter: 'blur(60px)', animation: 'drift2 30s ease-in-out infinite' }} />
     </div>
-    <div style={{ position: 'relative', zIndex: 1, maxWidth: 480, margin: '0 auto', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>{children}</div>
+    <div style={{ position: 'relative', zIndex: 1, maxWidth: 480, margin: '0 auto', ...(fill ? { height: '100%' } : { minHeight: '100vh' }), display: 'flex', flexDirection: 'column' }}>{children}</div>
   </div>
 );
 
