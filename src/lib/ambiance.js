@@ -142,6 +142,15 @@ function burstBuffer(c) {
   return sharedBurst;
 }
 
+// Cached long noise loops shared by one-shot events (thunder, wave breaks) so
+// each event doesn't allocate a fresh multi-second buffer.
+let sharedLoops = null;
+function loopBuf(c, type) {
+  if (!sharedLoops || sharedLoops.rate !== c.sampleRate) sharedLoops = { rate: c.sampleRate };
+  if (!sharedLoops[type]) sharedLoops[type] = makeNoise(c, type);
+  return sharedLoops[type];
+}
+
 // A looping filtered-noise layer. Returns refs so LFOs can move its params.
 function voice(c, dest, { type = 'white', bp = 0, hp = 0, lp = 0, q = 1, gain = 0.1 } = {}) {
   const src = c.createBufferSource();
@@ -177,20 +186,119 @@ function every(minMs, maxMs, fn) {
   };
   timers.push(setTimeout(loop, rand(minMs, maxMs)));
 }
+// One-off delayed event that dies with the soundscape (e.g. the first thunder).
+function once(minMs, maxMs, fn) {
+  const gen = generation;
+  timers.push(setTimeout(() => { if (gen === generation) fn(); }, rand(minMs, maxMs)));
+}
 
 // One-shot filtered noise burst (a raindrop hit, a fire crackle). Self-ending;
 // wired to the master so stopping the soundscape silences any tail instantly.
-function blip(c, dest, { bp = 3000, q = 4, gain = 0.03, decay = 0.03, rate = 1, pan = 0 } = {}) {
+// `at` schedules it a few (sample-accurate) seconds ahead — used for clusters.
+function blip(c, dest, { bp = 3000, q = 4, gain = 0.03, decay = 0.03, rate = 1, pan = 0, at = 0 } = {}) {
   const src = c.createBufferSource(); src.buffer = burstBuffer(c); src.playbackRate.value = rate;
   const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = bp; f.Q.value = q;
   const g = c.createGain();
   src.connect(f); f.connect(g);
   if (c.createStereoPanner) { const p = c.createStereoPanner(); p.pan.value = pan; g.connect(p); p.connect(dest); }
   else g.connect(dest);
-  const t = c.currentTime;
+  const t = c.currentTime + at;
   g.gain.setValueAtTime(gain, t);
   g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
   src.start(t); src.stop(t + decay + 0.05);
+}
+
+// Rolling thunder: a long brown-noise rumble shaped by a random-walk envelope,
+// so each strike rolls and fades differently. Closer strikes get an onset crack.
+function rumble(c, dest, { far = false } = {}) {
+  const src = c.createBufferSource(); src.buffer = loopBuf(c, 'brown'); src.loop = true;
+  const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = rand(110, far ? 190 : 280);
+  const g = c.createGain();
+  src.connect(f); f.connect(g);
+  if (c.createStereoPanner) { const p = c.createStereoPanner(); p.pan.value = rand(-0.6, 0.6); g.connect(p); p.connect(dest); }
+  else g.connect(dest);
+  const t = c.currentTime + 0.05;
+  const dur = rand(3, 7);
+  const peak = far ? rand(0.05, 0.1) : rand(0.1, 0.2);
+  const n = 48, env = new Float32Array(n);
+  let walk = 1;
+  for (let i = 0; i < n; i++) {
+    const x = i / (n - 1);
+    walk = Math.max(0.35, Math.min(1.6, walk + rand(-0.3, 0.3)));
+    env[i] = Math.max(0.0001, peak * Math.min(1, x * 10) * Math.exp(-x * 3) * walk);
+  }
+  env[0] = 0.0001; env[n - 1] = 0.0001;
+  g.gain.setValueCurveAtTime(env, t, dur);
+  if (!far && Math.random() < 0.35) blip(c, dest, { bp: rand(700, 1600), q: 1.2, gain: rand(0.04, 0.09), decay: rand(0.12, 0.25), rate: rand(0.5, 0.8) });
+  src.start(t); src.stop(t + dur + 0.1);
+}
+
+// A cricket chirp train: a few rapid high pulses, like one insect answering.
+function cricketChirp(c, dest, f0, pan) {
+  let out = dest;
+  if (c.createStereoPanner) { const p = c.createStereoPanner(); p.pan.value = pan; p.connect(dest); out = p; }
+  let t = c.currentTime + 0.02;
+  const pulses = 3 + Math.floor(Math.random() * 4);
+  for (let i = 0; i < pulses; i++) {
+    const osc = c.createOscillator(); osc.type = 'sine'; osc.frequency.value = f0 * rand(0.98, 1.02);
+    const g = c.createGain(); osc.connect(g); g.connect(out);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(rand(0.005, 0.012), t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + rand(0.018, 0.028));
+    osc.start(t); osc.stop(t + 0.04);
+    t += rand(0.03, 0.05);
+  }
+}
+
+// A distant woodpecker: a rapid series of hollow knocks on one tree.
+function woodpecker(c, dest) {
+  const pan = rand(-0.7, 0.7);
+  const knocks = 5 + Math.floor(Math.random() * 6);
+  const gap = rand(0.045, 0.07);
+  for (let i = 0; i < knocks; i++) {
+    blip(c, dest, { bp: rand(700, 1100), q: 2, gain: rand(0.018, 0.038), decay: 0.012, rate: rand(0.6, 0.9), pan, at: i * gap });
+  }
+}
+
+// A soft two-note dove coo, low and far away.
+function dovecoo(c, dest) {
+  let out = dest;
+  if (c.createStereoPanner) { const p = c.createStereoPanner(); p.pan.value = rand(-0.7, 0.7); p.connect(dest); out = p; }
+  const f0 = rand(420, 540);
+  let t = c.currentTime + 0.05;
+  for (const [dur, drop] of [[0.16, 0.97], [0.3, 0.88]]) {
+    const osc = c.createOscillator(); osc.type = 'sine';
+    const g = c.createGain(); osc.connect(g); g.connect(out);
+    osc.frequency.setValueAtTime(f0, t);
+    osc.frequency.exponentialRampToValueAtTime(f0 * drop, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.012, t + 0.04);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.start(t); osc.stop(t + dur + 0.02);
+    t += dur + 0.12;
+  }
+}
+
+// One full ocean wave: a low rush that builds, breaks bright, then washes out
+// as a long darkening hiss (a lowpass sweeping down over the retreat).
+function waveEvent(c, dest) {
+  const src = c.createBufferSource(); src.buffer = loopBuf(c, 'white'); src.loop = true;
+  const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 320;
+  const g = c.createGain();
+  src.connect(f); f.connect(g);
+  if (c.createStereoPanner) { const p = c.createStereoPanner(); p.pan.value = rand(-0.4, 0.4); g.connect(p); p.connect(dest); }
+  else g.connect(dest);
+  const t = c.currentTime;
+  const build = rand(1.8, 3.2), crash = rand(0.2, 0.4), wash = rand(3.5, 6.5);
+  const peak = rand(0.05, 0.1);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(peak * 0.25, t + build);
+  g.gain.exponentialRampToValueAtTime(peak, t + build + crash);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + build + crash + wash);
+  f.frequency.setValueAtTime(320, t);
+  f.frequency.exponentialRampToValueAtTime(rand(2600, 5200), t + build + crash);
+  f.frequency.exponentialRampToValueAtTime(420, t + build + crash + wash);
+  src.start(t); src.stop(t + build + crash + wash + 0.2);
 }
 
 // A little multi-syllable bird call with pitch contours — sounds like a real
@@ -282,32 +390,50 @@ export function playAmbiance(key) {
     const bed = voice(c, dest, { type: 'pink', hp: light ? 500 : 380, lp: light ? 4200 : 6000, gain: light ? 0.035 : 0.07 });
     lfo(c, bed.g.gain, 0.06, light ? 0.006 : 0.012);   // intensity drifts slowly
     voice(c, dest, { type: 'brown', lp: 700, gain: light ? 0.012 : 0.028 });
-    // …plus individual droplet hits, randomly pitched and panned.
+    // …individual droplet hits, randomly pitched and panned…
     every(light ? 160 : 55, light ? 520 : 170, () =>
       blip(c, dest, { bp: rand(2200, 8000), q: rand(2.5, 6), gain: rand(0.008, light ? 0.03 : 0.05), decay: rand(0.012, 0.04), rate: rand(0.7, 1.4), pan: rand(-0.8, 0.8) }));
+    // …and rolling thunder — one early strike, then now and again. Light rain
+    // keeps it rarer and further away.
+    once(6000, 14000, () => rumble(c, dest, { far: light }));
+    every(light ? 35000 : 18000, light ? 80000 : 45000, () => { if (Math.random() < 0.8) rumble(c, dest, { far: light }); });
   } else if (key === 'fire') {
     // Low roar with fast flame flicker + slow breathing…
     const roar = voice(c, dest, { type: 'brown', lp: 380, gain: 0.075 });
     lfo(c, roar.g.gain, 5.3, 0.014);
     lfo(c, roar.g.gain, 0.17, 0.02);
     voice(c, dest, { type: 'brown', hp: 140, lp: 950, gain: 0.02 });   // warm mids
-    voice(c, dest, { type: 'white', hp: 6000, gain: 0.0035 });         // faint hiss
-    // …plus random crackles, and the occasional deeper pop.
-    every(45, 260, () => {
-      if (Math.random() < 0.1) blip(c, dest, { bp: rand(380, 900), q: 2.5, gain: rand(0.05, 0.1), decay: rand(0.04, 0.09), rate: rand(0.5, 0.9), pan: rand(-0.5, 0.5) });
-      else blip(c, dest, { bp: rand(1800, 6500), q: rand(3, 8), gain: rand(0.008, 0.05), decay: rand(0.008, 0.03), rate: rand(0.8, 1.6), pan: rand(-0.6, 0.6) });
+    voice(c, dest, { type: 'white', hp: 6000, gain: 0.003 });          // faint hiss
+    // …plus wood crackle: sharp snaps, often in little splitting clusters,
+    // with the occasional deep pop-and-settle as a log shifts.
+    const snap = (at = 0, pan = rand(-0.6, 0.6)) =>
+      blip(c, dest, { bp: rand(2500, 8000), q: rand(4, 10), gain: rand(0.012, 0.06), decay: rand(0.004, 0.016), rate: rand(0.9, 1.8), pan, at });
+    every(45, 280, () => {
+      const r = Math.random();
+      if (r < 0.08) {
+        // log pop: a low knock followed by a burst of rapid splitting ticks
+        const pan = rand(-0.5, 0.5);
+        blip(c, dest, { bp: rand(300, 750), q: 2.5, gain: rand(0.05, 0.11), decay: rand(0.04, 0.09), rate: rand(0.5, 0.9), pan });
+        const ticks = 2 + Math.floor(Math.random() * 4);
+        for (let i = 0; i < ticks; i++) snap(rand(0.015, 0.16), pan + rand(-0.15, 0.15));
+      } else if (r < 0.3) {
+        // double-tick: wood splitting twice in quick succession
+        const pan = rand(-0.6, 0.6);
+        snap(0, pan); snap(rand(0.02, 0.05), pan);
+      } else {
+        snap();
+      }
     });
   } else if (key === 'waves') {
-    // Two overlapping swells at different periods (real surf never repeats)…
-    const surgeA = voice(c, dest, { type: 'brown', lp: 420, q: 0.8, gain: 0.028 });
-    lfo(c, surgeA.lp.frequency, 0.05, 240);
-    lfo(c, surgeA.g.gain, 0.05, 0.022);
-    const surgeB = voice(c, dest, { type: 'brown', lp: 360, q: 0.8, gain: 0.02 });
-    lfo(c, surgeB.lp.frequency, 0.073, 200);
-    lfo(c, surgeB.g.gain, 0.073, 0.016);
-    // …with a foam "shhh" layer that swells as each wave breaks.
-    const foam = voice(c, dest, { type: 'white', hp: 1300, lp: 6500, gain: 0.011 });
-    lfo(c, foam.g.gain, 0.05, 0.01);
+    // A quiet distant-surf bed so it's never silent between waves…
+    const bedW = voice(c, dest, { type: 'brown', lp: 450, gain: 0.018 });
+    lfo(c, bedW.g.gain, 0.05, 0.008);
+    const foam = voice(c, dest, { type: 'white', hp: 1500, lp: 7000, gain: 0.004 });
+    lfo(c, foam.g.gain, 0.073, 0.003);
+    // …with actual wave events: build → break → long darkening wash. One rolls
+    // in right away, then they keep coming at their own pace (tails overlap).
+    waveEvent(c, dest);
+    every(5500, 12000, () => waveEvent(c, dest));
   } else if (key === 'space') {
     // Sub-bass felt more than heard + a slowly-beating drone chord…
     const sub = c.createOscillator(); sub.type = 'sine'; sub.frequency.value = 36;
@@ -329,7 +455,14 @@ export function playAmbiance(key) {
     lfo(c, leaves.g.gain, 0.09, 0.01);
     lfo(c, leaves.bp.frequency, 0.06, 900);
     voice(c, dest, { type: 'brown', lp: 350, gain: 0.012 });
-    // …and unhurried, varied birdsong.
-    every(2200, 7500, () => { if (Math.random() < 0.85) birdCall(c, dest); });
+    // …and a properly-populated wood: frequent varied birdsong, a cricket
+    // chorus (two individuals trading chirps from either side), a distant
+    // woodpecker now and then, and the occasional soft dove.
+    every(1500, 5000, () => { if (Math.random() < 0.85) birdCall(c, dest); });
+    const crickets = [{ f: 4300, pan: -0.55 }, { f: 4750, pan: 0.6 }];
+    every(500, 1500, () => { const cr = crickets[Math.floor(Math.random() * crickets.length)]; cricketChirp(c, dest, cr.f, cr.pan + rand(-0.1, 0.1)); });
+    every(12000, 30000, () => { if (Math.random() < 0.6) woodpecker(c, dest); });
+    every(15000, 40000, () => { if (Math.random() < 0.55) dovecoo(c, dest); });
+    once(3000, 8000, () => woodpecker(c, dest));   // let the wood introduce itself
   }
 }
