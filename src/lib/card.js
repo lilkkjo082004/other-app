@@ -98,6 +98,70 @@ export function makeCardBlob({ comp, quote, profileName } = {}) {
   return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/png'));
 }
 
+// Shareable "cosmic profile card": the USER's multi-system chart (sun sign,
+// element, Chinese zodiac, life path, Vedic) + their companions. Pure canvas.
+export function makeProfileCardBlob({ profile, comps = [] } = {}) {
+  const W = 1080, H = 1080;
+  const a = profile?.astrology || {};
+  const color = '#7c5bf5';
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#06060c'; ctx.fillRect(0, 0, W, H);
+  const glow = ctx.createRadialGradient(W / 2, 300, 40, W / 2, 300, 620);
+  glow.addColorStop(0, `${color}44`); glow.addColorStop(1, 'transparent');
+  ctx.fillStyle = glow; ctx.fillRect(0, 0, W, H);
+
+  // Scattered stars
+  const rnd = mulberry32(hashStr((profile?.name || 'you') + (a.western || '')));
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  for (let i = 0; i < 60; i++) { const x = rnd() * W, y = rnd() * H, r = rnd() * 2.2; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
+
+  ctx.textAlign = 'center';
+  // Big sun-sign glyph
+  ctx.fillStyle = lighten(color, 0.5);
+  ctx.font = '400 200px Georgia, serif';
+  ctx.fillText(a.westernData?.sym || '✦', W / 2, 340);
+
+  ctx.fillStyle = '#f4f2ff';
+  ctx.font = '700 66px Georgia, serif';
+  ctx.fillText(profile?.name || 'My chart', W / 2, 460);
+
+  const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+  const rows = [
+    ['Sun', `${cap(a.western) || '—'}${a.westernData ? ` · ${a.westernData.el}` : ''}`],
+    ['Chinese', `${a.chinese || '—'}${a.chineseElement ? ` · ${a.chineseElement}` : ''}`],
+    ['Life path', a.lifePath || '—'],
+  ];
+  if (a.vedic?.rashi) rows.push(['Vedic moon', `${cap(a.vedic.rashi)} · ${a.vedic.nakshatra}`]);
+
+  let y = 560;
+  ctx.font = '400 40px Georgia, serif';
+  for (const [k, v] of rows) {
+    ctx.fillStyle = '#8a86a8'; ctx.textAlign = 'right'; ctx.fillText(k, W / 2 - 24, y);
+    ctx.fillStyle = '#e8e5f7'; ctx.textAlign = 'left'; ctx.fillText(v, W / 2 + 24, y);
+    y += 66;
+  }
+
+  const names = comps.filter((c) => c && c.status !== 'deleted').map((c) => c.name);
+  if (names.length) {
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#8a86a8'; ctx.font = '400 28px Arial, sans-serif';
+    ctx.fillText('MY COMPANIONS', W / 2, y + 20);
+    ctx.fillStyle = color; ctx.font = '600 40px Georgia, serif';
+    ctx.fillText(names.join('  ·  '), W / 2, y + 76);
+  }
+
+  ctx.textAlign = 'center';
+  ctx.fillStyle = color; ctx.font = '600 30px Georgia, serif';
+  ctx.fillText('✦ Other', W / 2, H - 92);
+  ctx.fillStyle = '#6b6880'; ctx.font = '400 24px Arial, sans-serif';
+  ctx.fillText('My cosmic profile on Other — AI companion app', W / 2, H - 52);
+
+  return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/png'));
+}
+
 export async function shareOrDownloadCard(blob, comp) {
   if (!blob) return;
   const file = new File([blob], `other-${(comp?.name || 'companion').toLowerCase()}.png`, { type: 'image/png' });

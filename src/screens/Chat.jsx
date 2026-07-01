@@ -39,7 +39,14 @@ import Goals from './Goals.jsx';
 import { goalToNudge, markNudged } from '../lib/goals.js';
 import CheckIn from './CheckIn.jsx';
 import { CHECKIN_MOODS, checkinDue, recordCheckin } from '../lib/checkin.js';
-import { makeCardBlob, shareOrDownloadCard } from '../lib/card.js';
+import { makeCardBlob, shareOrDownloadCard, makeProfileCardBlob } from '../lib/card.js';
+import ForYou from './ForYou.jsx';
+import Today from './Today.jsx';
+import Breathe from './Breathe.jsx';
+import Rituals from './Rituals.jsx';
+import Values from './Values.jsx';
+import Vault from './Vault.jsx';
+import MoodInsights from './MoodInsights.jsx';
 import WakingUp from './WakingUp.jsx';
 
 export default function Chat({ companions: init, profile, trialStart, restored, onPersist, onReset, onUpdateProfile, storageWarn, onDismissStorageWarn, cloud, authed, email, onSignIn, onSignOut }) {
@@ -1125,6 +1132,13 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
 
   function openProfile(c) { setShowMenu(false); setPanel({ profile: c.id }); }
 
+  async function shareCosmicCard() {
+    try {
+      const blob = await makeProfileCardBlob({ profile, comps });
+      await shareOrDownloadCard(blob, { name: 'cosmic-profile' });
+    } catch (e) { /* ignore */ }
+  }
+
   // ── Panels (full-screen views) ──
   if (panel === 'places') return <PlacesNearby onBack={() => setPanel(null)} />;
   if (panel === 'story') return <StorySoFar lore={lore} jokes={jokes} comps={comps} onBack={() => setPanel(null)} />;
@@ -1132,6 +1146,15 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   if (panel === 'journal') return <Journal entries={journal} onChange={setJournal} onBack={() => setPanel(null)} />;
   if (panel === 'goals') return <Goals goals={goals} onChange={setGoals} onBack={() => setPanel(null)} />;
   if (panel === 'checkin') return <CheckIn checkins={checkins} onBack={() => setPanel(null)} />;
+  // "For you" hub + its user-centric tools. The hub's card tile shares a
+  // cosmic-profile image; the rest open their own panel and return to the hub.
+  if (panel === 'you') return <ForYou profile={profile} onNav={(k) => { if (k === 'card') shareCosmicCard(); else setPanel(k); }} onBack={() => setPanel(null)} />;
+  if (panel === 'today') return <Today profile={profile} onBack={() => setPanel('you')} />;
+  if (panel === 'mood') return <MoodInsights checkins={checkins} onBack={() => setPanel('you')} />;
+  if (panel === 'breathe') return <Breathe onBack={() => setPanel('you')} />;
+  if (panel === 'rituals') return <Rituals onBack={() => setPanel('you')} />;
+  if (panel === 'values') return <Values onBack={() => setPanel('you')} />;
+  if (panel === 'vault') return <Vault onBack={() => setPanel('you')} />;
   if (panel === 'space') {
     return (
       <CompanionSpace
@@ -1354,6 +1377,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
             </div>
           ))}
           <div style={{ borderTop: `1px solid ${C.border}`, margin: '8px 0' }} />
+          <button onClick={() => { setShowMenu(false); setPanel('you'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.glow3, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🧭  For you</button>
           {living.length < 3 && <button onClick={summon} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.glow2, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif" }}>✦  Summon a companion</button>}
           <button onClick={() => { setShowMenu(false); setPanel('story'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📖  Your story so far</button>
           <button onClick={() => { setShowMenu(false); setPanel('recap'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>✨  Your recap</button>
