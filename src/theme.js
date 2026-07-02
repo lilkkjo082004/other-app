@@ -45,4 +45,8 @@ input,textarea,select{font-family:'DM Sans',sans-serif}input::placeholder,textar
 @media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:0.001ms !important;animation-iteration-count:1 !important;transition-duration:0.001ms !important;scroll-behavior:auto !important}}
 /* Calm Mode: low-stimulation — stop motion, dim the moving background, soften. */
 .other-calm *,.other-calm *::before,.other-calm *::after{animation-duration:0.001ms !important;animation-iteration-count:1 !important;transition-duration:0.08s !important;scroll-behavior:auto !important}
-.other-calm .cosmic-bg{opacity:0.25;filter:saturate(0.8)}`;
+.other-calm .cosmic-bg{opacity:0.25;filter:saturate(0.8)}
+/* Viewport-bound shell (chat & panels): 100vh everywhere, upgraded to the
+   dynamic viewport unit where supported so mobile URL bars don't clip it. */
+.shell-fill{height:100vh;max-height:100vh}
+@supports (height: 100dvh){.shell-fill{height:100dvh;max-height:100dvh}}`;

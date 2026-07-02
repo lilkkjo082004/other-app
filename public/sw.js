@@ -1,6 +1,6 @@
 // OTHER service worker — offline app shell + runtime asset caching.
 // Cross-origin requests (e.g. the AI proxy) are never intercepted.
-const CACHE = 'other-v1';
+const CACHE = 'other-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (e) => {
@@ -21,9 +21,18 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return; // leave the AI proxy etc. to the network
 
-  // App navigations: network-first, fall back to the cached shell when offline.
+  // App navigations: network-first (revalidating past any HTTP cache so a new
+  // deploy is picked up immediately), falling back to the cached shell offline.
   if (req.mode === 'navigate') {
-    e.respondWith(fetch(req).catch(() => caches.match('./index.html')));
+    e.respondWith(
+      fetch(req, { cache: 'no-cache' })
+        .then((res) => {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put('./index.html', copy)).catch(() => {});
+          return res;
+        })
+        .catch(() => caches.match('./index.html'))
+    );
     return;
   }
 

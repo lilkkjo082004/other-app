@@ -962,12 +962,17 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     const jump = () => {
       const el = scrollRef.current;
       if (el) { el.scrollTop = el.scrollHeight; atBottomRef.current = true; setAtBottom(true); }
+      // Safety net: if the shell bound failed on this browser and the DOCUMENT
+      // became the scroller, pin that to the bottom too.
+      const doc = document.scrollingElement;
+      if (doc && doc.scrollHeight > doc.clientHeight + 4) doc.scrollTop = doc.scrollHeight;
     };
     jump();
     const r = requestAnimationFrame(jump);
-    const t1 = setTimeout(jump, 150);
-    const t2 = setTimeout(jump, 500);
-    return () => { cancelAnimationFrame(r); clearTimeout(t1); clearTimeout(t2); };
+    // Re-pin as late content settles (ambient "while you were away" lines and
+    // check-in/seasonal cards arrive up to a second after the view opens).
+    const ts = [150, 500, 1200, 2000].map((ms) => setTimeout(jump, ms));
+    return () => { cancelAnimationFrame(r); ts.forEach(clearTimeout); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panel]);
   // Instant pin to the latest message — used while typing (the input box grows)

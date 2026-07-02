@@ -2,12 +2,15 @@ import React from 'react';
 import { C, CSS } from '../theme.js';
 
 // Cosmic background frame used by every screen.
-// `fill` bounds the shell to the viewport height (dynamic vh) so an inner
-// `flex:1; overflow:auto` region becomes the real scroller instead of growing
-// the whole page — used by the chat so it always opens at the latest message.
-// Browsers without dvh fall back to the previous page-growing behavior.
+// `fill` bounds the shell to the viewport height so an inner `flex:1;
+// overflow:auto` region becomes the real scroller instead of growing the whole
+// page — used by the chat so it always opens at the latest message. The bound
+// comes from the `.shell-fill` CSS class (100vh base, upgraded to dynamic
+// 100dvh via @supports) rather than an inline dvh value, because browsers
+// without dvh silently drop invalid inline styles — which un-bounded the shell
+// and made the *document* the scroller (opening at the top of the chat).
 export const Shell = ({ children, fill }) => (
-  <div style={{ background: C.void, minHeight: '100vh', ...(fill ? { height: '100dvh', maxHeight: '100dvh' } : null), position: 'relative', overflow: 'hidden' }}>
+  <div className={fill ? 'shell-fill' : undefined} style={{ background: C.void, minHeight: '100vh', position: 'relative', overflow: 'hidden' }}>
     <style>{CSS}</style>
     <div className="cosmic-bg" style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, transition: 'opacity 0.4s' }}>
       <div style={{ position: 'absolute', width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(circle,rgba(124,91,245,0.08),transparent 70%)', top: '-10%', right: '-8%', filter: 'blur(60px)', animation: 'drift1 25s ease-in-out infinite' }} />
