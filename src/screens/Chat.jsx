@@ -62,7 +62,15 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const [chatMode, setChatMode] = useState(restored?.chatMode || 'group');
   const [showMenu, setShowMenu] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(restored?.autoSpeak || false);
-  const [panel, setPanel] = useState('home');          // 'home' | null (chat) | 'settings' | { profile: id } | ...
+  // Returning users land on the Home hub; a brand-new user (no restored
+  // session) goes straight into the chat to meet their companions — the
+  // first greeting shouldn't happen invisibly behind Home.
+  const [panel, setPanel] = useState(restored ? 'home' : null); // 'home' | null (chat) | 'settings' | { profile: id } | ...
+  // Where the current panel was opened from, so Back returns there ('home' hub
+  // vs. the chat) instead of always dropping into the conversation.
+  const panelFromHomeRef = useRef(false);
+  const openPanel = (k, fromHome = false) => { panelFromHomeRef.current = fromHome; setPanel(k); };
+  const goBack = () => setPanel(panelFromHomeRef.current ? 'home' : null);
   const [ambient, setAmbient] = useState([]);          // ephemeral "while you were away" thread
   const [bonds, setBonds] = useState(restored?.bonds || {});
   const [voiceCall, setVoiceCall] = useState(restored?.voiceCall !== false);   // call-by-name on by default
@@ -1204,7 +1212,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     else setUnlock({ companion: cand, onResult: (ok) => { if (ok) { cand.purchased = true; addCompanion(cand); } } });
   }
 
-  function openProfile(c) { setShowMenu(false); setPanel({ profile: c.id }); }
+  function openProfile(c) { setShowMenu(false); openPanel({ profile: c.id }); }
 
   async function shareCosmicCard() {
     try {
@@ -1214,16 +1222,17 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   }
 
   // ── Panels (full-screen views) ──
-  if (panel === 'home') return <Home profile={profile} comps={comps} checkins={checkins} onOpenChat={() => setPanel(null)} onNav={(k) => setPanel(k)} />;
-  if (panel === 'places') return <PlacesNearby onBack={() => setPanel(null)} />;
-  if (panel === 'story') return <StorySoFar lore={lore} jokes={jokes} comps={comps} onBack={() => setPanel(null)} />;
-  if (panel === 'recap') return <Recap comps={comps} lore={lore} jokes={jokes} profile={profile} onBack={() => setPanel(null)} />;
-  if (panel === 'journal') return <Journal entries={journal} onChange={setJournal} onBack={() => setPanel(null)} />;
-  if (panel === 'goals') return <Goals goals={goals} onChange={setGoals} onBack={() => setPanel(null)} />;
-  if (panel === 'checkin') return <CheckIn checkins={checkins} profile={profile} onCheckIn={logCheckin} onBack={() => setPanel(null)} />;
+  if (panel === 'home') return <Home profile={profile} comps={comps} checkins={checkins} onOpenChat={() => setPanel(null)} onNav={(k) => openPanel(k, true)} />;
+  if (panel === 'places') return <PlacesNearby onBack={goBack} />;
+  if (panel === 'story') return <StorySoFar lore={lore} jokes={jokes} comps={comps} onBack={goBack} />;
+  if (panel === 'recap') return <Recap comps={comps} lore={lore} jokes={jokes} profile={profile} onBack={goBack} />;
+  if (panel === 'journal') return <Journal entries={journal} onChange={setJournal} onBack={goBack} />;
+  if (panel === 'goals') return <Goals goals={goals} onChange={setGoals} onBack={goBack} />;
+  if (panel === 'checkin') return <CheckIn checkins={checkins} profile={profile} onCheckIn={logCheckin} onBack={goBack} />;
   // "For you" hub + its user-centric tools. The hub's card tile shares a
-  // cosmic-profile image; the rest open their own panel and return to the hub.
-  if (panel === 'you') return <ForYou profile={profile} comps={comps} onNav={(k) => { if (k === 'card') shareCosmicCard(); else setPanel(k); }} onOpenCompanion={(id) => setPanel({ profile: id })} onBack={() => setPanel(null)} />;
+  // cosmic-profile image; the rest open their own panel and return to the hub
+  // (which itself goes back to wherever it was opened from).
+  if (panel === 'you') return <ForYou profile={profile} comps={comps} onNav={(k) => { if (k === 'card') shareCosmicCard(); else setPanel(k); }} onOpenCompanion={(id) => setPanel({ profile: id })} onBack={goBack} />;
   if (panel === 'today') return <Today profile={profile} onBack={() => setPanel('you')} />;
   if (panel === 'mood') return <MoodInsights checkins={checkins} onBack={() => setPanel('you')} />;
   if (panel === 'breathe') return <Breathe onBack={() => setPanel('you')} />;
@@ -1231,12 +1240,12 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   if (panel === 'values') return <Values onBack={() => setPanel('you')} />;
   if (panel === 'vault') return <Vault onBack={() => setPanel('you')} />;
   if (panel === 'duo') return <DuoCompat profile={profile} onBack={() => setPanel('you')} />;
-  if (panel === 'timeline') return <Timeline comps={comps} lore={lore} jokes={jokes} messages={msgs} onBack={() => setPanel(null)} />;
+  if (panel === 'timeline') return <Timeline comps={comps} lore={lore} jokes={jokes} messages={msgs} onBack={goBack} />;
   if (panel === 'cowork') return <Cowork comps={comps} profile={profile}
     onFocus={(mins, buddy) => startFocus(mins, buddy, { silent: true })}
     onEndFocus={() => endFocus({ silent: true })}
     onSay={(comp, text) => setMsgs((p) => [...p, { role: 'assistant', companion: comp, content: text, ts: Date.now() }])}
-    onBack={() => setPanel(null)} />;
+    onBack={goBack} />;
   if (panel === 'space') {
     return (
       <CompanionSpace
@@ -1246,7 +1255,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         onInteract={(id, kind) => bumpCloseness([id], kind)}
         lore={lore}
         onOpenProfile={(id) => setPanel({ profile: id })}
-        onBack={() => setPanel(null)}
+        onBack={goBack}
       />
     );
   }
@@ -1263,7 +1272,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         onSleepAll={() => setComps((p) => p.map((c) => (c.status === 'awake' ? { ...c, status: 'sleeping' } : c)))}
         onWakeAll={() => setComps((p) => p.map((c) => (c.status === 'sleeping' ? { ...c, status: 'awake' } : c)))}
         onReset={onReset}
-        onBack={() => setPanel(null)}
+        onBack={goBack}
       />
     );
   }
@@ -1275,7 +1284,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
           companion={pc} trialStart={trialStart} history={msgs} comps={comps} bonds={bonds}
           memories={memOf(pc.id)} onForgetMemory={(id) => setMemStore((s) => ({ ...s, [pc.id]: removeMemory(s[pc.id] || [], id) }))}
           onCustomize={(updates) => setComps((p) => p.map((c) => (c.id === pc.id ? { ...c, ...updates } : c)))}
-          onBack={() => setPanel(null)}
+          onBack={goBack}
           onPrivate={() => { setChatMode(pc.id); setPanel(null); }}
           onSleepToggle={() => { togSleep(pc.id); setPanel(null); }}
           onDelete={() => { delComp(pc.id); setPanel(null); }}
@@ -1379,7 +1388,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
           {voiceCall && <button aria-label={listening ? 'Listening — tap to stop' : 'Call a companion by voice'} onClick={startListening} style={{ background: listening ? `${C.danger}22` : 'none', border: `1px solid ${listening ? C.danger : C.border}`, borderRadius: 7, padding: '5px 8px', color: listening ? C.danger : C.textDim, fontSize: 13, cursor: 'pointer', animation: listening ? 'micPulse 1.5s infinite' : 'none' }}>🎤</button>}
           {priv && priv.status === 'awake' && <button aria-label={`Call ${priv.name}`} title={`Call ${priv.name}`} onClick={() => startCall(priv)} style={{ background: 'none', border: `1px solid ${C.border}`, borderRadius: 7, padding: '5px 8px', color: C.textDim, fontSize: 13, cursor: 'pointer' }}>📞</button>}
           <button aria-label="Home" title="Home" onClick={() => setPanel('home')} style={{ background: 'none', border: `1px solid ${C.border}`, borderRadius: 7, padding: '5px 8px', color: C.textDim, fontSize: 13, cursor: 'pointer' }}>🏠</button>
-          <button aria-label="Open the space — where your companions hang out" title="The Space" onClick={() => setPanel('space')} style={{ background: 'none', border: `1px solid ${C.border}`, borderRadius: 7, padding: '5px 8px', color: C.textDim, fontSize: 13, cursor: 'pointer' }}>✦</button>
+          <button aria-label="Open the space — where your companions hang out" title="The Space" onClick={() => openPanel('space')} style={{ background: 'none', border: `1px solid ${C.border}`, borderRadius: 7, padding: '5px 8px', color: C.textDim, fontSize: 13, cursor: 'pointer' }}>✦</button>
           <button aria-label="Search messages" onClick={() => setSearch((s) => (s == null ? '' : null))} style={{ background: search != null ? `${C.glow1}22` : 'none', border: `1px solid ${search != null ? C.glow1 : C.border}`, borderRadius: 7, padding: '5px 8px', color: search != null ? C.glow1 : C.textDim, fontSize: 13, cursor: 'pointer' }}>🔍</button>
           <button aria-label="Menu" aria-expanded={showMenu} onClick={() => setShowMenu(!showMenu)} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 16, cursor: 'pointer', padding: 4 }}>☰</button>
         </div>
@@ -1405,7 +1414,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
               ? "This device's storage is full — new messages may not be saved. Export a backup so nothing is lost."
               : 'Your history is getting large for this device. Export a backup to keep it safe.'}
           </span>
-          <button onClick={() => { setPanel('settings'); onDismissStorageWarn?.(); }} style={{ flexShrink: 0, background: 'transparent', border: `1px solid ${storageWarn === 'full' ? C.danger : C.glow2}`, color: storageWarn === 'full' ? C.danger : C.glow2, borderRadius: 7, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>Export</button>
+          <button onClick={() => { openPanel('settings'); onDismissStorageWarn?.(); }} style={{ flexShrink: 0, background: 'transparent', border: `1px solid ${storageWarn === 'full' ? C.danger : C.glow2}`, color: storageWarn === 'full' ? C.danger : C.glow2, borderRadius: 7, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>Export</button>
           <button aria-label="Dismiss" onClick={() => onDismissStorageWarn?.()} style={{ flexShrink: 0, background: 'none', border: 'none', color: C.textDim, fontSize: 15, cursor: 'pointer', lineHeight: 1 }}>×</button>
         </div>
       )}
@@ -1460,19 +1469,19 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
             </div>
           ))}
           <div style={{ borderTop: `1px solid ${C.border}`, margin: '8px 0' }} />
-          <button onClick={() => { setShowMenu(false); setPanel('you'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.glow3, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🧭  For you</button>
+          <button onClick={() => { setShowMenu(false); openPanel('you'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.glow3, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🧭  For you</button>
           {living.length < 3 && <button onClick={summon} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.glow2, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif" }}>✦  Summon a companion</button>}
-          <button onClick={() => { setShowMenu(false); setPanel('story'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📖  Your story so far</button>
-          <button onClick={() => { setShowMenu(false); setPanel('timeline'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🕰️  Timeline</button>
-          <button onClick={() => { setShowMenu(false); setPanel('recap'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>✨  Your recap</button>
-          <button onClick={() => { setShowMenu(false); setPanel('journal'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📓  Journal</button>
-          <button onClick={() => { setShowMenu(false); setPanel('goals'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🌱  Goals</button>
-          <button onClick={() => { setShowMenu(false); setPanel('checkin'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🌤️  Daily check-in</button>
-          <button onClick={() => { setShowMenu(false); setPanel('places'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📍  Find nearby</button>
-          {active.length > 0 && <button onClick={() => { setShowMenu(false); setPanel('cowork'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🧑‍💻  Cowork station</button>}
+          <button onClick={() => { setShowMenu(false); openPanel('story'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📖  Your story so far</button>
+          <button onClick={() => { setShowMenu(false); openPanel('timeline'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🕰️  Timeline</button>
+          <button onClick={() => { setShowMenu(false); openPanel('recap'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>✨  Your recap</button>
+          <button onClick={() => { setShowMenu(false); openPanel('journal'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📓  Journal</button>
+          <button onClick={() => { setShowMenu(false); openPanel('goals'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🌱  Goals</button>
+          <button onClick={() => { setShowMenu(false); openPanel('checkin'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🌤️  Daily check-in</button>
+          <button onClick={() => { setShowMenu(false); openPanel('places'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📍  Find nearby</button>
+          {active.length > 0 && <button onClick={() => { setShowMenu(false); openPanel('cowork'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🧑‍💻  Cowork station</button>}
           {!focusUntil && active.length > 0 && <button onClick={() => { const buddy = priv || active[0]; setShowMenu(false); startFocus(25, buddy); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🎯  Quick focus (25 min)</button>}
           {active.length > 1 && <button onClick={() => { setShowMenu(false); startGroupCall(); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📞  Group call (everyone)</button>}
-          <button onClick={() => { setShowMenu(false); setPanel('settings'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>⚙  Settings</button>
+          <button onClick={() => { setShowMenu(false); openPanel('settings'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>⚙  Settings</button>
           <button onClick={() => setShowMenu(false)} style={{ width: '100%', background: 'none', border: `1px solid ${C.border}`, borderRadius: 7, padding: '5px', color: C.textSoft, cursor: 'pointer', fontSize: 11, fontFamily: "'DM Sans',sans-serif" }}>Close</button>
         </div>
       )}
