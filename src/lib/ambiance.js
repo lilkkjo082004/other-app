@@ -208,29 +208,40 @@ function blip(c, dest, { bp = 3000, q = 4, gain = 0.03, decay = 0.03, rate = 1, 
   src.start(t); src.stop(t + decay + 0.05);
 }
 
-// Rolling thunder: a long brown-noise rumble shaped by a random-walk envelope,
-// so each strike rolls and fades differently. Closer strikes get an onset crack.
+// Rolling thunder: a long noise rumble shaped by a random-walk envelope, so
+// each strike rolls and fades differently. The body sits in the 300-800Hz band
+// (NOT sub-bass — phone/laptop speakers can't reproduce below ~200Hz, which
+// made earlier thunder inaudible), with a deep layer underneath for good
+// speakers and an audible "crack!" at the onset of closer strikes.
 function rumble(c, dest, { far = false } = {}) {
-  const src = c.createBufferSource(); src.buffer = loopBuf(c, 'brown'); src.loop = true;
-  const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = rand(110, far ? 190 : 280);
-  const g = c.createGain();
-  src.connect(f); f.connect(g);
-  if (c.createStereoPanner) { const p = c.createStereoPanner(); p.pan.value = rand(-0.6, 0.6); g.connect(p); p.connect(dest); }
-  else g.connect(dest);
   const t = c.currentTime + 0.05;
-  const dur = rand(3, 7);
-  const peak = far ? rand(0.05, 0.1) : rand(0.1, 0.2);
+  const dur = rand(4, 8);
+  const peak = far ? rand(0.12, 0.2) : rand(0.3, 0.5);
+  const pan = rand(-0.6, 0.6);
+  // Shared random-walk envelope so both layers roll together.
   const n = 48, env = new Float32Array(n);
   let walk = 1;
   for (let i = 0; i < n; i++) {
     const x = i / (n - 1);
     walk = Math.max(0.35, Math.min(1.6, walk + rand(-0.3, 0.3)));
-    env[i] = Math.max(0.0001, peak * Math.min(1, x * 10) * Math.exp(-x * 3) * walk);
+    env[i] = Math.max(0.0001, Math.min(1, x * 10) * Math.exp(-x * 3) * walk);
   }
   env[0] = 0.0001; env[n - 1] = 0.0001;
-  g.gain.setValueCurveAtTime(env, t, dur);
-  if (!far && Math.random() < 0.35) blip(c, dest, { bp: rand(700, 1600), q: 1.2, gain: rand(0.04, 0.09), decay: rand(0.12, 0.25), rate: rand(0.5, 0.8) });
-  src.start(t); src.stop(t + dur + 0.1);
+  const layer = (type, lpHz, scale) => {
+    const src = c.createBufferSource(); src.buffer = loopBuf(c, type); src.loop = true;
+    const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = lpHz;
+    const g = c.createGain();
+    src.connect(f); f.connect(g);
+    if (c.createStereoPanner) { const p = c.createStereoPanner(); p.pan.value = pan; g.connect(p); p.connect(dest); }
+    else g.connect(dest);
+    const e = new Float32Array(n);
+    for (let i = 0; i < n; i++) e[i] = Math.max(0.0001, env[i] * peak * scale);
+    g.gain.setValueCurveAtTime(e, t, dur);
+    src.start(t); src.stop(t + dur + 0.1);
+  };
+  layer('brown', far ? rand(300, 500) : rand(450, 800), 1);   // audible mid body
+  layer('brown', 160, 0.8);                                    // depth for real speakers
+  if (!far && Math.random() < 0.65) blip(c, dest, { bp: rand(900, 2200), q: 1.2, gain: rand(0.1, 0.2), decay: rand(0.15, 0.35), rate: rand(0.5, 0.8), pan });
 }
 
 // A cricket chirp train: a few rapid high pulses, like one insect answering.
@@ -393,30 +404,34 @@ export function playAmbiance(key) {
     // …individual droplet hits, randomly pitched and panned…
     every(light ? 160 : 55, light ? 520 : 170, () =>
       blip(c, dest, { bp: rand(2200, 8000), q: rand(2.5, 6), gain: rand(0.008, light ? 0.03 : 0.05), decay: rand(0.012, 0.04), rate: rand(0.7, 1.4), pan: rand(-0.8, 0.8) }));
-    // …and rolling thunder — one early strike, then now and again. Light rain
+    // …and rolling thunder — one early strike, then regularly. Light rain
     // keeps it rarer and further away.
-    once(6000, 14000, () => rumble(c, dest, { far: light }));
-    every(light ? 35000 : 18000, light ? 80000 : 45000, () => { if (Math.random() < 0.8) rumble(c, dest, { far: light }); });
+    once(3000, 8000, () => rumble(c, dest, { far: light }));
+    every(light ? 25000 : 12000, light ? 60000 : 35000, () => { if (Math.random() < 0.85) rumble(c, dest, { far: light }); });
   } else if (key === 'fire') {
-    // Low roar with fast flame flicker + slow breathing…
-    const roar = voice(c, dest, { type: 'brown', lp: 380, gain: 0.075 });
-    lfo(c, roar.g.gain, 5.3, 0.014);
-    lfo(c, roar.g.gain, 0.17, 0.02);
-    voice(c, dest, { type: 'brown', hp: 140, lp: 950, gain: 0.02 });   // warm mids
-    voice(c, dest, { type: 'white', hp: 6000, gain: 0.003 });          // faint hiss
-    // …plus wood crackle: sharp snaps, often in little splitting clusters,
-    // with the occasional deep pop-and-settle as a log shifts.
+    // The crackle IS the fire — the bed underneath stays soft and airy so it
+    // never reads as a thunder-like rumble (small speakers only get the ticks).
+    const roar = voice(c, dest, { type: 'brown', lp: 240, gain: 0.03 });    // soft ember glow
+    lfo(c, roar.g.gain, 5.3, 0.007);
+    lfo(c, roar.g.gain, 0.17, 0.008);
+    const flame = voice(c, dest, { type: 'pink', hp: 250, lp: 1600, gain: 0.012 });  // flame movement
+    lfo(c, flame.g.gain, 7.1, 0.005);
+    voice(c, dest, { type: 'white', hp: 6000, gain: 0.003 });               // faint hiss
+    // Dense, prominent wood crackle: sharp snaps, splitting clusters, and
+    // deep pop-and-settle events as logs shift. Gains here look large because a
+    // narrow bandpass passes only ~15-30% of the burst's energy — after that
+    // attenuation the crackle peaks land well ABOVE the soft bed, as they should.
     const snap = (at = 0, pan = rand(-0.6, 0.6)) =>
-      blip(c, dest, { bp: rand(2500, 8000), q: rand(4, 10), gain: rand(0.012, 0.06), decay: rand(0.004, 0.016), rate: rand(0.9, 1.8), pan, at });
-    every(45, 280, () => {
+      blip(c, dest, { bp: rand(2500, 8000), q: rand(3, 7), gain: rand(0.15, 0.4), decay: rand(0.005, 0.018), rate: rand(0.9, 1.8), pan, at });
+    every(25, 150, () => {
       const r = Math.random();
-      if (r < 0.08) {
+      if (r < 0.12) {
         // log pop: a low knock followed by a burst of rapid splitting ticks
         const pan = rand(-0.5, 0.5);
-        blip(c, dest, { bp: rand(300, 750), q: 2.5, gain: rand(0.05, 0.11), decay: rand(0.04, 0.09), rate: rand(0.5, 0.9), pan });
-        const ticks = 2 + Math.floor(Math.random() * 4);
-        for (let i = 0; i < ticks; i++) snap(rand(0.015, 0.16), pan + rand(-0.15, 0.15));
-      } else if (r < 0.3) {
+        blip(c, dest, { bp: rand(350, 800), q: 2.5, gain: rand(0.25, 0.45), decay: rand(0.05, 0.12), rate: rand(0.5, 0.9), pan });
+        const ticks = 3 + Math.floor(Math.random() * 4);
+        for (let i = 0; i < ticks; i++) snap(rand(0.015, 0.18), pan + rand(-0.15, 0.15));
+      } else if (r < 0.45) {
         // double-tick: wood splitting twice in quick succession
         const pan = rand(-0.6, 0.6);
         snap(0, pan); snap(rand(0.02, 0.05), pan);
