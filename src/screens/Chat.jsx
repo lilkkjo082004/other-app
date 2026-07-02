@@ -952,18 +952,24 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     if (el) { const at = el.scrollHeight - el.scrollTop - el.clientHeight < 80; atBottomRef.current = at; setAtBottom(at); }
   };
   const scrollToBottom = () => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-  // On open/resume, land on the latest message — not mid-conversation. Jump
-  // instantly (no smooth) and re-pin a few times as layout settles (avatars,
-  // day separators, photo thumbnails can change the height after first paint).
+  // Whenever the chat view becomes visible (fresh open, or returning from Home
+  // or any panel — the transcript DOM doesn't exist while a panel is showing),
+  // land on the latest message, not mid-conversation. Jump instantly (no
+  // smooth) and re-pin a few times as layout settles (avatars, day separators,
+  // photo thumbnails can change the height after first paint).
   useEffect(() => {
-    const jump = () => { const el = scrollRef.current; if (el) el.scrollTop = el.scrollHeight; };
+    if (panel) return;   // a panel (home/settings/…) is covering the chat
+    const jump = () => {
+      const el = scrollRef.current;
+      if (el) { el.scrollTop = el.scrollHeight; atBottomRef.current = true; setAtBottom(true); }
+    };
     jump();
     const r = requestAnimationFrame(jump);
     const t1 = setTimeout(jump, 150);
     const t2 = setTimeout(jump, 500);
     return () => { cancelAnimationFrame(r); clearTimeout(t1); clearTimeout(t2); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [panel]);
   // Instant pin to the latest message — used while typing (the input box grows)
   // and when the on-screen keyboard opens, so new messages never hide under it.
   const pinBottom = () => { const el = scrollRef.current; if (el) el.scrollTop = el.scrollHeight; };
