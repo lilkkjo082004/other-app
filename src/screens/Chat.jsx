@@ -22,7 +22,8 @@ import { aiEnabled, billingEnabled } from '../config.js';
 import { onDeviceActive } from '../lib/ondevice.js';
 import { calmEnabled } from '../lib/comfort.js';
 import { scanLocation, shouldNudgePlace, markPlaceNudged, weatherNow } from '../lib/location.js';
-import { parseAction, stripActionPartial, downloadICS, googleCalUrl, formatWhen, actionTitle } from '../lib/actions.js';
+import { parseAction, stripActionPartial, downloadICS, googleCalUrl, formatWhen, actionTitle, actionStart } from '../lib/actions.js';
+import { pickReminder, whenPhrase, loadReminded, markReminded } from '../lib/reminders.js';
 import { birthdayStatus, monthsKnown, pendingMilestones, monthsLabel } from '../lib/occasion.js';
 import { seasonalTheme, seasonalDue, seasonalLine } from '../lib/seasonal.js';
 import { voiceNoteDue, markVoiceNote, waveform } from '../lib/voicenote.js';
@@ -471,6 +472,54 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     return () => { alive = false; clearTimeout(first); clearInterval(iv); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comps]);
+
+  // Proactive calendar reminders: when something on the user's calendar is
+  // coming up soon, a companion brings it up unprompted — like a friend who
+  // remembered. Sources are all on-device: shared Google events (`upcoming`)
+  // and any plans/reminders a companion made (message actions). Each event is
+  // mentioned at most once (lib/reminders.js), and never during a focus session
+  // or while the tab is hidden.
+  const remindBusyRef = useRef(false);
+  const calEvents = () => {
+    const out = [];
+    for (const e of upcoming) { const t = Date.parse(e.when); if (t) out.push({ title: e.title, when: t, allDay: e.allDay }); }
+    for (const m of msgsRef.current || []) {
+      const a = m.action;
+      if (a && (a.type === 'calendar' || a.type === 'reminder')) {
+        const t = Date.parse(actionStart(a)) || +actionStart(a);
+        if (t) out.push({ title: actionTitle(a), when: t, allDay: false });
+      }
+    }
+    return out;
+  };
+  useEffect(() => {
+    let alive = true;
+    async function check() {
+      if (!alive || remindBusyRef.current || loadingRef.current) return;
+      if (focusRef.current && Date.now() < focusRef.current) return; // quiet during focus
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+      const awake = comps.filter((c) => c.status === 'awake');
+      if (!awake.length) return;
+      const now = Date.now();
+      const due = pickReminder(calEvents(), now, loadReminded());
+      if (!due) return;
+      remindBusyRef.current = true;
+      markReminded(due.key, now);
+      const c = awake[Math.floor(Math.random() * awake.length)];
+      const focus = `${due.event.title} — ${whenPhrase(due.event, now)}`;
+      setTyping(c); setLoading(true);
+      try {
+        const t = await proactiveCompanion(c, profFor(c), chatMode === 'group' ? 'group' : 'private', comps, msgsRef.current, 'calendar', '', focus);
+        if (alive) { setMsgs((p) => [...p, { role: 'assistant', companion: c, content: t, ts: Date.now() }]); if (autoSpeak && !calmEnabled()) speakAs(t, c); }
+      } catch (e) { /* ignore */ }
+      setTyping(null); setLoading(false);
+      remindBusyRef.current = false;
+    }
+    const first = setTimeout(check, 8000);
+    const iv = setInterval(check, 3 * 60 * 1000);
+    return () => { alive = false; clearTimeout(first); clearInterval(iv); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [upcoming, comps, chatMode]);
 
   // Best-effort local weather (on-device coords -> Open-Meteo) for grounding.
   useEffect(() => {

@@ -21,6 +21,7 @@ const { addRitual, toggleToday, refreshForToday } = await import('../src/lib/rit
 const { addGoal, newGoal, toggleGoal, goalToNudge, markNudged } = await import('../src/lib/goals.js');
 const { saveSession, loadSession, ARCHIVE_THRESHOLD, KEEP_RECENT } = await import('../src/lib/storage.js');
 const { buildSystemBlocks } = await import('../src/lib/prompt.js');
+const { pickReminder, reminderKey, whenPhrase } = await import('../src/lib/reminders.js');
 
 console.log('checkin');
 {
@@ -135,6 +136,34 @@ console.log('calendar prompt block');
   ok(!noCal.volatile.includes('UPCOMING CALENDAR'), 'no calendar block when nothing is shared');
   const empty = buildSystemBlocks(comp, { ...base, upcoming: [] }, [comp], 'c1', []);
   ok(!empty.volatile.includes('UPCOMING CALENDAR'), 'empty upcoming list adds nothing');
+}
+
+console.log('calendar reminders');
+{
+  const now = 1_700_000_000_000;
+  const soon = { title: 'Dentist', when: now + 40 * 60000, allDay: false };
+  const later = { title: 'Dinner', when: now + 5 * 3600000, allDay: false };
+  const far = { title: 'Trip', when: now + 3 * 86400000, allDay: false };
+  const past = { title: 'Old', when: now - 60000, allDay: false };
+  const allDayToday = { title: 'Holiday', when: now + 6 * 3600000, allDay: true };
+
+  const r = pickReminder([later, soon, far], now, {});
+  ok(r && r.event.title === 'Dentist' && r.urgency === 'soon', 'imminent event is picked with "soon" urgency');
+  ok(pickReminder([far], now, {}) === null, 'events days out are not reminded yet');
+  ok(pickReminder([past], now, {}) === null, 'past events are never reminded');
+
+  const later2 = pickReminder([later], now, {});
+  ok(later2 && later2.urgency === 'today', 'a later-today event is a gentle "today" heads-up');
+  ok(pickReminder([allDayToday], now, {}).urgency === 'today', 'all-day event today is a "today" nudge');
+
+  const key = reminderKey(soon);
+  ok(pickReminder([soon], now, { [key]: now }) === null, 'an already-reminded event is skipped');
+  ok(reminderKey({ title: 'A B!', when: now }) === reminderKey({ title: 'a b', when: now }), 'reminder keys are slug/time-stable');
+
+  ok(/minute/.test(whenPhrase(soon, now)), 'whenPhrase describes a soon event in minutes');
+  const noon = Date.UTC(2023, 10, 14, 12, 0, 0);
+  ok(whenPhrase({ when: noon + 2 * 3600000, allDay: true }, noon) === 'today', 'whenPhrase calls a same-day all-day event "today"');
+  ok(whenPhrase({ when: noon + 20 * 3600000, allDay: true }, noon) === 'tomorrow', 'whenPhrase calls a next-day all-day event "tomorrow"');
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);
