@@ -65,3 +65,13 @@ CREATE TABLE IF NOT EXISTS cal_tokens (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_cal_token ON cal_tokens (token);
+
+-- Push reminder dedup — one row per (device endpoint, reminder key) so the cron
+-- never pushes the same calendar event / task reminder to a device twice.
+CREATE TABLE IF NOT EXISTS reminder_sends (
+  endpoint TEXT NOT NULL,
+  rkey     TEXT NOT NULL,
+  sent_at  INTEGER NOT NULL,
+  PRIMARY KEY (endpoint, rkey)
+);
+CREATE INDEX IF NOT EXISTS idx_reminder_sent_at ON reminder_sends (sent_at);

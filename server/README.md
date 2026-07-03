@@ -35,12 +35,23 @@ model by tier so a client can't self-upgrade. Free/anonymous users always get
 
 ## Companion check-ins (Web Push)
 
-A `scheduled()` cron handler fans out companion-initiated check-in
-notifications to subscribed devices (RFC 8291 `aes128gcm` payload encryption,
-RFC 8292 VAPID auth — all via Web Crypto, no dependencies). It picks an awake
-companion from each user's synced state and rate-limits to ~once per device per
-day. The schedule lives in `wrangler.toml` (`[triggers] crons`); it is a no-op
-until VAPID keys are configured.
+A `scheduled()` cron handler fans out companion-initiated notifications to
+subscribed devices (RFC 8291 `aes128gcm` payload encryption, RFC 8292 VAPID auth
+— all via Web Crypto, no dependencies). It sends two independent kinds, each
+toggleable per user in Settings (`pushSchedule.types`):
+
+- **Event & task reminders** — companion-made calendar events and reminders
+  (chat message `action`s) coming up within ~1h get a closed-app push in the
+  voice of the companion who set them (`dueEventReminders`). Deduped per device
+  via the `reminder_sends` table so each event pings once. Because the cron runs
+  every 15 min, lead-time reminders land on time.
+- **Companion check-ins** — a warm "thinking of you", a memory follow-up
+  ("how did your interview go?"), or an ambient-conversation nudge, from an awake
+  companion in the user's synced state, at the user's chosen times (rate-limited
+  to their schedule).
+
+Both respect quiet hours. The schedule lives in `wrangler.toml`
+(`[triggers] crons`); it is a no-op until VAPID keys are configured.
 
 Generate a VAPID keypair (e.g. `npx web-push generate-vapid-keys`), then:
 

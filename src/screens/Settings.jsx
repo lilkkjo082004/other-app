@@ -86,8 +86,14 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
     times: [...new Set(times)].sort(), tz: localTz(),
     quietStart: pushSchedule?.quietStart || '', quietEnd: pushSchedule?.quietEnd || '',
     tone: pushSchedule?.tone || 'standard',
+    types: pushSchedule?.types || {},
     ...patch,
   });
+  // Notification-type switches (default on). Event/task reminders and check-ins
+  // are independently toggleable; the cron honors these on the synced schedule.
+  const pushTypes = pushSchedule?.types || {};
+  const typeOn = (k) => pushTypes[k] !== false;
+  const saveType = (k, v) => savePush({ types: { ...pushTypes, [k]: v } });
   const saveTimes = (next) => savePush({ times: [...new Set(next)].sort() });
   const addTime = () => { if (/^\d{2}:\d{2}$/.test(newTime) && !times.includes(newTime)) saveTimes([...times, newTime]); };
   const removeTime = (t) => saveTimes(times.filter((x) => x !== t));
@@ -290,12 +296,25 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
             {section('Notifications')}
             <div style={{ ...card, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ flex: 1, paddingRight: 10 }}>
-                <div style={{ fontSize: 13 }}>Companion check-ins</div>
-                <div style={{ fontSize: 11, color: C.textDim }}>Let your companions reach out during the day</div>
+                <div style={{ fontSize: 13 }}>Push notifications</div>
+                <div style={{ fontSize: 11, color: C.textDim }}>Let your companions reach you when the app is closed</div>
                 {pushErr && <div style={{ fontSize: 11, color: C.danger, marginTop: 4 }}>{pushErr}</div>}
               </div>
-              <Toggle on={pushOn} onClick={togglePush} />
+              <Toggle on={pushOn} onClick={togglePush} label="Push notifications" />
             </div>
+            {pushOn && (
+              <div style={{ ...card }}>
+                <div style={{ fontSize: 11, color: C.textDim, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>What to send</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ flex: 1 }}><div style={{ fontSize: 13 }}>Event & task reminders</div><div style={{ fontSize: 11, color: C.textDim, lineHeight: 1.5 }}>A companion pings you before calendar events, reminders, and tasks you asked them to remember — even when the app is closed.</div></div>
+                  <Toggle on={typeOn('events')} onClick={() => saveType('events', !typeOn('events'))} label="Event & task reminders" />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+                  <div style={{ flex: 1 }}><div style={{ fontSize: 13 }}>Companion check-ins</div><div style={{ fontSize: 11, color: C.textDim, lineHeight: 1.5 }}>Warm "thinking of you" notes, follow-ups, and nudges to come check on them.</div></div>
+                  <Toggle on={typeOn('checkins')} onClick={() => saveType('checkins', !typeOn('checkins'))} label="Companion check-ins" />
+                </div>
+              </div>
+            )}
             {pushOn && (
               <div style={{ ...card }}>
                 <button onClick={runPushTest} disabled={testBusy} aria-label="Send a test notification" style={{ width: '100%', padding: '10px 0', borderRadius: 9, cursor: testBusy ? 'default' : 'pointer', fontFamily: "'DM Sans',sans-serif", fontSize: 13, background: 'transparent', border: `1px solid ${C.glow1}`, color: C.glow1, fontWeight: 600, opacity: testBusy ? 0.6 : 1 }}>

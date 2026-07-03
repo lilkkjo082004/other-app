@@ -139,6 +139,48 @@ function innerLine(name, text) {
   ][Math.floor(Math.random() * 3)];
 }
 
+// --- Event / task reminders ------------------------------------------------
+// A companion made a calendar event or reminder ("remind me to call Mom at 6").
+// Those live as `action`s on chat messages in the synced state. When one is
+// coming up within the lead window, the companion who set it pushes a reminder
+// even if the app is closed. Pure + deterministic so it's unit-testable.
+const REMIND_LEAD_MS = 65 * 60 * 1000; // fire within ~1h before (cron runs often)
+
+function rslug(s) {
+  return String(s || 'reminder').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24);
+}
+
+export function dueEventReminders(blob, now) {
+  const out = [];
+  const awake = new Set((blob.companions || []).filter((c) => c.status === 'awake').map((c) => c.id));
+  for (const m of blob.messages || []) {
+    const a = m && m.action;
+    if (!a || (a.type !== 'calendar' && a.type !== 'reminder')) continue;
+    const raw = a.start || a.at;
+    const start = typeof raw === 'number' ? raw : Date.parse(raw);
+    if (!start || Number.isNaN(start)) continue;
+    const dt = start - now;
+    if (dt <= 0 || dt > REMIND_LEAD_MS) continue;        // only the imminent, still-future ones
+    // Prefer the companion who set it (if still awake); else any awake one.
+    let name = m.companion && m.companion.name;
+    if (!name || (m.companion.id && !awake.has(m.companion.id))) {
+      const any = (blob.companions || []).find((c) => c.status === 'awake');
+      name = any ? any.name : 'Your companion';
+    }
+    const title = a.title || a.text || 'your reminder';
+    const mins = Math.max(1, Math.round(dt / 60000));
+    const soon = mins < 60 ? `in ${mins} min` : 'coming up';
+    const line = a.type === 'reminder'
+      ? `${name}: don't forget — ${title} (${soon}) ✦`
+      : `${name}: heads up, ${title} is ${soon}.`;
+    out.push({ key: `ev-${Math.round(start / 60000)}-${rslug(title)}`, line, start });
+  }
+  // Soonest first, and de-dupe identical keys within one blob.
+  out.sort((x, y) => x.start - y.start);
+  const seen = new Set();
+  return out.filter((r) => (seen.has(r.key) ? false : (seen.add(r.key), true)));
+}
+
 const CHECKINS = [
   (n) => `${n} was just thinking about you. How's your day going?`,
   (n) => `${n} left the light on for you. Come say hi when you can ✦`,
@@ -184,13 +226,49 @@ export default {
     // Legacy cadence (for blobs that predate custom times): off | few | daily.
     const dueWindow = (freq) => (freq === 'off' ? Infinity : freq === 'few' ? 68 * HOUR : 20 * HOUR);
 
+    const sendTo = async (s, line) => {
+      const code = await sendPush(
+        { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+        JSON.stringify({ title: 'Other', body: line, url: env.ALLOWED_ORIGIN || './' }),
+        vapid,
+      );
+      if (code === 404 || code === 410) { await store.deletePushSub(s.user_id, s.endpoint); return false; }
+      return true;
+    };
+
     for (const s of subs) {
       let blob = {};
       try { blob = JSON.parse((await store.getState(s.user_id))?.blob || '{}'); } catch (e) { /* empty */ }
+      const sched = blob.pushSchedule;
+      // Legacy blobs (no pushSchedule) that explicitly chose "off" stay fully
+      // muted — don't surprise them with the new reminder channel.
+      if (!sched && blob.pushFrequency === 'off') continue;
+      // Per-user notification-type switches (all default on). Users can turn off
+      // event/task reminders or check-ins independently in Settings.
+      const types = (sched && sched.types) || {};
+      const wantEvents = types.events !== false;
+      const wantCheckins = types.checkins !== false;
+      const quiet = sched ? inQuietHours(sched, now) : false;
+
+      // 1) Event / task reminders — companion-made calendar events & reminders
+      // coming up soon. Independent of the check-in cadence; deduped per device
+      // so each event pings once. Respects quiet hours and the type switch.
+      if (wantEvents && !quiet) {
+        let subGone = false;
+        for (const r of dueEventReminders(blob, now)) {
+          if (await store.reminderSent(s.endpoint, r.key)) continue;
+          const ok = await sendTo(s, r.line);
+          if (!ok) { subGone = true; break; }            // expired endpoint — stop using it
+          await store.markReminderSent(s.endpoint, r.key, now);
+        }
+        if (subGone) continue;
+      }
+
+      // 2) Companion check-ins ("thinking about you", follow-ups, ambient).
+      if (!wantCheckins) continue;
       // Preferred path: explicit check-in times in the user's timezone. A
       // check-in is due when a scheduled time has passed that we haven't
       // notified for yet — this naturally supports several times per day.
-      const sched = blob.pushSchedule;
       if (sched && Array.isArray(sched.times)) {
         if (!sched.times.length) continue;             // times cleared = off
         if (!scheduleDue(sched, s.last_notified || 0, now)) continue;

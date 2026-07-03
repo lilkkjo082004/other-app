@@ -2,7 +2,7 @@
 // global Web APIs (Request/Response/fetch/crypto). No network or D1 needed.
 import { handle } from '../src/handlers.js';
 import { memoryStore } from '../src/store-memory.js';
-import { inQuietHours, scheduleDue } from '../src/worker.js';
+import { inQuietHours, scheduleDue, dueEventReminders } from '../src/worker.js';
 
 const env = { store: memoryStore(), SECRET: 'test-secret', ALLOWED_ORIGIN: '*' };
 let passed = 0, failed = 0;
@@ -247,6 +247,40 @@ console.log('quiet hours (check-in scheduling)');
   // but 22:00→07:00 quiet should suppress it.
   ok(scheduleDue({ tz: 'UTC', times: ['05:00'] }, 0, now) === true, 'a passed time is due when not in quiet hours');
   ok(scheduleDue({ tz: 'UTC', times: ['05:00'], quietStart: '22:00', quietEnd: '07:00' }, 0, now) === false, 'quiet hours suppress an otherwise-due check-in');
+}
+
+console.log('event reminders (closed-app push)');
+{
+  const now = Date.parse('2026-07-01T12:00:00Z');
+  const coral = { id: 'c1', name: 'Coral', status: 'awake' };
+  const mk = (over) => ({ role: 'assistant', companion: coral, action: { type: 'reminder', title: 'Call Mom', start: now + 30 * 60000, ...over } });
+  const blob = { companions: [coral], messages: [mk()] };
+
+  const due = dueEventReminders(blob, now);
+  ok(due.length === 1 && /Call Mom/.test(due[0].line) && /Coral/.test(due[0].line), 'imminent companion reminder produces a voiced push line');
+  ok(/ev-\d+-call-mom/.test(due[0].key), 'reminder key is stable/sluggy');
+
+  ok(dueEventReminders({ companions: [coral], messages: [mk({ start: now + 5 * 3600000 })] }, now).length === 0, 'events beyond the lead window are not pushed yet');
+  ok(dueEventReminders({ companions: [coral], messages: [mk({ start: now - 60000 })] }, now).length === 0, 'past events are never pushed');
+  ok(dueEventReminders({ companions: [coral], messages: [{ role: 'assistant', content: 'hi' }] }, now).length === 0, 'messages without an action produce nothing');
+
+  // A calendar-type action reads as a heads-up; falls back to any awake companion.
+  const cal = { companions: [coral], messages: [{ role: 'assistant', action: { type: 'calendar', title: 'Dentist', start: now + 20 * 60000 } }] };
+  const dcal = dueEventReminders(cal, now);
+  ok(dcal.length === 1 && /Dentist/.test(dcal[0].line) && /Coral/.test(dcal[0].line), 'calendar action falls back to an awake companion voice');
+
+  // Dedup within a blob: two identical actions collapse to one.
+  const dup = dueEventReminders({ companions: [coral], messages: [mk(), mk()] }, now);
+  ok(dup.length === 1, 'identical reminders collapse to a single push');
+}
+
+console.log('reminder-send dedup store');
+{
+  const store = memoryStore();
+  ok((await store.reminderSent('ep1', 'k1')) === false, 'unsent reminder key reads false');
+  await store.markReminderSent('ep1', 'k1', Date.now());
+  ok((await store.reminderSent('ep1', 'k1')) === true, 'marked reminder key reads true');
+  ok((await store.reminderSent('ep2', 'k1')) === false, 'dedup is per-device (endpoint)');
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

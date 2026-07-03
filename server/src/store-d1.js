@@ -61,8 +61,20 @@ export function d1Store(DB) {
     async setNotified(endpoint, ts) {
       await DB.prepare('UPDATE push_subscriptions SET last_notified = ? WHERE endpoint = ?').bind(ts, endpoint).run();
     },
+    async reminderSent(endpoint, key) {
+      const r = await DB.prepare('SELECT 1 FROM reminder_sends WHERE endpoint = ? AND rkey = ?').bind(endpoint, key).first();
+      return !!r;
+    },
+    async markReminderSent(endpoint, key, ts) {
+      await DB.prepare(
+        'INSERT INTO reminder_sends (endpoint, rkey, sent_at) VALUES (?, ?, ?) ' +
+        'ON CONFLICT(endpoint, rkey) DO UPDATE SET sent_at = excluded.sent_at',
+      ).bind(endpoint, key, ts).run();
+    },
     async deleteAccount(uid) {
       await DB.batch([
+        DB.prepare('DELETE FROM reminder_sends WHERE endpoint IN (SELECT endpoint FROM push_subscriptions WHERE user_id = ?)').bind(uid),
+        DB.prepare('DELETE FROM cal_tokens WHERE user_id = ?').bind(uid),
         DB.prepare('DELETE FROM push_subscriptions WHERE user_id = ?').bind(uid),
         DB.prepare('DELETE FROM mood_events WHERE user_id = ?').bind(uid),
         DB.prepare('DELETE FROM states WHERE user_id = ?').bind(uid),
