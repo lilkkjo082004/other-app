@@ -51,12 +51,12 @@ import DuoCompat from './DuoCompat.jsx';
 import Timeline from './Timeline.jsx';
 import Cowork from './Cowork.jsx';
 import Home from './Home.jsx';
+import ChatInput from '../components/ChatInput.jsx';
 import WakingUp from './WakingUp.jsx';
 
 export default function Chat({ companions: init, profile, trialStart, restored, onPersist, onReset, onUpdateProfile, storageWarn, onDismissStorageWarn, cloud, authed, email, onSignIn, onSignOut }) {
   const [comps, setComps] = useState(init.map((c) => ({ ...c, status: c.status || 'awake' })));
   const [msgs, setMsgs] = useState(restored ? restored.messages || [] : []);
-  const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [typing, setTyping] = useState(null);   // companion currently composing a reply
   const [chatMode, setChatMode] = useState(restored?.chatMode || 'group');
@@ -157,7 +157,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const [summonCandidate, setSummonCandidate] = useState(null);
   const scrollRef = useRef(null);
   const msgRefs = useRef(new Map());                // msgs index -> rendered row, for jump-to
-  const inputRef = useRef(null);
+  const inputRef = useRef(null);   // ChatInput api: { setText, focus, clear }
   const msgsRef = useRef(msgs);
   const idleRef = useRef(null);
   const stopRef = useRef(false);
@@ -348,7 +348,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     const lo = t.toLowerCase();
     const f = active.find((c) => lo.includes(c.name.toLowerCase()));
     if (f) { setChatMode(f.id); setShowMenu(false); }
-    else if (t.trim()) { setInput(t); setTimeout(() => inputRef.current?.focus(), 50); }
+    else if (t.trim()) { inputRef.current?.setText(t); setTimeout(() => inputRef.current?.focus(), 50); }
   }, [active]);
   const { listening, startListening } = useSpeechRec(handleVoice);
 
@@ -1027,13 +1027,10 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
 
   // Ask the room: pose a question and have EVERY awake companion weigh in with
   // their own take (they already disagree per personality). A group-only action.
-  async function askRoom() {
-    if (!input.trim() || loading) return;
+  async function askRoom(u) {
+    if (!u || loading) return;
     const room = active;
-    if (room.length < 2) { send(); return; }
-    const u = input.trim();
-    setInput('');
-    if (inputRef.current) inputRef.current.style.height = 'auto';
+    if (room.length < 2) { send(u); return; }
     setAtBottom(true);
     const nm = [...msgs, { role: 'user', content: u, ts: Date.now() }];
     setMsgs(nm);
@@ -1066,11 +1063,8 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     maybeExtractMemories(run);
   }
 
-  async function send() {
-    if (!input.trim() || loading) return;
-    const u = input.trim();
-    setInput('');
-    if (inputRef.current) inputRef.current.style.height = 'auto';
+  async function send(u) {
+    if (!u || loading) return;
     setAtBottom(true);
     const nm = [...msgs, { role: 'user', content: u, ts: Date.now() }];
     setMsgs(nm);
@@ -1222,7 +1216,12 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   }
 
   // ── Panels (full-screen views) ──
-  if (panel === 'home') return <Home profile={profile} comps={comps} checkins={checkins} onOpenChat={() => setPanel(null)} onNav={(k) => openPanel(k, true)} />;
+  if (panel === 'home') {
+    // A one-line preview of the latest exchange makes the Chat tile feel alive.
+    const lm = [...msgs].reverse().find((m) => (m.role === 'user' || m.role === 'assistant') && m.content && !m.kind);
+    const lastMsg = lm ? { who: lm.role === 'user' ? 'You' : (lm.companion?.name || 'Them'), text: lm.content.slice(0, 60) } : null;
+    return <Home profile={profile} comps={comps} checkins={checkins} lastMsg={lastMsg} onOpenChat={() => setPanel(null)} onNav={(k) => openPanel(k, true)} />;
+  }
   if (panel === 'places') return <PlacesNearby onBack={goBack} />;
   if (panel === 'story') return <StorySoFar lore={lore} jokes={jokes} comps={comps} onBack={goBack} />;
   if (panel === 'recap') return <Recap comps={comps} lore={lore} jokes={jokes} profile={profile} onBack={goBack} />;
@@ -1381,14 +1380,13 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         </div>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
           {(() => { const live = aiEnabled() || onDeviceActive(); return (
-          <span title={onDeviceActive() ? 'Running on your device' : (live ? 'Live AI responses' : 'Offline placeholder replies')} style={{ fontSize: 9, color: live ? C.glow3 : C.textDim, display: 'flex', alignItems: 'center', gap: 3, marginRight: 2 }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: live ? C.glow3 : C.textDim }} />{onDeviceActive() ? 'On-device' : (live ? 'Live' : 'Offline')}
+          <span title={onDeviceActive() ? 'AI running on your device' : (live ? 'Live AI responses' : 'Offline placeholder replies')} aria-label={onDeviceActive() ? 'On-device AI' : (live ? 'Live AI' : 'Offline')} style={{ display: 'flex', alignItems: 'center', marginRight: 2 }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: live ? C.glow3 : C.textDim }} />
           </span>); })()}
           <button aria-label={autoSpeak ? 'Turn off auto-speak' : 'Turn on auto-speak'} aria-pressed={autoSpeak} onClick={() => setAutoSpeak(!autoSpeak)} style={{ background: autoSpeak ? `${C.glow3}22` : 'none', border: `1px solid ${autoSpeak ? C.glow3 : C.border}`, borderRadius: 7, padding: '5px 8px', color: autoSpeak ? C.glow3 : C.textDim, fontSize: 13, cursor: 'pointer' }}>{autoSpeak ? '🔊' : '🔇'}</button>
           {voiceCall && <button aria-label={listening ? 'Listening — tap to stop' : 'Call a companion by voice'} onClick={startListening} style={{ background: listening ? `${C.danger}22` : 'none', border: `1px solid ${listening ? C.danger : C.border}`, borderRadius: 7, padding: '5px 8px', color: listening ? C.danger : C.textDim, fontSize: 13, cursor: 'pointer', animation: listening ? 'micPulse 1.5s infinite' : 'none' }}>🎤</button>}
           {priv && priv.status === 'awake' && <button aria-label={`Call ${priv.name}`} title={`Call ${priv.name}`} onClick={() => startCall(priv)} style={{ background: 'none', border: `1px solid ${C.border}`, borderRadius: 7, padding: '5px 8px', color: C.textDim, fontSize: 13, cursor: 'pointer' }}>📞</button>}
           <button aria-label="Home" title="Home" onClick={() => setPanel('home')} style={{ background: 'none', border: `1px solid ${C.border}`, borderRadius: 7, padding: '5px 8px', color: C.textDim, fontSize: 13, cursor: 'pointer' }}>🏠</button>
-          <button aria-label="Open the space — where your companions hang out" title="The Space" onClick={() => openPanel('space')} style={{ background: 'none', border: `1px solid ${C.border}`, borderRadius: 7, padding: '5px 8px', color: C.textDim, fontSize: 13, cursor: 'pointer' }}>✦</button>
           <button aria-label="Search messages" onClick={() => setSearch((s) => (s == null ? '' : null))} style={{ background: search != null ? `${C.glow1}22` : 'none', border: `1px solid ${search != null ? C.glow1 : C.border}`, borderRadius: 7, padding: '5px 8px', color: search != null ? C.glow1 : C.textDim, fontSize: 13, cursor: 'pointer' }}>🔍</button>
           <button aria-label="Menu" aria-expanded={showMenu} onClick={() => setShowMenu(!showMenu)} style={{ background: 'none', border: 'none', color: C.textSoft, fontSize: 16, cursor: 'pointer', padding: 4 }}>☰</button>
         </div>
@@ -1471,6 +1469,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
           <div style={{ borderTop: `1px solid ${C.border}`, margin: '8px 0' }} />
           <button onClick={() => { setShowMenu(false); openPanel('you'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.glow3, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 600, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🧭  For you</button>
           {living.length < 3 && <button onClick={summon} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.glow2, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif" }}>✦  Summon a companion</button>}
+          <button onClick={() => { setShowMenu(false); openPanel('space'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>✦  The Space</button>
           <button onClick={() => { setShowMenu(false); openPanel('story'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>📖  Your story so far</button>
           <button onClick={() => { setShowMenu(false); openPanel('timeline'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>🕰️  Timeline</button>
           <button onClick={() => { setShowMenu(false); openPanel('recap'); }} style={{ width: '100%', background: 'none', border: 'none', borderRadius: 7, padding: '7px 10px', color: C.text, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontFamily: "'DM Sans',sans-serif", marginBottom: 4 }}>✨  Your recap</button>
@@ -1486,7 +1485,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         </div>
       )}
 
-      <div ref={scrollRef} onScroll={onScroll} style={{ flex: 1, overflowY: 'auto', padding: '10px 10px 4px', position: 'relative' }}>
+      <div ref={scrollRef} onScroll={onScroll} role="log" aria-live="polite" aria-label="Conversation" style={{ flex: 1, overflowY: 'auto', padding: '10px 10px 4px', position: 'relative' }}>
         {searching && totalResults > 0 && (
           <div style={{ fontSize: 10.5, color: C.textDim, textAlign: 'center', padding: '2px 0 8px' }}>Tap a message to open it in the conversation</div>
         )}
@@ -1598,19 +1597,17 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
               {m.role === 'assistant' && <div style={{ marginRight: 7, flexShrink: 0, marginTop: chatMode === 'group' ? 14 : 0, lineHeight: 0 }}><Avatar comp={m.companion} size={24} glow={false} /></div>}
               <div style={{ maxWidth: '78%' }}>
                 {m.role === 'assistant' && chatMode === 'group' && <span style={{ fontSize: 9, color: m.companion?.color?.primary, fontWeight: 600, display: 'block', marginBottom: 1 }}>{m.companion?.name}</span>}
-                <div style={{ position: 'relative' }}>
-                  <div onClick={searching ? () => jumpTo(idx) : undefined} title={searching ? 'Jump to this message' : undefined} style={{ padding: '8px 12px', borderRadius: m.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: m.role === 'user' ? C.glow1 : C.card, color: m.role === 'user' ? '#fff' : C.text, fontSize: 13, lineHeight: 1.5, border: m.role === 'user' ? 'none' : `1px solid ${C.border}`, whiteSpace: 'pre-wrap', cursor: searching ? 'pointer' : 'default' }}>
-                    {m.isAmbient && <span style={{ fontSize: 8, color: C.textDim, display: 'block', marginBottom: 2, fontStyle: 'italic' }}>earlier...</span>}
-                    {searching ? highlight(m.content, q) : m.content}
-                  </div>
-                  {m.role === 'assistant' && !m.isAmbient && (
-                    <div style={{ position: 'absolute', top: 3, right: -68, display: 'flex', gap: 4 }}>
-                      <button aria-label="Read this message aloud" onClick={() => speakAs(m.content, m.companion)} style={{ background: 'none', border: 'none', color: C.textDim, fontSize: 12, cursor: 'pointer', opacity: 0.55, padding: 0 }}>🔊</button>
-                      <button aria-label="Copy message with attribution" onClick={() => copyMsg(m, i)} style={{ background: 'none', border: 'none', color: copiedIdx === i ? C.glow3 : C.textDim, fontSize: 11, cursor: 'pointer', opacity: copiedIdx === i ? 1 : 0.55, padding: 0 }}>{copiedIdx === i ? '✓' : '⧉'}</button>
-                      <button aria-label="Share as a card" title="Share as a card" onClick={async () => { try { const b = await makeCardBlob({ comp: m.companion, quote: m.content, profileName: profile?.name }); await shareOrDownloadCard(b, m.companion); } catch (e) { /* ignore */ } }} style={{ background: 'none', border: 'none', color: C.textDim, fontSize: 11, cursor: 'pointer', opacity: 0.55, padding: 0 }}>🖼</button>
-                    </div>
-                  )}
+                <div onClick={searching ? () => jumpTo(idx) : undefined} title={searching ? 'Jump to this message' : undefined} style={{ padding: '8px 12px', borderRadius: m.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: m.role === 'user' ? C.glow1 : C.card, color: m.role === 'user' ? '#fff' : C.text, fontSize: 13, lineHeight: 1.5, border: m.role === 'user' ? 'none' : `1px solid ${C.border}`, whiteSpace: 'pre-wrap', cursor: searching ? 'pointer' : 'default' }}>
+                  {m.isAmbient && <span style={{ fontSize: 8, color: C.textDim, display: 'block', marginBottom: 2, fontStyle: 'italic' }}>earlier...</span>}
+                  {searching ? highlight(m.content, q) : m.content}
                 </div>
+                {m.role === 'assistant' && !m.isAmbient && (
+                  <div style={{ display: 'flex', gap: 14, marginTop: 3, alignItems: 'center' }}>
+                    <button aria-label="Read this message aloud" onClick={() => speakAs(m.content, m.companion)} style={{ background: 'none', border: 'none', color: C.textDim, fontSize: 13, cursor: 'pointer', opacity: 0.6, padding: '2px 0' }}>🔊</button>
+                    <button aria-label="Copy message with attribution" onClick={() => copyMsg(m, i)} style={{ background: 'none', border: 'none', color: copiedIdx === i ? C.glow3 : C.textDim, fontSize: 12, cursor: 'pointer', opacity: copiedIdx === i ? 1 : 0.6, padding: '2px 0' }}>{copiedIdx === i ? '✓' : '⧉'}</button>
+                    <button aria-label="Share as a card" title="Share as a card" onClick={async () => { try { const b = await makeCardBlob({ comp: m.companion, quote: m.content, profileName: profile?.name }); await shareOrDownloadCard(b, m.companion); } catch (e) { /* ignore */ } }} style={{ background: 'none', border: 'none', color: C.textDim, fontSize: 12, cursor: 'pointer', opacity: 0.6, padding: '2px 0' }}>🖼</button>
+                  </div>
+                )}
                 {m.action && (
                   <div style={{ marginTop: 6, background: C.surface, border: `1px solid ${m.companion?.color?.primary || C.border}`, borderRadius: 12, padding: '10px 12px', maxWidth: 260 }}>
                     <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 3 }}>{m.action.type === 'reminder' ? '⏰ Reminder' : '📅 Calendar'}</div>
@@ -1678,22 +1675,21 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
         {!active.length ? (
           <p style={{ textAlign: 'center', color: C.textDim, fontSize: 12, padding: 8 }}>All companions resting 💤</p>
         ) : (
-          <div style={{ display: 'flex', gap: 7, alignItems: 'flex-end' }}>
+          <>
             <input ref={photoInputRef} type="file" accept="image/*" onChange={onPhotoChosen} style={{ display: 'none' }} />
-            <button aria-label="Share a photo" title="Share a photo" onClick={pickPhoto} disabled={loading} style={{ width: 38, height: 38, borderRadius: '50%', background: 'transparent', border: `1px solid ${C.border}`, color: loading ? C.textDim : C.textSoft, fontSize: 16, cursor: loading ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>📷</button>
-            {chatMode === 'group' && active.length > 1 && <button aria-label="Ask the room — everyone weighs in" title="Ask the room" onClick={askRoom} disabled={loading || !input.trim()} style={{ width: 38, height: 38, borderRadius: '50%', background: 'transparent', border: `1px solid ${C.border}`, color: (loading || !input.trim()) ? C.textDim : C.textSoft, fontSize: 15, cursor: (loading || !input.trim()) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>🗣</button>}
-            <textarea ref={inputRef} value={input} rows={1}
-              onChange={(e) => { setInput(e.target.value); const el = e.target; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px'; if (atBottomRef.current) pinBottom(); }}
-              onFocus={() => { if (atBottomRef.current) setTimeout(pinBottom, 100); }}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+            <ChatInput
+              apiRef={inputRef}
               placeholder={priv ? `Message ${priv.name}...` : (directTo ? `Message ${active.find((c) => c.id === directTo)?.name || 'everyone'}...` : 'Message everyone...')}
-              style={{ flex: 1, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 18, padding: '10px 14px', fontSize: 13, color: C.text, outline: 'none', resize: 'none', fontFamily: "'DM Sans',sans-serif", lineHeight: 1.4, maxHeight: 120, overflowY: 'auto' }} />
-            {loading ? (
-              <button aria-label="Stop generating" onClick={stopGenerating} style={{ width: 38, height: 38, borderRadius: '50%', background: C.danger, border: 'none', color: '#fff', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>■</button>
-            ) : (
-              <button aria-label="Send message" onClick={send} disabled={!input.trim()} style={{ width: 38, height: 38, borderRadius: '50%', background: input.trim() ? C.glow1 : C.border, border: 'none', color: '#fff', fontSize: 14, cursor: input.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>↑</button>
-            )}
-          </div>
+              loading={loading}
+              canAskRoom={chatMode === 'group' && active.length > 1}
+              onSend={send}
+              onAskRoom={askRoom}
+              onStop={stopGenerating}
+              onPickPhoto={pickPhoto}
+              scrollRef={scrollRef}
+              atBottomRef={atBottomRef}
+            />
+          </>
         )}
       </div>
 

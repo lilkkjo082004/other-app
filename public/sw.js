@@ -23,12 +23,36 @@ self.addEventListener('fetch', (e) => {
 
   // App navigations: network-first (revalidating past any HTTP cache so a new
   // deploy is picked up immediately), falling back to the cached shell offline.
-  if (req.mode === 'navigate') {
+  // After caching the fresh index.html, prune hashed /assets/ entries it no
+  // longer references — without this, every deploy left its old bundles (up to
+  // ~6MB each with the on-device model chunk) in the cache forever.
+  // (Also match direct index.html fetches — the in-app update check — so they
+  // aren't served stale by the asset cache below.)
+  if (req.mode === 'navigate' || url.pathname.endsWith('/index.html')) {
     e.respondWith(
       fetch(req, { cache: 'no-cache' })
         .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put('./index.html', copy)).catch(() => {});
+          const forCache = res.clone();
+          const forPrune = res.clone();
+          e.waitUntil((async () => {
+            try {
+              const c = await caches.open(CACHE);
+              await c.put('./index.html', forCache);
+              const html = await forPrune.text();
+              // Assets named by the fresh index.html are definitely current.
+              // Dynamically-imported chunks (e.g. the on-device AI model shim)
+              // aren't listed there, so those are trimmed by age instead:
+              // keep the most recent few, evict the rest (Cache API keys come
+              // back in insertion order, so the head is the oldest).
+              const live = new Set((html.match(/assets\/[A-Za-z0-9._-]+/g) || []));
+              const keys = await c.keys();
+              const unref = keys.filter((k) => {
+                const m = new URL(k.url).pathname.match(/assets\/[A-Za-z0-9._-]+$/);
+                return m && !live.has(m[0]);
+              });
+              await Promise.all(unref.slice(0, Math.max(0, unref.length - 4)).map((k) => c.delete(k)));
+            } catch (err) { /* best-effort */ }
+          })());
           return res;
         })
         .catch(() => caches.match('./index.html'))

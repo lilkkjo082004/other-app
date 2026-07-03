@@ -73,7 +73,17 @@ export default function Onboarding({ onComplete }) {
     return W(<><Back /><Q icon="🔒" q="One quick check —" sub="Please confirm your age." /><Checks opts={[{ v: '18+', label: "I'm 18 or older", em: '✓' }, { v: 'under18', label: "I'm under 18", em: '✓' }]} sel={sel} onTog={(v) => save(v)} /></>);
   }
 
-  if (sid === 'vibe') return W(<><Back /><Q icon="◈" q="What energy do you gravitate toward?" sub="Pick all that resonate." /><Checks opts={VIBES} sel={sel} onTog={tog} /><button className="bp" onClick={() => save(sel)} style={{ marginTop: 12, width: '100%' }}>{sel.length ? `Continue (${sel.length})` : 'Skip'}</button></>);
+  // Everything after the age gate is optional personalization — offer a quick
+  // start here (name + birthday + age check are done) for people in a hurry.
+  // All of it can be filled in later via Settings → Edit profile.
+  const finishNow = () => {
+    try { localStorage.removeItem(DRAFT_KEY); } catch (e) { /* ignore */ }
+    onComplete(d);
+  };
+
+  if (sid === 'vibe') return W(<><Back /><Q icon="◈" q="What energy do you gravitate toward?" sub="Pick all that resonate." /><Checks opts={VIBES} sel={sel} onTog={tog} /><button className="bp" onClick={() => save(sel)} style={{ marginTop: 12, width: '100%' }}>{sel.length ? `Continue (${sel.length})` : 'Skip'}</button>
+    <button onClick={finishNow} style={{ marginTop: 12, width: '100%', background: 'none', border: `1px dashed ${C.border}`, borderRadius: 12, padding: '11px', color: C.textSoft, fontSize: 12.5, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>⚡ Quick start — skip the rest, meet your companions now</button>
+    <p style={{ fontSize: 10.5, color: C.textDim, textAlign: 'center', marginTop: 6 }}>You can fill everything in later under Settings → Edit profile.</p></>);
 
   if (sid === 'communication') return W(<><Back /><Q icon="◆" q="How do you like to communicate?" sub="Select all that fit." /><Checks opts={COMMUNICATION} sel={sel} onTog={tog} /><button className="bp" onClick={() => save(sel)} style={{ marginTop: 12, width: '100%' }}>{sel.length ? `Continue (${sel.length})` : 'Skip'}</button></>);
 

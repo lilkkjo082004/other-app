@@ -8,7 +8,7 @@ import { checkinDue } from '../lib/checkin.js';
 // Home — the app's landing screen: a warm launcher that surfaces everything
 // (chat, cowork, the space, the "for you" tools) instead of burying them in a
 // menu. Everything routes back into the Chat screen's panels.
-export default function Home({ profile, comps, checkins, onOpenChat, onNav }) {
+export default function Home({ profile, comps, checkins, lastMsg, onOpenChat, onNav }) {
   const awake = (comps || []).filter((c) => c.status === 'awake');
   const sign = profile?.astrology?.western;
   const g = sign ? dailyGuidance(sign) : null;
@@ -16,7 +16,7 @@ export default function Home({ profile, comps, checkins, onOpenChat, onNav }) {
   const dueCheckin = checkinDue(checkins);
 
   const tiles = [
-    { key: 'chat', em: '💬', title: 'Chat', sub: awake.length ? `${awake.map((c) => c.name).join(', ')}` : 'Your companions', accent: C.glow1, onClick: onOpenChat },
+    { key: 'chat', em: '💬', title: 'Chat', sub: lastMsg ? `${lastMsg.who}: ${lastMsg.text}` : (awake.length ? `${awake.map((c) => c.name).join(', ')}` : 'Your companions'), accent: C.glow1, onClick: onOpenChat },
     { key: 'cowork', em: '🧑‍💻', title: 'Cowork', sub: 'Focus together', accent: C.glow3 || C.glow1, onClick: () => onNav('cowork') },
     { key: 'space', em: '✦', title: 'The Space', sub: 'Where they hang out', accent: C.glow2, onClick: () => onNav('space') },
     { key: 'you', em: '🧭', title: 'For you', sub: 'Mood, breathe, rituals', accent: C.glow3 || C.glow1, onClick: () => onNav('you') },
