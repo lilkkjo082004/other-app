@@ -1,6 +1,27 @@
 // Cloudflare D1-backed Store. Same async surface as the in-memory store.
+
+// Tables added AFTER the original deploy. CI ships worker code but its token
+// can't run D1 migrations, so these can be missing in prod until a migration
+// runs. Creating them through the D1 *binding* (below) needs no API-token
+// permission, so the features that use them self-heal. Idempotent; the module
+// flag makes it run at most once per isolate. Must exactly match schema.sql.
+let schemaReady = false;
+const LATE_TABLES = [
+  "CREATE TABLE IF NOT EXISTS entitlements (user_id TEXT PRIMARY KEY, tier TEXT NOT NULL DEFAULT 'free', status TEXT, provider TEXT, expires_at INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL)",
+  'CREATE TABLE IF NOT EXISTS cal_tokens (user_id TEXT PRIMARY KEY, token TEXT NOT NULL UNIQUE, created_at INTEGER NOT NULL)',
+  'CREATE TABLE IF NOT EXISTS reminder_sends (endpoint TEXT NOT NULL, rkey TEXT NOT NULL, sent_at INTEGER NOT NULL, PRIMARY KEY (endpoint, rkey))',
+];
+
 export function d1Store(DB) {
   return {
+    // Create the late-added tables if they're missing. Called once per isolate
+    // on the request path (handle) and the cron path (scheduled) so a not-yet-
+    // migrated table can never silently break entitlements / calendar / reminders.
+    async ensureSchema() {
+      if (schemaReady || !DB) return;
+      for (const ddl of LATE_TABLES) await DB.prepare(ddl).run();
+      schemaReady = true;
+    },
     async getUserByEmail(email) {
       return await DB.prepare('SELECT id, email, pw_hash, pw_salt FROM users WHERE email = ?').bind(email).first();
     },

@@ -2,20 +2,6 @@ import { handle } from './handlers.js';
 import { d1Store } from './store-d1.js';
 import { importVapid, sendPush } from './webpush.js';
 
-// Ensure the reminder dedup table exists. CI ships worker code but can't run D1
-// migrations (its token lacks D1 REST access), so a newly added table like
-// reminder_sends may be missing in prod. Creating it through the D1 *binding*
-// needs no API-token permission, so the feature self-heals on the first cron
-// tick. Idempotent; cached per isolate so it runs at most once per instance.
-let reminderSchemaReady = false;
-async function ensureReminderSchema(DB) {
-  if (reminderSchemaReady || !DB) return;
-  await DB.prepare(
-    'CREATE TABLE IF NOT EXISTS reminder_sends (endpoint TEXT NOT NULL, rkey TEXT NOT NULL, sent_at INTEGER NOT NULL, PRIMARY KEY (endpoint, rkey))',
-  ).run();
-  reminderSchemaReady = true;
-}
-
 // --- Timezone-aware check-in scheduling -----------------------------------
 // The cron runs in UTC; users pick wall-clock times ("09:00") in their own
 // timezone. These helpers map between the two using Intl (available in Workers).
@@ -233,11 +219,16 @@ export default {
   async scheduled(event, env, ctx) {
     if (!env.VAPID_PRIVATE || !env.VAPID_PUBLIC) return;
     const store = d1Store(env.DB);
-    // Self-heal the reminder table (CI can't migrate D1). Non-fatal on failure:
-    // the reminder block below is also try/catch-guarded, so check-ins still run.
-    try { await ensureReminderSchema(env.DB); } catch (e) { /* non-fatal */ }
+    // Self-heal late-added tables (CI can't migrate D1). Non-fatal: the blocks
+    // below are also try/catch-guarded, so check-ins still run either way.
+    try { await store.ensureSchema(); } catch (e) { /* non-fatal */ }
     const vapid = await importVapid(env.VAPID_PRIVATE, env.VAPID_PUBLIC, env.VAPID_SUBJECT);
-    const subs = await store.listPushSubs();
+    // Guard the one remaining unguarded DB read on the cron's critical path: if
+    // push_subscriptions ever failed to read, an unhandled throw here would
+    // abort the whole tick (the reminder_sends bug class). Degrade to "no pushes
+    // this run" instead.
+    let subs;
+    try { subs = await store.listPushSubs(); } catch (e) { return; }
     const now = event?.scheduledTime || Date.now();
     const HOUR = 60 * 60 * 1000;
     // Legacy cadence (for blobs that predate custom times): off | few | daily.

@@ -54,6 +54,10 @@ export async function handle(request, env) {
   const p = url.pathname.replace(/\/+$/, '') || '/';
 
   try {
+    // Self-heal late-added tables once per isolate so a not-yet-migrated table
+    // can't 500 the entitlement (/ai), calendar, or account-deletion paths.
+    // Best-effort — never let it break a request.
+    try { await env.store.ensureSchema?.(); } catch (e) { /* non-fatal */ }
     // Abuse protection: throttle auth (brute force) and AI (cost) by client IP.
     if ((p === '/auth/signup' || p === '/auth/login') && request.method === 'POST') {
       const limited = await rateLimited(env, `auth:${clientIp(request)}`, numEnv(env.AUTH_RATE_LIMIT, 20), 60_000);

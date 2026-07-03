@@ -12,6 +12,8 @@ export function memoryStore() {
   let seq = 1;
 
   return {
+    // No-op: the in-memory store always has every "table". Mirrors d1Store.
+    async ensureSchema() {},
     async getUserByEmail(email) {
       return usersByEmail.get(email) || null;
     },
