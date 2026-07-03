@@ -57,7 +57,7 @@ export default function Home({ profile, comps, checkins, lastMsg, onOpenChat, on
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           {tiles.map((t) => (
-            <button key={t.key} onClick={t.onClick} style={{ textAlign: 'left', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: '15px 14px 16px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", color: C.text }}>
+            <button key={t.key} onClick={t.onClick} style={{ minWidth: 0, textAlign: 'left', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: '15px 14px 16px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", color: C.text }}>
               <div style={{ fontSize: 25, marginBottom: 9, color: t.accent }}>{t.em}</div>
               <div style={{ fontSize: 14.5, fontWeight: 600 }}>{t.title}</div>
               <div style={{ fontSize: 11, color: C.textDim, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.sub}</div>
