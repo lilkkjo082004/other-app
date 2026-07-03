@@ -181,6 +181,52 @@ export function dueEventReminders(blob, now) {
   return out.filter((r) => (seen.has(r.key) ? false : (seen.add(r.key), true)));
 }
 
+// Local calendar parts (weekday 0-6, minutes-of-day, YYYY-MM-DD) for `now` in
+// tz — so habit reminders fire on the user's own day and clock.
+function localParts(now, tz) {
+  try {
+    const dtf = new Intl.DateTimeFormat('en-US', { timeZone: tz || 'UTC', hour12: false, weekday: 'short', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    const m = {};
+    for (const p of dtf.formatToParts(new Date(now))) m[p.type] = p.value;
+    const dow = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[m.weekday];
+    return { dow, minutes: (+m.hour % 24) * 60 + (+m.minute), dayKey: `${m.year}-${m.month}-${m.day}` };
+  } catch (e) { return null; }
+}
+
+const HABIT_SLOT_MIN = { morning: 8 * 60, afternoon: 13 * 60, evening: 18 * 60, anytime: 10 * 60 };
+const HABIT_WINDOW = 3 * 60; // only nudge within 3h after the scheduled time (don't ping stale)
+
+// Closed-app habit reminders: reminded habits (synced in blob.habitReminders)
+// that are due at this local time today. Scoped to daily + specific-weekday
+// recurrences, which have a clear "today at this time"; flexible ones
+// (weekly/biweekly/monthly/N-per-week) stay in-app only.
+export function dueHabitReminders(blob, now, tz = 'UTC') {
+  const out = [];
+  const habits = blob.habitReminders || [];
+  if (!habits.length) return out;
+  const L = localParts(now, tz);
+  if (!L) return out;
+  const awake = (blob.companions || []).filter((c) => c && c.status === 'awake');
+  const name = awake.length ? awake[0].name : 'Your companion';
+  for (const h of habits) {
+    if (!h || !h.text) continue;
+    const f = h.freq || { type: 'daily' };
+    let scheduled;
+    if (f.type === 'daily') scheduled = true;
+    else if (f.type === 'weekdays') scheduled = (f.days && f.days.length ? f.days : [0, 1, 2, 3, 4, 5, 6]).includes(L.dow);
+    else continue;
+    if (!scheduled) continue;
+    if (h.lastDone === L.dayKey) continue; // already done today (user-local)
+    const mins = /^\d{2}:\d{2}$/.test(h.time || '')
+      ? (() => { const [hh, mm] = h.time.split(':').map(Number); return hh * 60 + mm; })()
+      : (HABIT_SLOT_MIN[h.when] ?? 10 * 60);
+    if (L.minutes < mins || L.minutes > mins + HABIT_WINDOW) continue;
+    const title = `${h.em ? h.em + ' ' : ''}${h.text}`.trim();
+    out.push({ key: `hb-${L.dayKey}-${h.id}`, line: `${name}: gentle nudge — ${title} ✦` });
+  }
+  return out;
+}
+
 const CHECKINS = [
   (n) => `${n} was just thinking about you. How's your day going?`,
   (n) => `${n} left the light on for you. Come say hi when you can ✦`,
@@ -279,6 +325,22 @@ export default {
           // schema) — never let a reminder error abort the whole cron tick and
           // take the check-ins below down with it. Same posture as tierOf().
         }
+      }
+
+      // 1b) Habit reminders — opt-in habits due at their local time today.
+      // Independent switch; deduped per device (once/day/habit); respects quiet
+      // hours. Only for daily / specific-weekday habits.
+      if (types.habits !== false && !quiet) {
+        try {
+          let subGone = false;
+          for (const r of dueHabitReminders(blob, now, sched?.tz || 'UTC')) {
+            if (await store.reminderSent(s.endpoint, r.key)) continue;
+            const ok = await sendTo(s, r.line);
+            if (!ok) { subGone = true; break; }
+            await store.markReminderSent(s.endpoint, r.key, now);
+          }
+          if (subGone) continue;
+        } catch (e) { /* non-fatal */ }
       }
 
       // 2) Companion check-ins ("thinking about you", follow-ups, ambient).

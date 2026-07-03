@@ -1096,14 +1096,18 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     setTimeout(() => setCopiedIdx((x) => (x === i ? null : x)), 1500);
   }
 
+  // Photos: keep only the tiny thumbnail in the saved session (the full-res
+  // data URL would blow the localStorage budget after a few shares).
+  const buildPersistState = () => ({
+    companions: comps, messages: msgs.map((m) => (m.kind === 'photo' ? { ...m, img: m.thumb || undefined } : m)),
+    chatMode, autoSpeak, trialStart, bonds, voiceCall, pushFrequency: pushFreq, pushSchedule: pushSched,
+    memories: memStore, spacePos, ambientAlerts, lore, jokes, journal, goals, checkins,
+  });
   useEffect(() => {
     // Don't persist on every streamed token — the final setMsgs (after
     // streamingRef flips false) saves the completed turn once.
     if (streamingRef.current) return;
-    // Photos: keep only the tiny thumbnail in the saved session (the full-res
-    // data URL would blow the localStorage budget after a few shares).
-    const persistMsgs = msgs.map((m) => (m.kind === 'photo' ? { ...m, img: m.thumb || undefined } : m));
-    onPersist?.({ companions: comps, messages: persistMsgs, chatMode, autoSpeak, trialStart, bonds, voiceCall, pushFrequency: pushFreq, pushSchedule: pushSched, memories: memStore, spacePos, ambientAlerts, lore, jokes, journal, goals, checkins });
+    onPersist?.(buildPersistState());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comps, msgs, chatMode, autoSpeak, bonds, voiceCall, pushFreq, pushSched, memStore, spacePos, ambientAlerts, lore, jokes, journal, goals, checkins]);
 
@@ -1328,7 +1332,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   if (panel === 'today') return <Today profile={profile} onBack={() => setPanel('you')} />;
   if (panel === 'mood') return <MoodInsights checkins={checkins} onBack={() => setPanel('you')} />;
   if (panel === 'breathe') return <Breathe onBack={() => setPanel('you')} />;
-  if (panel === 'habits' || panel === 'rituals') return <Habits onBack={() => setPanel('you')} />;
+  if (panel === 'habits' || panel === 'rituals') return <Habits onBack={() => setPanel('you')} onChange={() => onPersist?.(buildPersistState())} />;
   if (panel === 'values') return <Values onBack={() => setPanel('you')} />;
   if (panel === 'vault') return <Vault onBack={() => setPanel('you')} />;
   if (panel === 'duo') return <DuoCompat profile={profile} onBack={() => setPanel('you')} />;

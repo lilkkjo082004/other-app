@@ -262,6 +262,28 @@ function pastScheduledTime(h, now) {
   return mins >= (start[h.when] ?? 9 * 60);
 }
 
+// A compact snapshot of reminder-enabled habits to ride along in the synced
+// session blob, so the backend cron can send closed-app push reminders. Only
+// habits with the bell on leave the device; lastDone lets the server skip ones
+// already done today.
+export function habitPushSpec() {
+  const out = [];
+  for (const raw of loadHabits()) {
+    if (!raw || !raw.remind) continue;
+    const done = Array.isArray(raw.done) ? raw.done : (raw.last ? [raw.last] : []);
+    out.push({
+      id: raw.id,
+      text: (raw.text || '').trim(),
+      em: raw.em || '✦',
+      when: raw.when || 'anytime',
+      time: /^\d{2}:\d{2}$/.test(raw.time || '') ? raw.time : '',
+      freq: raw.freq || { type: 'daily' },
+      lastDone: done.length ? done[done.length - 1] : '',
+    });
+  }
+  return out;
+}
+
 // The first habit worth a companion nudge right now: reminders on, scheduled
 // today and not yet done, its time has arrived, and not already nudged today.
 export function habitToRemind(list, now = Date.now()) {

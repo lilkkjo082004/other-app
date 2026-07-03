@@ -2,7 +2,7 @@
 // global Web APIs (Request/Response/fetch/crypto). No network or D1 needed.
 import { handle } from '../src/handlers.js';
 import { memoryStore } from '../src/store-memory.js';
-import { inQuietHours, scheduleDue, dueEventReminders } from '../src/worker.js';
+import { inQuietHours, scheduleDue, dueEventReminders, dueHabitReminders } from '../src/worker.js';
 
 const env = { store: memoryStore(), SECRET: 'test-secret', ALLOWED_ORIGIN: '*' };
 let passed = 0, failed = 0;
@@ -272,6 +272,30 @@ console.log('event reminders (closed-app push)');
   // Dedup within a blob: two identical actions collapse to one.
   const dup = dueEventReminders({ companions: [coral], messages: [mk(), mk()] }, now);
   ok(dup.length === 1, 'identical reminders collapse to a single push');
+}
+
+console.log('habit reminders (closed-app push)');
+{
+  const now = Date.UTC(2023, 5, 14, 9, 30); // Wed 09:30 UTC
+  const coral = { id: 'c1', name: 'Coral', status: 'awake' };
+  const H = (over) => ({ id: 'h1', text: 'Meditate', em: '🧘', when: 'morning', time: '', freq: { type: 'daily' }, lastDone: '', ...over });
+  const blob = (h) => ({ companions: [coral], habitReminders: [h] });
+
+  const d = dueHabitReminders(blob(H()), now, 'UTC');
+  ok(d.length === 1 && /Meditate/.test(d[0].line) && /Coral/.test(d[0].line), 'a due daily habit produces a voiced nudge');
+  ok(d[0].key === 'hb-2023-06-14-h1', 'habit reminder key is per-day-per-habit');
+  ok(dueHabitReminders(blob(H({ lastDone: '2023-06-14' })), now, 'UTC').length === 0, 'already done today => no nudge');
+  ok(dueHabitReminders(blob(H({ when: 'evening' })), now, 'UTC').length === 0, 'not nudged before the time-of-day arrives');
+  ok(dueHabitReminders(blob(H({ time: '05:00' })), now, 'UTC').length === 0, 'not nudged hours after the time passed');
+
+  const wd = H({ freq: { type: 'weekdays', days: [1, 3, 5] } });
+  ok(dueHabitReminders(blob(wd), now, 'UTC').length === 1, 'weekday habit is due on a scheduled weekday (Wed)');
+  ok(dueHabitReminders(blob(wd), Date.UTC(2023, 5, 13, 9, 30), 'UTC').length === 0, 'weekday habit is not pushed on an off day (Tue)');
+
+  ok(dueHabitReminders(blob(H({ freq: { type: 'weekly' } })), now, 'UTC').length === 0, 'weekly habits are in-app only, not pushed');
+  ok(dueHabitReminders(blob(H({ freq: { type: 'timesPerWeek', n: 2 } })), now, 'UTC').length === 0, 'N-per-week habits are in-app only, not pushed');
+  ok(dueHabitReminders({ companions: [coral] }, now, 'UTC').length === 0, 'no reminded habits => nothing');
+  ok(/Your companion/.test(dueHabitReminders({ companions: [], habitReminders: [H()] }, now, 'UTC')[0].line), 'falls back to a generic voice with no awake companion');
 }
 
 console.log('reminder-send dedup store');

@@ -4,6 +4,7 @@ import { genComp } from './lib/companions.js';
 import { loadSession, saveSession, clearSession, STORAGE_SOFT_LIMIT } from './lib/storage.js';
 import { cloudEnabled } from './config.js';
 import { withAgeVerification } from './lib/age.js';
+import { habitPushSpec } from './lib/habits.js';
 import * as api from './lib/api.js';
 import Welcome from './screens/Welcome.jsx';
 import Onboarding from './screens/Onboarding.jsx';
@@ -78,7 +79,10 @@ export default function App() {
 
   const persist = (chatState) => {
     if (!profile) return;
-    const session = { profile, ...chatState };
+    // Carry a snapshot of reminder-enabled habits so the backend cron can send
+    // closed-app habit pushes (habits are otherwise device-local).
+    const hr = habitPushSpec();
+    const session = { profile, ...chatState, ...(hr.length ? { habitReminders: hr } : {}) };
     const r = saveSession(session);
     setStorageWarn(!r.ok ? 'full' : (r.bytes > STORAGE_SOFT_LIMIT ? 'near' : null));
     if (cloudEnabled() && api.isAuthed()) api.pushState(session).catch(() => {});

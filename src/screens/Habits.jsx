@@ -10,7 +10,7 @@ import {
 // Habit tracker — add daily/recurring habits (type your own or pick from 20),
 // give each a time of day (or specific time) and a recurrence, then check them
 // off for a gentle streak. Folds in the former "Rituals" tool.
-export default function Habits({ onBack }) {
+export default function Habits({ onBack, onChange }) {
   const [list, setList] = useState(() => initHabits());
   const [adding, setAdding] = useState(false);
   const [text, setText] = useState('');
@@ -18,7 +18,9 @@ export default function Habits({ onBack }) {
   const [time, setTime] = useState('');
   const [freqKey, setFreqKey] = useState('daily');
   const [days, setDays] = useState([]); // for 'weekdays'
-  useEffect(() => { saveHabits(list); }, [list]);
+  // Save locally, and let the app resync so reminder-enabled habits reach the
+  // backend cron (for closed-app push).
+  useEffect(() => { saveHabits(list); onChange?.(); }, [list]);
 
   const now = Date.now();
   const open = adding || list.length === 0;

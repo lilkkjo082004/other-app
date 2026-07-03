@@ -313,6 +313,10 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
                   <div style={{ flex: 1 }}><div style={{ fontSize: 13 }}>Companion check-ins</div><div style={{ fontSize: 11, color: C.textDim, lineHeight: 1.5 }}>Warm "thinking of you" notes, follow-ups, and nudges to come check on them.</div></div>
                   <Toggle on={typeOn('checkins')} onClick={() => saveType('checkins', !typeOn('checkins'))} label="Companion check-ins" />
                 </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+                  <div style={{ flex: 1 }}><div style={{ fontSize: 13 }}>Habit reminders</div><div style={{ fontSize: 11, color: C.textDim, lineHeight: 1.5 }}>For habits with the 🔔 turned on, a companion nudges you at the habit's time — even when the app is closed. (Daily &amp; specific-weekday habits.)</div></div>
+                  <Toggle on={typeOn('habits')} onClick={() => saveType('habits', !typeOn('habits'))} label="Habit reminders" />
+                </div>
               </div>
             )}
             {pushOn && (
