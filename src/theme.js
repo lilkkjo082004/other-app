@@ -49,4 +49,23 @@ input,textarea,select{font-family:'DM Sans',sans-serif}input::placeholder,textar
 /* Viewport-bound shell (chat & panels): 100vh everywhere, upgraded to the
    dynamic viewport unit where supported so mobile URL bars don't clip it. */
 .shell-fill{height:100vh;max-height:100vh}
-@supports (height: 100dvh){.shell-fill{height:100dvh;max-height:100dvh}}`;
+@supports (height: 100dvh){.shell-fill{height:100dvh;max-height:100dvh}}
+
+/* Desktop: present the app as a centered, framed window floating on the cosmic
+   backdrop instead of a stranded phone-width column. Mobile is untouched — the
+   overrides only kick in on wide viewports. */
+@media (min-width: 900px){
+  .app-root{display:flex;align-items:center;justify-content:center;padding:32px}
+  .app-col{
+    width:min(760px,100%);
+    max-width:760px !important;
+    height:min(960px, calc(100vh - 64px)) !important;
+    min-height:0 !important;
+    margin:0 !important;
+    background:${C.void};
+    border:1px solid rgba(255,255,255,0.09);
+    border-radius:26px;
+    box-shadow:0 40px 100px -24px rgba(0,0,0,0.8);
+    overflow:hidden auto;
+  }
+}`;

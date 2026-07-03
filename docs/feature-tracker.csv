@@ -130,7 +130,7 @@ Platforms,Web app,"Primary platform, full experience",Built,P0,React + Vite (reb
 Platforms,PWA install,Installable + offline app shell,Built,P1,NEW; manifest + service worker
 Platforms,Android (Google Play),TWA/Capacitor wrapper,Partial,P0,Needs store setup + __OTHER_NATIVE__
 Platforms,iOS (App Store),Stricter content policies,Future,P2,
-Platforms,Desktop,Full desktop experience,Future,P2,
+Platforms,Desktop (responsive layout),"On wide viewports (>=900px) the app presents as a centered, framed 'window' (760px, rounded, bordered, drop-shadow) floating on the animated cosmic backdrop — instead of a stranded phone-width column with empty space. Mobile is untouched (media query only). Driven by .app-root/.app-col classes on Shell + a theme.js desktop media query, so every screen benefits at once.",Built,P2,"NEW; components/ui.jsx Shell classNames + src/theme.js @media(min-width:900px). Verified via Playwright desktop(1440)+mobile(390) screenshots, 0 page errors. (Installable/native wrapper still Future.)"
 Backend,API proxy server,Cloudflare Worker + D1,Built,P0,UPDATED Future->Built; server/
 Backend,Real AI responses,"Claude API integration; hosted proxy serves every user with no API key and no login required (owner-funded)",Built,P0,"UPDATED Future->Built; offline fallback; /ai is unauthenticated"
 Backend,AI cost safeguards,"Public keyless /ai protected by per-minute, per-IP/day, and optional global/day caps so it can't run up the owner's bill",Built,P1,"NEW; AI_RATE_LIMIT, AI_DAILY_LIMIT (200), AI_DAILY_TOTAL (0=off) in server"

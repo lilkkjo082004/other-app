@@ -10,13 +10,13 @@ import { C, CSS } from '../theme.js';
 // without dvh silently drop invalid inline styles — which un-bounded the shell
 // and made the *document* the scroller (opening at the top of the chat).
 export const Shell = ({ children, fill }) => (
-  <div className={fill ? 'shell-fill' : undefined} style={{ background: C.void, minHeight: '100vh', position: 'relative', overflow: 'hidden' }}>
+  <div className={`app-root${fill ? ' shell-fill' : ''}`} style={{ background: C.void, minHeight: '100vh', position: 'relative', overflow: 'hidden' }}>
     <style>{CSS}</style>
     <div className="cosmic-bg" style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, transition: 'opacity 0.4s' }}>
       <div style={{ position: 'absolute', width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(circle,rgba(124,91,245,0.08),transparent 70%)', top: '-10%', right: '-8%', filter: 'blur(60px)', animation: 'drift1 25s ease-in-out infinite' }} />
       <div style={{ position: 'absolute', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle,rgba(232,67,147,0.06),transparent 70%)', bottom: '-8%', left: '-5%', filter: 'blur(60px)', animation: 'drift2 30s ease-in-out infinite' }} />
     </div>
-    <div style={{ position: 'relative', zIndex: 1, maxWidth: 480, margin: '0 auto', ...(fill ? { height: '100%' } : { minHeight: '100vh' }), display: 'flex', flexDirection: 'column' }}>{children}</div>
+    <div className="app-col" style={{ position: 'relative', zIndex: 1, maxWidth: 480, margin: '0 auto', ...(fill ? { height: '100%' } : { minHeight: '100vh' }), display: 'flex', flexDirection: 'column' }}>{children}</div>
   </div>
 );
 
