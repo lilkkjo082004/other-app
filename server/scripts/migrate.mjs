@@ -11,8 +11,11 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-const acct = process.env.CLOUDFLARE_ACCOUNT_ID;
-const token = process.env.CLOUDFLARE_API_TOKEN;
+// Trim: a stored secret can carry a trailing newline. Wrangler trims it (so
+// `wrangler deploy` works), but a raw string interpolated into the request URL
+// would not — a newline in the account id yields Cloudflare error 7403.
+const acct = (process.env.CLOUDFLARE_ACCOUNT_ID || '').trim();
+const token = (process.env.CLOUDFLARE_API_TOKEN || '').trim();
 if (!acct || !token) {
   console.error('Missing CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN');
   process.exit(1);
