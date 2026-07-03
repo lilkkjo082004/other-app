@@ -1,9 +1,9 @@
 // Data export & portability — assembles a human-readable copy of the user's
 // data (profile, companions, full chat transcript, journals, goals, mood
-// history, rituals, values) as Markdown. The PRIVATE VAULT is deliberately
+// history, habits, values) as Markdown. The PRIVATE VAULT is deliberately
 // excluded. Complements the JSON backup (which is for restore); this is for the
 // user to read/keep/take with them (GDPR/CCPA portability spirit).
-import { loadRituals } from './rituals.js';
+import { loadHabits, streakOf, freqLabel, scheduleLabel } from './habits.js';
 import { loadValues } from './values.js';
 
 const fmtDate = (ts) => { try { return new Date(ts).toLocaleString(); } catch (e) { return ''; } };
@@ -41,10 +41,10 @@ export function buildReadableExport(session = {}) {
     L.push('');
   }
 
-  const rituals = loadRituals();
-  if (rituals.length) {
-    L.push('## Rituals');
-    for (const r of rituals) L.push(`- ${r.em || '•'} ${r.text}${r.streak ? ` (streak: ${r.streak})` : ''}`);
+  const habits = loadHabits();
+  if (habits.length) {
+    L.push('## Habits');
+    for (const h of habits) { const s = streakOf(h); L.push(`- ${h.em || '•'} ${h.text} — ${scheduleLabel(h)} · ${freqLabel(h)}${s ? ` · 🔥 ${s}` : ''}`); }
     L.push('');
   }
 

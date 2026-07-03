@@ -19,7 +19,7 @@ export default function Home({ profile, comps, checkins, lastMsg, onOpenChat, on
     { key: 'chat', em: '💬', title: 'Chat', sub: lastMsg ? `${lastMsg.who}: ${lastMsg.text}` : (awake.length ? `${awake.map((c) => c.name).join(', ')}` : 'Your companions'), accent: C.glow1, onClick: onOpenChat },
     { key: 'cowork', em: '🧑‍💻', title: 'Cowork', sub: 'Focus together', accent: C.glow3 || C.glow1, onClick: () => onNav('cowork') },
     { key: 'space', em: '✦', title: 'The Space', sub: 'Where they hang out', accent: C.glow2, onClick: () => onNav('space') },
-    { key: 'you', em: '🧭', title: 'For you', sub: 'Mood, breathe, rituals', accent: C.glow3 || C.glow1, onClick: () => onNav('you') },
+    { key: 'you', em: '🧭', title: 'For you', sub: 'Mood, habits, breathe', accent: C.glow3 || C.glow1, onClick: () => onNav('you') },
     { key: 'timeline', em: '🕰️', title: 'Timeline', sub: 'Your story together', accent: C.glow1, onClick: () => onNav('timeline') },
     { key: 'settings', em: '⚙', title: 'Settings', sub: 'Voice, plan, more', accent: C.textSoft, onClick: () => onNav('settings') },
   ];

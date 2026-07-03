@@ -17,7 +17,6 @@ const { pomoNext } = await import('../src/lib/cowork.js');
 const { recallBlock } = await import('../src/lib/recall.js');
 const { seasonalTheme, seasonalDue, seasonalLine, seasonalParticles } = await import('../src/lib/seasonal.js');
 const { dailyGuidance, weeklyOutlook, companionOfDay } = await import('../src/lib/horoscope.js');
-const { addRitual, toggleToday, refreshForToday } = await import('../src/lib/rituals.js');
 const { addGoal, newGoal, toggleGoal, goalToNudge, markNudged } = await import('../src/lib/goals.js');
 const { saveSession, loadSession, ARCHIVE_THRESHOLD, KEEP_RECENT } = await import('../src/lib/storage.js');
 const { buildSystemBlocks } = await import('../src/lib/prompt.js');
@@ -83,20 +82,6 @@ console.log('horoscope');
   const c2 = companionOfDay(comps, 'leo', ts + 86400000).comp.id;
   ok(c1 !== c2, 'companion of the day rotates daily with 2 companions');
   ok(companionOfDay([], 'leo', ts) === null, 'no companions -> null');
-}
-
-console.log('rituals');
-{
-  const now = Date.UTC(2026, 5, 15, 12);
-  let list = addRitual([], 'Drink water', '💧');
-  ok(list.length === 1 && list[0].streak === 0, 'add ritual');
-  list = toggleToday(list, list[0].id, now);
-  ok(list[0].doneToday === true && list[0].streak === 1, 'checking off today starts the streak');
-  list = toggleToday(list, list[0].id, now);
-  ok(list[0].doneToday === false, 'tapping again undoes today');
-  list = toggleToday(list, list[0].id, now);
-  list = toggleToday(list, list[0].id, now + 86400000);
-  ok(list[0].streak === 2, 'consecutive days build the streak');
 }
 
 console.log('goals');
@@ -169,25 +154,53 @@ console.log('calendar reminders');
 
 console.log('habits');
 {
+  const DAY = 86400000;
+  const now = Date.UTC(2023, 5, 14, 9, 0, 0); // Wed 2023-06-14
+
+  // add + schedule
   let hs = habits.addHabit([], 'Meditate', { em: '🧘', when: 'morning', time: '07:30' });
-  ok(hs.length === 1 && hs[0].when === 'morning' && hs[0].time === '07:30', 'addHabit stores time-of-day + specific time');
+  ok(hs[0].when === 'morning' && hs[0].time === '07:30', 'addHabit stores time-of-day + specific time');
   ok(habits.scheduleLabel(hs[0]) === '⏰ 7:30 AM', 'scheduleLabel shows a specific time in 12h');
-  const anytime = habits.addHabit([], 'Drink water', { when: 'anytime' })[0];
-  ok(habits.scheduleLabel(anytime) === '✦ Anytime', 'scheduleLabel falls back to the slot label');
+  ok(habits.scheduleLabel(habits.addHabit([], 'Water', { when: 'anytime' })[0]) === '✦ Anytime', 'scheduleLabel falls back to the slot label');
   ok(habits.addHabit([], '   ').length === 0, 'blank habit is ignored');
   ok(habits.HABIT_IDEAS.length === 20, 'ships exactly 20 preset habits');
-
   hs = habits.addHabit(hs, 'Read', { when: 'evening' });
   ok(hs[0].text === 'Meditate' && hs[1].text === 'Read', 'habits sort earliest-in-the-day first');
 
-  const now = Date.UTC(2023, 5, 10, 9, 0, 0);
+  // daily completion + streak (completion-log model; streak is computed, not stored)
   const id = hs[0].id;
-  let done = habits.toggleToday(hs, id, now);
-  const d1 = done.find((h) => h.id === id);
-  ok(d1.doneToday && d1.streak === 1, 'toggleToday marks done with a 1-day streak');
-  done = habits.toggleToday(done, id, now);
-  const d2 = done.find((h) => h.id === id);
-  ok(!d2.doneToday && d2.streak === 0, 'toggling again undoes it');
+  let d = habits.toggleToday(hs, id, now);
+  let h = d.find((x) => x.id === id);
+  ok(habits.doneToday(h, now) && habits.streakOf(h, now) === 1, 'toggle marks done, streak = 1');
+  d = habits.toggleToday(d, id, now);
+  ok(!habits.doneToday(d.find((x) => x.id === id), now), 'toggling again undoes today');
+  d = habits.toggleToday(habits.toggleToday(hs, id, now - DAY), id, now);
+  ok(habits.streakOf(d.find((x) => x.id === id), now) === 2, 'consecutive days build the streak');
+
+  // recurrence labels
+  ok(habits.freqLabel({ freq: { type: 'weekdays', days: [1, 3, 5] } }) === 'Mon · Wed · Fri', 'freqLabel lists chosen weekdays');
+  ok(habits.freqLabel({ freq: { type: 'timesPerWeek', n: 2 } }) === '2× a week', 'freqLabel for N-times-a-week');
+  ok(habits.freqLabel({ freq: { type: 'monthly' } }) === 'Monthly', 'freqLabel for monthly');
+
+  // weekdays: due only on scheduled days (now is a Wednesday)
+  const wd = habits.addHabit([], 'Gym', { freq: { type: 'weekdays', days: [1, 3, 5] } })[0];
+  ok(habits.dueToday(wd, now) === true, 'weekday habit is due on a scheduled day (Wed)');
+  ok(habits.dueToday(wd, Date.UTC(2023, 5, 13, 9)) === false, 'weekday habit is not due on an off day (Tue)');
+
+  // N×/week: due until the weekly target is met, then a 1-week streak
+  let tp = habits.addHabit([], 'Run', { freq: { type: 'timesPerWeek', n: 2 } });
+  const tid = tp[0].id;
+  ok(habits.dueToday(tp[0], now) === true, 'N×/week habit is due before the target');
+  tp = habits.toggleToday(habits.toggleToday(tp, tid, now - DAY), tid, now); // Tue + Wed same week
+  const th = tp.find((x) => x.id === tid);
+  ok(habits.weekProgress(th, now) === 2, 'weekProgress counts completions this week');
+  ok(habits.dueToday(th, now) === false && habits.streakOf(th, now) === 1, 'target met = not due + 1-week streak');
+
+  // weekly streak across two consecutive weeks
+  let wk = habits.addHabit([], 'Deep clean', { freq: { type: 'weekly' } });
+  const wid = wk[0].id;
+  wk = habits.toggleToday(habits.toggleToday(wk, wid, now - 7 * DAY), wid, now);
+  ok(habits.streakOf(wk.find((x) => x.id === wid), now) === 2, 'weekly streak counts consecutive weeks');
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

@@ -11,7 +11,6 @@ const TILES = [
   { key: 'mood', em: '📈', title: 'Mood insights', sub: 'Your check-in trends' },
   { key: 'breathe', em: '🌬️', title: 'Breathe', sub: 'Calm in a minute' },
   { key: 'habits', em: '✅', title: 'Habits', sub: 'Track your daily habits' },
-  { key: 'rituals', em: '🔁', title: 'Rituals', sub: 'Small daily practices' },
   { key: 'values', em: '🧭', title: 'Values', sub: 'Your north star' },
   { key: 'vault', em: '🔒', title: 'Private vault', sub: 'Just for you' },
   { key: 'duo', em: '💫', title: 'Compatibility', sub: 'You & a friend' },
