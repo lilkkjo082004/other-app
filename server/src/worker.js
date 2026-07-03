@@ -254,14 +254,20 @@ export default {
       // coming up soon. Independent of the check-in cadence; deduped per device
       // so each event pings once. Respects quiet hours and the type switch.
       if (wantEvents && !quiet) {
-        let subGone = false;
-        for (const r of dueEventReminders(blob, now)) {
-          if (await store.reminderSent(s.endpoint, r.key)) continue;
-          const ok = await sendTo(s, r.line);
-          if (!ok) { subGone = true; break; }            // expired endpoint — stop using it
-          await store.markReminderSent(s.endpoint, r.key, now);
+        try {
+          let subGone = false;
+          for (const r of dueEventReminders(blob, now)) {
+            if (await store.reminderSent(s.endpoint, r.key)) continue;
+            const ok = await sendTo(s, r.line);
+            if (!ok) { subGone = true; break; }            // expired endpoint — stop using it
+            await store.markReminderSent(s.endpoint, r.key, now);
+          }
+          if (subGone) continue;
+        } catch (e) {
+          // e.g. reminder_sends not migrated yet (CI deploys code but not the
+          // schema) — never let a reminder error abort the whole cron tick and
+          // take the check-ins below down with it. Same posture as tierOf().
         }
-        if (subGone) continue;
       }
 
       // 2) Companion check-ins ("thinking about you", follow-ups, ambient).

@@ -23,6 +23,21 @@ jobs:
         id: gate
         run: echo "ready=${{ secrets.CLOUDFLARE_API_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
 
+      # Apply the D1 schema BEFORE shipping code so new code never runs against a
+      # DB missing its tables. schema.sql is all `CREATE TABLE/INDEX IF NOT
+      # EXISTS`, so this is idempotent and safe to run on every deploy — it's the
+      # only thing that migrates new tables (e.g. reminder_sends) to prod, since
+      # `wrangler deploy` ships code only.
+      - name: Apply D1 schema (idempotent migrations)
+        if: steps.gate.outputs.ready == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: server
+          command: d1 execute other --remote --file=./schema.sql
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
       - name: Deploy with Wrangler
         if: steps.gate.outputs.ready == 'true'
         uses: cloudflare/wrangler-action@v3
