@@ -193,7 +193,10 @@ export default {
   async fetch(request, env) {
     return handle(request, {
       store: d1Store(env.DB),
-      SECRET: env.AUTH_SECRET || 'dev-insecure-secret-change-me',
+      // No insecure fallback: if AUTH_SECRET isn't provisioned, auth fails
+      // closed (handlers below) instead of silently signing tokens with a
+      // public constant that anyone could forge. Set it as a Cloudflare secret.
+      SECRET: env.AUTH_SECRET,
       ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY,
       ALLOWED_ORIGIN: env.ALLOWED_ORIGIN,
       AI_RATE_LIMIT: env.AI_RATE_LIMIT,

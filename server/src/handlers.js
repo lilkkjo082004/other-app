@@ -20,6 +20,7 @@ async function body(request) {
   try { return await request.json(); } catch (e) { return null; }
 }
 async function authUid(request, env) {
+  if (!env.SECRET) return null; // fail closed: unconfigured signing secret => no valid tokens
   const h = request.headers.get('authorization') || '';
   const v = await verifyToken(h.replace(/^Bearer\s+/i, ''), env.SECRET);
   return v ? v.uid : null;
@@ -294,6 +295,7 @@ async function aiStream(payload, env) {
 }
 
 async function signup(request, env) {
+  if (!env.SECRET) return json({ error: 'auth not configured' }, 503, env);
   const b = await body(request);
   const email = (b?.email || '').trim().toLowerCase();
   const password = b?.password || '';
@@ -306,6 +308,7 @@ async function signup(request, env) {
 }
 
 async function login(request, env) {
+  if (!env.SECRET) return json({ error: 'auth not configured' }, 503, env);
   const b = await body(request);
   const email = (b?.email || '').trim().toLowerCase();
   const password = b?.password || '';
@@ -321,10 +324,13 @@ async function login(request, env) {
 // entitlement keyed by app_user_id (which the client sets to our user id).
 async function billingWebhook(request, env) {
   const secret = env.BILLING_WEBHOOK_SECRET;
-  if (secret) {
-    const auth = request.headers.get('authorization') || '';
-    if (auth !== secret && auth !== `Bearer ${secret}`) return json({ error: 'unauthorized' }, 401, env);
-  }
+  // Fail closed: without a configured shared secret there is no safe way to
+  // trust this webhook, so refuse rather than accept unauthenticated
+  // entitlement writes (which would let anyone grant themselves Plus). Set
+  // BILLING_WEBHOOK_SECRET to enable billing.
+  if (!secret) return json({ error: 'billing not configured' }, 503, env);
+  const auth = request.headers.get('authorization') || '';
+  if (auth !== secret && auth !== `Bearer ${secret}`) return json({ error: 'unauthorized' }, 401, env);
   if (!env.store.setEntitlement) return json({ error: 'entitlements unsupported' }, 500, env);
   const b = await body(request);
   const ev = b?.event || b || {};

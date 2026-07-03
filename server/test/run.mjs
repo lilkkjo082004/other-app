@@ -283,5 +283,35 @@ console.log('reminder-send dedup store');
   ok((await store.reminderSent('ep2', 'k1')) === false, 'dedup is per-device (endpoint)');
 }
 
+console.log('security: fail closed on missing secrets');
+{
+  // Auth signing secret absent => issuance and verification both refuse, rather
+  // than silently signing/accepting forgeable tokens.
+  const noSecret = { store: memoryStore(), ALLOWED_ORIGIN: '*' }; // no SECRET
+  const nsCall = async (method, path, { token, body: b } = {}) => {
+    const headers = {};
+    if (b) headers['content-type'] = 'application/json';
+    if (token) headers.authorization = 'Bearer ' + token;
+    const res = await handle(new Request('http://api' + path, { method, headers, body: b ? JSON.stringify(b) : undefined }), noSecret);
+    return { status: res.status, data: await res.json().catch(() => ({})) };
+  };
+  let s = await nsCall('POST', '/auth/signup', { body: { email: 'x@other.app', password: 'hunter2pw' } });
+  ok(s.status === 503, 'signup fails closed with no AUTH_SECRET');
+  s = await nsCall('POST', '/auth/login', { body: { email: 'x@other.app', password: 'hunter2pw' } });
+  ok(s.status === 503, 'login fails closed with no AUTH_SECRET');
+  s = await nsCall('GET', '/state', { token: 'anything.9999999999.sig' });
+  ok(s.status === 401, 'protected route rejects any token with no AUTH_SECRET');
+
+  // Billing webhook without a shared secret must refuse, not accept
+  // unauthenticated entitlement writes.
+  const noBilling = { store: memoryStore(), SECRET: 'test-secret', ALLOWED_ORIGIN: '*' }; // no BILLING_WEBHOOK_SECRET
+  const res = await handle(new Request('http://api/billing/webhook', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ event: { type: 'INITIAL_PURCHASE', app_user_id: 'u_forged', expiration_at_ms: Date.now() + 86400000 } }),
+  }), noBilling);
+  ok(res.status === 503, 'billing webhook fails closed with no BILLING_WEBHOOK_SECRET');
+  ok((await noBilling.store.getEntitlement('u_forged')) == null, 'no entitlement written when billing unconfigured');
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
