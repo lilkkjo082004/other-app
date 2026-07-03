@@ -1,0 +1,72 @@
+name: Deploy Web (GitHub Pages)
+
+# Builds the Vite web app with its production backend wiring baked in and
+# publishes it to GitHub Pages (the site at https://lilkkjo082004.github.io/other-app/).
+#
+# This is the ONLY reproducible path that guarantees the shipped bundle actually
+# talks to the backend: VITE_* are baked in at build time, so a hand build with a
+# missing .env silently ships a local-only app. The build also stamps the service
+# worker (npm run build -> scripts/stamp-sw.mjs) so updates reach installed users.
+#
+# One-time setup: repo Settings -> Pages -> Source = "GitHub Actions". The
+# configure-pages step below also attempts to enable that automatically.
+
+on:
+  push:
+    branches: [main, claude/continue-other-app-ewuf2q]
+    paths-ignore:
+      - 'server/**'
+      - 'worker/**'
+      - 'legacy_flutter/**'
+      - '**.md'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one Pages deploy at a time; newer pushes supersede in-flight ones.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build with production backend wiring
+        # These are PUBLIC, non-secret values (already present in the deployed
+        # worker's wrangler.toml and the shipped bundle). Baking them in here
+        # means a production build can never silently ship with the backend
+        # unwired — the failure mode that would make accounts/push/reminders
+        # dead on-device. VITE_NATURAL_VOICE is intentionally left off (it only
+        # works with an ElevenLabs key on the worker; off => graceful browser TTS).
+        env:
+          VITE_API_BASE: https://other-api.lilkkjo082004.workers.dev
+          VITE_VAPID_PUBLIC: BF_oz9i57Om2HKGoM_OFSMagZCD8iUmKzRaYLBRbJwkbbBoBePyoE0OFZjnh54CZpk-ub3Z03-acBA60jCn7tS0
+        run: npm run build
+
+      - name: Configure Pages (auto-enable GitHub Actions as the source)
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
