@@ -28,18 +28,17 @@ jobs:
       # EXISTS`, so this is idempotent and safe to run on every deploy — it's the
       # only thing that migrates new tables (e.g. reminder_sends) to prod, since
       # `wrangler deploy` ships code only.
-      # Use --command "$(cat schema.sql)" rather than --file=schema.sql: the
-      # --file path uploads through D1's R2-backed /import API, which a scoped
-      # CI API token can't authenticate to (10000) even as super-admin. --command
-      # goes through the plain query endpoint, which the token can use. Pinned to
-      # the same wrangler the deploy step uses.
+      # Applies schema.sql to remote D1 via the D1 /query REST endpoint. We can't
+      # use `wrangler d1 execute --file` here — its R2-backed /import path can't
+      # authenticate with a scoped CI token (Cloudflare error 10000). See the
+      # script header for details. Idempotent (CREATE ... IF NOT EXISTS).
       - name: Apply D1 schema (idempotent migrations)
         if: steps.gate.outputs.ready == 'true'
         working-directory: server
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx --yes wrangler@3.90.0 d1 execute other --remote --command "$(cat schema.sql)"
+        run: node scripts/migrate.mjs
 
       - name: Deploy with Wrangler
         if: steps.gate.outputs.ready == 'true'
