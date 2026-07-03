@@ -51,15 +51,19 @@ input,textarea,select{font-family:'DM Sans',sans-serif}input::placeholder,textar
 .shell-fill{height:100vh;max-height:100vh}
 @supports (height: 100dvh){.shell-fill{height:100dvh;max-height:100dvh}}
 
-/* Desktop: present the app as a centered, framed window floating on the cosmic
+/* Responsive tile / habit grids: 2-up on mobile, more on desktop. */
+.tile-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.habit-mini{display:grid;grid-template-columns:1fr;gap:6px}
+
+/* Desktop: present the app as a roomy, framed window floating on the cosmic
    backdrop instead of a stranded phone-width column. Mobile is untouched — the
    overrides only kick in on wide viewports. */
 @media (min-width: 900px){
-  .app-root{display:flex;align-items:center;justify-content:center;padding:32px}
+  .app-root{display:flex;align-items:center;justify-content:center;padding:34px}
   .app-col{
-    width:min(760px,100%);
-    max-width:760px !important;
-    height:min(960px, calc(100vh - 64px)) !important;
+    width:min(1040px,100%);
+    max-width:1040px !important;
+    height:min(980px, calc(100vh - 68px)) !important;
     min-height:0 !important;
     margin:0 !important;
     background:${C.void};
@@ -68,4 +72,6 @@ input,textarea,select{font-family:'DM Sans',sans-serif}input::placeholder,textar
     box-shadow:0 40px 100px -24px rgba(0,0,0,0.8);
     overflow:hidden auto;
   }
+  .tile-grid{grid-template-columns:1fr 1fr 1fr}
+  .habit-mini{grid-template-columns:1fr 1fr;gap:8px}
 }`;

@@ -1,19 +1,27 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { C } from '../theme.js';
 import { Shell } from '../components/ui.jsx';
 import Avatar from '../components/Avatar.jsx';
 import { dailyGuidance, companionOfDay } from '../lib/horoscope.js';
 import { checkinDue } from '../lib/checkin.js';
+import { initHabits, saveHabits, toggleToday, doneToday, dueToday } from '../lib/habits.js';
 
 // Home — the app's landing screen: a warm launcher that surfaces everything
 // (chat, cowork, the space, the "for you" tools) instead of burying them in a
 // menu. Everything routes back into the Chat screen's panels.
-export default function Home({ profile, comps, checkins, lastMsg, onOpenChat, onNav }) {
+export default function Home({ profile, comps, checkins, lastMsg, onOpenChat, onNav, onHabitsChange }) {
   const awake = (comps || []).filter((c) => c.status === 'awake');
   const sign = profile?.astrology?.western;
   const g = sign ? dailyGuidance(sign) : null;
   const cod = companionOfDay(comps, sign);
   const dueCheckin = checkinDue(checkins);
+
+  // Today's habits, glanceable + checkable right from Home (mobile & desktop).
+  const [habits, setHabits] = useState(() => initHabits());
+  const nowTs = Date.now();
+  const todayHabits = habits.filter((h) => dueToday(h, nowTs) || doneToday(h, nowTs));
+  const habitsDone = todayHabits.filter((h) => doneToday(h, nowTs)).length;
+  const toggleHabit = (id) => { const n = toggleToday(habits, id, nowTs); setHabits(n); saveHabits(n); onHabitsChange?.(); };
 
   const tiles = [
     { key: 'chat', em: '💬', title: 'Chat', sub: lastMsg ? `${lastMsg.who}: ${lastMsg.text}` : (awake.length ? `${awake.map((c) => c.name).join(', ')}` : 'Your companions'), accent: C.glow1, onClick: onOpenChat },
@@ -55,7 +63,33 @@ export default function Home({ profile, comps, checkins, lastMsg, onOpenChat, on
           </button>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        {/* Today's habits */}
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: '12px 14px 13px', marginBottom: 14 }}>
+          <button onClick={() => onNav('habits')} aria-label="Open habits" style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: C.text, fontFamily: "'DM Sans',sans-serif", marginBottom: todayHabits.length ? 10 : 2 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, flex: 1, textAlign: 'left' }}>Today's habits{todayHabits.length ? ` · ${habitsDone}/${todayHabits.length}` : ''}</span>
+            <span style={{ color: C.textDim, fontSize: 14 }}>›</span>
+          </button>
+          {todayHabits.length === 0 ? (
+            <div style={{ fontSize: 12, color: C.textDim }}>{habits.length ? 'Nothing scheduled today — nice.' : 'Set a habit to build your day.'}</div>
+          ) : (
+            <div className="habit-mini">
+              {todayHabits.slice(0, 6).map((h) => {
+                const done = doneToday(h, nowTs);
+                return (
+                  <button key={h.id} onClick={() => toggleHabit(h.id)} aria-label={`${done ? 'Mark not done' : 'Mark done'}: ${h.text}`} style={{ display: 'flex', alignItems: 'center', gap: 9, background: C.bg, border: `1px solid ${done ? C.glow3 : C.border}`, borderRadius: 11, padding: '8px 10px', cursor: 'pointer', color: C.text, fontFamily: "'DM Sans',sans-serif", minWidth: 0 }}>
+                    <span style={{ flexShrink: 0, width: 20, height: 20, borderRadius: '50%', border: `2px solid ${done ? C.glow3 : C.border}`, background: done ? C.glow3 : 'transparent', color: '#0b0a12', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{done ? '✓' : ''}</span>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: done ? 0.6 : 1 }}>{h.em} {h.text}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {todayHabits.length > 6 && (
+            <button onClick={() => onNav('habits')} style={{ marginTop: 8, background: 'none', border: 'none', color: C.glow1, fontSize: 11.5, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", padding: 0 }}>+{todayHabits.length - 6} more</button>
+          )}
+        </div>
+
+        <div className="tile-grid">
           {tiles.map((t) => (
             <button key={t.key} onClick={t.onClick} style={{ minWidth: 0, textAlign: 'left', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: '15px 14px 16px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", color: C.text }}>
               <div style={{ fontSize: 25, marginBottom: 9, color: t.accent }}>{t.em}</div>

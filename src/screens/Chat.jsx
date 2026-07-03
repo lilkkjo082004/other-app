@@ -1317,7 +1317,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     // A one-line preview of the latest exchange makes the Chat tile feel alive.
     const lm = [...msgs].reverse().find((m) => (m.role === 'user' || m.role === 'assistant') && m.content && !m.kind);
     const lastMsg = lm ? { who: lm.role === 'user' ? 'You' : (lm.companion?.name || 'Them'), text: lm.content.slice(0, 60) } : null;
-    return <Home profile={profile} comps={comps} checkins={checkins} lastMsg={lastMsg} onOpenChat={() => setPanel(null)} onNav={(k) => openPanel(k, true)} />;
+    return <Home profile={profile} comps={comps} checkins={checkins} lastMsg={lastMsg} onOpenChat={() => setPanel(null)} onNav={(k) => openPanel(k, true)} onHabitsChange={() => onPersist?.(buildPersistState())} />;
   }
   if (panel === 'places') return <PlacesNearby onBack={goBack} />;
   if (panel === 'story') return <StorySoFar lore={lore} jokes={jokes} comps={comps} onBack={goBack} />;
@@ -1618,7 +1618,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
             )}
             {m.kind === 'photo' ? (
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 7, animation: 'fadeUp 0.3s both' }}>
-                <div style={{ maxWidth: '70%', background: C.surfaceUp, border: `1px solid ${C.border}`, borderRadius: '14px 14px 4px 14px', padding: 4 }}>
+                <div style={{ maxWidth: 'min(70%, 480px)', background: C.surfaceUp, border: `1px solid ${C.border}`, borderRadius: '14px 14px 4px 14px', padding: 4 }}>
                   {m.img ? (
                     <img src={m.img} alt="Photo you shared" style={{ display: 'block', maxWidth: '100%', width: 200, borderRadius: 11 }} />
                   ) : (
@@ -1630,7 +1630,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
             ) : m.kind === 'voicenote' ? (
               <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 7, animation: 'fadeUp 0.3s both' }}>
                 <div style={{ marginRight: 7, flexShrink: 0, lineHeight: 0 }}><Avatar comp={m.companion} size={24} glow={false} /></div>
-                <div style={{ maxWidth: '82%', minWidth: 200, background: C.surface, border: `1px solid ${m.companion?.color?.primary || C.border}`, borderRadius: 14, padding: '10px 12px' }}>
+                <div style={{ maxWidth: 'min(82%, 600px)', minWidth: 200, background: C.surface, border: `1px solid ${m.companion?.color?.primary || C.border}`, borderRadius: 14, padding: '10px 12px' }}>
                   <div style={{ fontSize: 9.5, color: C.textDim, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 7, display: 'flex', alignItems: 'center', gap: 5 }}>
                     <span style={{ color: m.companion?.color?.primary }}>{m.companion?.name}</span> · 🎙️ voice note
                   </div>
@@ -1649,7 +1649,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
             ) : m.kind === 'checkin' ? (
               <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 7, animation: 'fadeUp 0.3s both' }}>
                 <div style={{ marginRight: 7, flexShrink: 0, lineHeight: 0 }}><Avatar comp={m.companion} size={24} glow={false} /></div>
-                <div style={{ maxWidth: '82%', background: C.surface, border: `1px solid ${m.companion?.color?.primary || C.border}`, borderRadius: 14, padding: '11px 13px' }}>
+                <div style={{ maxWidth: 'min(82%, 600px)', background: C.surface, border: `1px solid ${m.companion?.color?.primary || C.border}`, borderRadius: 14, padding: '11px 13px' }}>
                   <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6 }}>🌤️ Daily check-in</div>
                   {m.resolved ? (
                     <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>Thanks for checking in 💛 {(checkins.streak || 0) > 1 ? `🔥 ${checkins.streak}-day streak` : ''}</div>
@@ -1670,7 +1670,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
             ) : m.kind === 'rename' ? (
               <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 7, animation: 'fadeUp 0.3s both' }}>
                 <div style={{ marginRight: 7, flexShrink: 0, lineHeight: 0 }}><Avatar comp={m.companion} size={24} glow={false} /></div>
-                <div style={{ maxWidth: '82%', background: C.surface, border: `1px solid ${m.companion?.color?.primary || C.border}`, borderRadius: 14, padding: '11px 13px' }}>
+                <div style={{ maxWidth: 'min(82%, 600px)', background: C.surface, border: `1px solid ${m.companion?.color?.primary || C.border}`, borderRadius: 14, padding: '11px 13px' }}>
                   <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4 }}>✦ A new name</div>
                   {m.resolved === 'accepted' ? (
                     <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>You now call them <strong style={{ color: m.companion?.color?.primary }}>{m.newName}</strong>.</div>
@@ -1692,7 +1692,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
             ) : (
             <div ref={(el) => { if (idx != null && idx >= 0) { if (el) msgRefs.current.set(idx, el); else msgRefs.current.delete(idx); } }} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', marginBottom: 7, animation: 'fadeUp 0.3s both', borderRadius: 14, boxShadow: flashIdx === idx ? `0 0 0 2px ${C.glow1}aa` : 'none', transition: 'box-shadow 0.6s ease' }}>
               {m.role === 'assistant' && <div style={{ marginRight: 7, flexShrink: 0, marginTop: chatMode === 'group' ? 14 : 0, lineHeight: 0 }}><Avatar comp={m.companion} size={24} glow={false} /></div>}
-              <div style={{ maxWidth: '78%' }}>
+              <div style={{ maxWidth: 'min(78%, 560px)' }}>
                 {m.role === 'assistant' && chatMode === 'group' && <span style={{ fontSize: 9, color: m.companion?.color?.primary, fontWeight: 600, display: 'block', marginBottom: 1 }}>{m.companion?.name}</span>}
                 <div onClick={searching ? () => jumpTo(idx) : undefined} title={searching ? 'Jump to this message' : undefined} style={{ padding: '8px 12px', borderRadius: m.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: m.role === 'user' ? C.glow1 : C.card, color: m.role === 'user' ? '#fff' : C.text, fontSize: 13, lineHeight: 1.5, border: m.role === 'user' ? 'none' : `1px solid ${C.border}`, whiteSpace: 'pre-wrap', cursor: searching ? 'pointer' : 'default' }}>
                   {m.isAmbient && <span style={{ fontSize: 8, color: C.textDim, display: 'block', marginBottom: 2, fontStyle: 'italic' }}>earlier...</span>}

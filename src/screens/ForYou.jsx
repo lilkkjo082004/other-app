@@ -42,7 +42,7 @@ export default function ForYou({ profile, comps = [], onNav, onOpenCompanion, on
             <span style={{ color: cod.accent }}>›</span>
           </button>
         )}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div className="tile-grid">
           {TILES.map((t) => (
             <button key={t.key} onClick={() => onNav(t.key)} style={{ textAlign: 'left', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: '14px 14px 16px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", color: C.text }}>
               <div style={{ fontSize: 24, marginBottom: 8 }}>{t.em}</div>
