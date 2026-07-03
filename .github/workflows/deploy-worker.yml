@@ -23,23 +23,13 @@ jobs:
         id: gate
         run: echo "ready=${{ secrets.CLOUDFLARE_API_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
 
-      # Apply the D1 schema BEFORE shipping code so new code never runs against a
-      # DB missing its tables. schema.sql is all `CREATE TABLE/INDEX IF NOT
-      # EXISTS`, so this is idempotent and safe to run on every deploy — it's the
-      # only thing that migrates new tables (e.g. reminder_sends) to prod, since
-      # `wrangler deploy` ships code only.
-      # Applies schema.sql to remote D1 via the D1 /query REST endpoint. We can't
-      # use `wrangler d1 execute --file` here — its R2-backed /import path can't
-      # authenticate with a scoped CI token (Cloudflare error 10000). See the
-      # script header for details. Idempotent (CREATE ... IF NOT EXISTS).
-      - name: Apply D1 schema (idempotent migrations)
-        if: steps.gate.outputs.ready == 'true'
-        working-directory: server
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: node scripts/migrate.mjs
-
+      # NOTE: this only ships worker code — it does NOT run D1 migrations. The CI
+      # deploy token is Workers-scoped and can't authenticate to the D1 REST API
+      # (import → error 10000, query → 7403), so schema changes can't be applied
+      # here. New tables are instead created at runtime through the worker's D1
+      # binding (which needs no API-token permission) — see ensureReminderSchema
+      # in src/worker.js — and/or by running ./deploy.sh manually. schema.sql
+      # remains the source of truth for a fresh database.
       - name: Deploy with Wrangler
         if: steps.gate.outputs.ready == 'true'
         uses: cloudflare/wrangler-action@v3
