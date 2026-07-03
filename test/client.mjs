@@ -22,6 +22,7 @@ const { addGoal, newGoal, toggleGoal, goalToNudge, markNudged } = await import('
 const { saveSession, loadSession, ARCHIVE_THRESHOLD, KEEP_RECENT } = await import('../src/lib/storage.js');
 const { buildSystemBlocks } = await import('../src/lib/prompt.js');
 const { pickReminder, reminderKey, whenPhrase } = await import('../src/lib/reminders.js');
+const habits = await import('../src/lib/habits.js');
 
 console.log('checkin');
 {
@@ -164,6 +165,29 @@ console.log('calendar reminders');
   const noon = Date.UTC(2023, 10, 14, 12, 0, 0);
   ok(whenPhrase({ when: noon + 2 * 3600000, allDay: true }, noon) === 'today', 'whenPhrase calls a same-day all-day event "today"');
   ok(whenPhrase({ when: noon + 20 * 3600000, allDay: true }, noon) === 'tomorrow', 'whenPhrase calls a next-day all-day event "tomorrow"');
+}
+
+console.log('habits');
+{
+  let hs = habits.addHabit([], 'Meditate', { em: '🧘', when: 'morning', time: '07:30' });
+  ok(hs.length === 1 && hs[0].when === 'morning' && hs[0].time === '07:30', 'addHabit stores time-of-day + specific time');
+  ok(habits.scheduleLabel(hs[0]) === '⏰ 7:30 AM', 'scheduleLabel shows a specific time in 12h');
+  const anytime = habits.addHabit([], 'Drink water', { when: 'anytime' })[0];
+  ok(habits.scheduleLabel(anytime) === '✦ Anytime', 'scheduleLabel falls back to the slot label');
+  ok(habits.addHabit([], '   ').length === 0, 'blank habit is ignored');
+  ok(habits.HABIT_IDEAS.length === 20, 'ships exactly 20 preset habits');
+
+  hs = habits.addHabit(hs, 'Read', { when: 'evening' });
+  ok(hs[0].text === 'Meditate' && hs[1].text === 'Read', 'habits sort earliest-in-the-day first');
+
+  const now = Date.UTC(2023, 5, 10, 9, 0, 0);
+  const id = hs[0].id;
+  let done = habits.toggleToday(hs, id, now);
+  const d1 = done.find((h) => h.id === id);
+  ok(d1.doneToday && d1.streak === 1, 'toggleToday marks done with a 1-day streak');
+  done = habits.toggleToday(done, id, now);
+  const d2 = done.find((h) => h.id === id);
+  ok(!d2.doneToday && d2.streak === 0, 'toggling again undoes it');
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

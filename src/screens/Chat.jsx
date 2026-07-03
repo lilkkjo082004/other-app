@@ -45,6 +45,7 @@ import ForYou from './ForYou.jsx';
 import Today from './Today.jsx';
 import Breathe from './Breathe.jsx';
 import Rituals from './Rituals.jsx';
+import Habits from './Habits.jsx';
 import Values from './Values.jsx';
 import Vault from './Vault.jsx';
 import MoodInsights from './MoodInsights.jsx';
@@ -1296,6 +1297,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   if (panel === 'mood') return <MoodInsights checkins={checkins} onBack={() => setPanel('you')} />;
   if (panel === 'breathe') return <Breathe onBack={() => setPanel('you')} />;
   if (panel === 'rituals') return <Rituals onBack={() => setPanel('you')} />;
+  if (panel === 'habits') return <Habits onBack={() => setPanel('you')} />;
   if (panel === 'values') return <Values onBack={() => setPanel('you')} />;
   if (panel === 'vault') return <Vault onBack={() => setPanel('you')} />;
   if (panel === 'duo') return <DuoCompat profile={profile} onBack={() => setPanel('you')} />;
