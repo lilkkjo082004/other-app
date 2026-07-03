@@ -1,11 +1,23 @@
 // OTHER service worker — offline app shell + runtime asset caching.
 // Cross-origin requests (e.g. the AI proxy) are never intercepted.
-const CACHE = 'other-v2';
+// Cache name carries the build id (stamped into __BUILD__ at build time by
+// scripts/stamp-sw.mjs). A new deploy => new sw.js bytes => the browser runs an
+// update cycle, and the new name makes activate() purge the previous version's
+// assets instead of letting them pile up.
+const CACHE = 'other-__BUILD__';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).catch(() => {}));
-  self.skipWaiting();
+  // Deliberately NOT skipWaiting() here: the new worker waits until the user
+  // accepts the "Update ready" prompt (which posts SKIP_WAITING), so we never
+  // swap bundles out from under an active session.
+});
+
+// The page asks us to activate the freshly-installed worker when the user taps
+// the update pill.
+self.addEventListener('message', (e) => {
+  if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', (e) => {
