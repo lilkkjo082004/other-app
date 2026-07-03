@@ -284,6 +284,7 @@ console.log('habit reminders (closed-app push)');
   const d = dueHabitReminders(blob(H()), now, 'UTC');
   ok(d.length === 1 && /Meditate/.test(d[0].line) && /Coral/.test(d[0].line), 'a due daily habit produces a voiced nudge');
   ok(d[0].key === 'hb-2023-06-14-h1', 'habit reminder key is per-day-per-habit');
+  ok(/for 40 min/.test(dueHabitReminders(blob(H({ duration: 40 })), now, 'UTC')[0].line), 'push line includes the habit duration');
   ok(dueHabitReminders(blob(H({ lastDone: '2023-06-14' })), now, 'UTC').length === 0, 'already done today => no nudge');
   ok(dueHabitReminders(blob(H({ when: 'evening' })), now, 'UTC').length === 0, 'not nudged before the time-of-day arrives');
   ok(dueHabitReminders(blob(H({ time: '05:00' })), now, 'UTC').length === 0, 'not nudged hours after the time passed');

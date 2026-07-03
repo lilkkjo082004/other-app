@@ -221,8 +221,10 @@ export function dueHabitReminders(blob, now, tz = 'UTC') {
       ? (() => { const [hh, mm] = h.time.split(':').map(Number); return hh * 60 + mm; })()
       : (HABIT_SLOT_MIN[h.when] ?? 10 * 60);
     if (L.minutes < mins || L.minutes > mins + HABIT_WINDOW) continue;
+    const dur = Math.max(0, Math.round(Number(h.duration) || 0));
+    const durStr = dur ? (dur < 60 ? ` for ${dur} min` : ` for ${Math.floor(dur / 60)} hr${dur % 60 ? ` ${dur % 60} min` : ''}`) : '';
     const title = `${h.em ? h.em + ' ' : ''}${h.text}`.trim();
-    out.push({ key: `hb-${L.dayKey}-${h.id}`, line: `${name}: gentle nudge — ${title} ✦` });
+    out.push({ key: `hb-${L.dayKey}-${h.id}`, line: `${name}: gentle nudge — ${title}${durStr} ✦` });
   }
   return out;
 }

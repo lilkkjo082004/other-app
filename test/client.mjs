@@ -167,6 +167,11 @@ console.log('habits');
   hs = habits.addHabit(hs, 'Read', { when: 'evening' });
   ok(hs[0].text === 'Meditate' && hs[1].text === 'Read', 'habits sort earliest-in-the-day first');
 
+  // duration ("time allowed") — e.g. journal 40 min at 8pm every Wed
+  const jd = habits.addHabit([], 'Journal', { time: '20:00', freq: { type: 'weekdays', days: [3] }, duration: 40 })[0];
+  ok(jd.duration === 40 && jd.time === '20:00' && jd.freq.days[0] === 3, 'addHabit stores duration + time + weekday');
+  ok(habits.formatDuration(40) === '40 min' && habits.formatDuration(60) === '1 hr' && habits.formatDuration(90) === '1 hr 30 min' && habits.formatDuration(0) === '', 'formatDuration formats minutes/hours');
+
   // daily completion + streak (completion-log model; streak is computed, not stored)
   const id = hs[0].id;
   let d = habits.toggleToday(hs, id, now);

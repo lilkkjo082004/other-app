@@ -3,7 +3,7 @@ import { C } from '../theme.js';
 import { Shell } from '../components/ui.jsx';
 import {
   initHabits, saveHabits, addHabit, removeHabit, toggleToday, toggleRemind,
-  doneToday, dueToday, streakOf, weekProgress, scheduleLabel, freqLabel,
+  doneToday, dueToday, streakOf, weekProgress, scheduleLabel, freqLabel, formatDuration,
   HABIT_IDEAS, SLOTS, FREQ_CHOICES, WEEKDAYS,
 } from '../lib/habits.js';
 
@@ -18,6 +18,7 @@ export default function Habits({ onBack, onChange }) {
   const [time, setTime] = useState('');
   const [freqKey, setFreqKey] = useState('daily');
   const [days, setDays] = useState([]); // for 'weekdays'
+  const [duration, setDuration] = useState(0); // minutes; 0 = none
   // Save locally, and let the app resync so reminder-enabled habits reach the
   // backend cron (for closed-app push).
   useEffect(() => { saveHabits(list); onChange?.(); }, [list]);
@@ -30,7 +31,7 @@ export default function Habits({ onBack, onChange }) {
   const buildFreq = () => (FREQ_CHOICES.find((f) => f.key === freqKey) || FREQ_CHOICES[0]).build(days);
   const add = (t, em) => {
     if (!(t || '').trim()) return;
-    setList((p) => addHabit(p, t, { em, when, time, freq: buildFreq() }));
+    setList((p) => addHabit(p, t, { em, when, time, freq: buildFreq(), duration }));
     setText('');
   };
   const toggleDay = (d) => setDays((p) => (p.includes(d) ? p.filter((x) => x !== d) : [...p, d]));
@@ -56,6 +57,7 @@ export default function Habits({ onBack, onChange }) {
           const active = done || dueToday(h, now);
           const streak = streakOf(h, now);
           const parts = [scheduleLabel(h), freqLabel(h)];
+          if (h.duration > 0) parts.push(`⏳ ${formatDuration(h.duration)}`);
           if ((h.freq || {}).type === 'timesPerWeek') parts.push(`${weekProgress(h, now)}/${h.freq.n || 2} this week`);
           if (streak > 0) parts.push(`🔥 ${streak}`);
           return (
@@ -93,6 +95,22 @@ export default function Habits({ onBack, onChange }) {
               <input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Specific time (optional)"
                 style={{ background: C.bg, border: `1px solid ${time ? C.glow1 : C.border}`, borderRadius: 9, padding: '7px 10px', fontSize: 13, color: C.text, outline: 'none', colorScheme: 'dark', fontFamily: "'DM Sans',sans-serif" }} />
               {time && <button onClick={() => setTime('')} aria-label="Clear time" style={{ background: 'none', border: 'none', color: C.textDim, fontSize: 15, cursor: 'pointer' }}>×</button>}
+            </div>
+
+            {/* Duration (time allowed) */}
+            <Label>How long <span style={{ textTransform: 'none', letterSpacing: 0, color: C.textDim }}>(optional)</span></Label>
+            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 11 }}>
+              <input
+                type="number" min="0" step="5" inputMode="numeric" value={duration || ''}
+                onChange={(e) => setDuration(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                placeholder="min" aria-label="Duration in minutes"
+                style={{ width: 66, background: C.bg, border: `1px solid ${duration ? C.glow1 : C.border}`, borderRadius: 9, padding: '7px 9px', fontSize: 13, color: C.text, outline: 'none', fontFamily: "'DM Sans',sans-serif" }}
+              />
+              <span style={{ fontSize: 12, color: C.textDim, marginRight: 2 }}>min</span>
+              {[15, 30, 45, 60, 90].map((m) => (
+                <Chip key={m} on={duration === m} onClick={() => setDuration(m)}>{m >= 60 ? (m % 60 ? `${Math.floor(m / 60)}h${m % 60}` : `${m / 60}h`) : `${m}m`}</Chip>
+              ))}
+              {duration > 0 && <button onClick={() => setDuration(0)} aria-label="Clear duration" style={{ background: 'none', border: 'none', color: C.textDim, fontSize: 15, cursor: 'pointer' }}>×</button>}
             </div>
 
             {/* Recurrence */}

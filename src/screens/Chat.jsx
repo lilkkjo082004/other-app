@@ -38,7 +38,7 @@ import Recap from './Recap.jsx';
 import Journal from './Journal.jsx';
 import Goals from './Goals.jsx';
 import { goalToNudge, markNudged } from '../lib/goals.js';
-import { loadHabits, habitToRemind, remindKey, markHabitReminded } from '../lib/habits.js';
+import { loadHabits, habitToRemind, remindKey, markHabitReminded, formatDuration } from '../lib/habits.js';
 import CheckIn from './CheckIn.jsx';
 import { CHECKIN_MOODS, checkinDue, recordCheckin } from '../lib/checkin.js';
 import { makeCardBlob, shareOrDownloadCard, makeProfileCardBlob } from '../lib/card.js';
@@ -542,7 +542,8 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
       const c = awake[Math.floor(Math.random() * awake.length)];
       setTyping(c); setLoading(true);
       try {
-        const t = await proactiveCompanion(c, profFor(c), chatMode === 'group' ? 'group' : 'private', comps, msgsRef.current, 'habit', '', `${h.em} ${h.text}`);
+        const habitFocus = `${h.em} ${h.text}${h.duration ? ` for ${formatDuration(h.duration)}` : ''}`;
+        const t = await proactiveCompanion(c, profFor(c), chatMode === 'group' ? 'group' : 'private', comps, msgsRef.current, 'habit', '', habitFocus);
         if (alive) { setMsgs((p) => [...p, { role: 'assistant', companion: c, content: t, ts: Date.now() }]); if (autoSpeak && !calmEnabled()) speakAs(t, c); }
       } catch (e) { /* ignore */ }
       setTyping(null); setLoading(false);

@@ -94,6 +94,7 @@ function normalize(h) {
     when: SLOT_RANK[h.when] != null ? h.when : 'anytime',
     time: /^\d{2}:\d{2}$/.test(h.time || '') ? h.time : '',
     freq,
+    duration: Math.max(0, Math.round(Number(h.duration) || 0)),
     remind: !!h.remind,
     done,
   };
@@ -121,7 +122,8 @@ export function addHabit(list, text, opts = {}) {
   const when = SLOT_RANK[opts.when] != null ? opts.when : 'anytime';
   const time = /^\d{2}:\d{2}$/.test(opts.time || '') ? opts.time : '';
   const freq = opts.freq && typeof opts.freq === 'object' ? opts.freq : { type: 'daily' };
-  const h = { id: 'h' + Math.abs(hash(t + when + time + JSON.stringify(freq) + list.length + Date.now())), em: opts.em || '✦', text: t, when, time, freq, remind: false, done: [] };
+  const duration = Math.max(0, Math.round(Number(opts.duration) || 0));
+  const h = { id: 'h' + Math.abs(hash(t + when + time + JSON.stringify(freq) + list.length + Date.now())), em: opts.em || '✦', text: t, when, time, freq, duration, remind: false, done: [] };
   return sortHabits([...list, h]);
 }
 export function removeHabit(list, id) { return list.filter((h) => h.id !== id); }
@@ -218,6 +220,15 @@ export function freqLabel(h) {
   if (f.type === 'monthly') return 'Monthly';
   return 'Every day';
 }
+// Minutes -> "40 min" / "1 hr" / "1 hr 30 min". '' when unset.
+export function formatDuration(m) {
+  m = Math.max(0, Math.round(Number(m) || 0));
+  if (!m) return '';
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60), mm = m % 60;
+  return mm ? `${h} hr ${mm} min` : `${h} hr`;
+}
+
 export function formatTime(t) {
   const m = /^(\d{2}):(\d{2})$/.exec(t || '');
   if (!m) return t || '';
@@ -278,6 +289,7 @@ export function habitPushSpec() {
       when: raw.when || 'anytime',
       time: /^\d{2}:\d{2}$/.test(raw.time || '') ? raw.time : '',
       freq: raw.freq || { type: 'daily' },
+      duration: Math.max(0, Math.round(Number(raw.duration) || 0)),
       lastDone: done.length ? done[done.length - 1] : '',
     });
   }
