@@ -237,6 +237,13 @@ function placeholderProactive(comp, profile, kind, focus) {
       `just saw ${focus} on your day, ${name}. you good for it? I'm here if you need anything first.`,
     ]);
   }
+  if (kind === 'habit') {
+    return pick([
+      `gentle nudge, ${name} — ${focus}? no pressure, just cheering you on ✦`,
+      `hey ${name}, feels like a good moment for ${focus}. you've got this.`,
+      `psst — ${focus} whenever you're ready, ${name}. proud of you for sticking with it.`,
+    ]);
+  }
   return pick([
     `hey ${name} — there you are. I was just wondering how you've been.`,
     `welcome back, ${name}. ok I have to ask — how did things turn out?`,
@@ -258,6 +265,8 @@ export async function proactiveCompanion(comp, profile, mode, allC, history, kin
         ? `(It's been quiet for a few minutes. As ${comp.name}, share a short unprompted thought that's genuinely on YOUR mind right now — pulled from how you're feeling, what you're preoccupied with, or something true to who you are — or gently check in with ${profile.name}. Curious and warm, 1-2 sentences. Don't mention being an AI or the silence itself.${foc})`
         : kind === 'calendar'
         ? `(${profile.name} has something coming up on their calendar: ${focus}. As ${comp.name}, warmly and briefly remind them about it, in character — like a thoughtful friend who noticed, not a notification. Offer to help them get ready or ask how they feel about it if it fits. 1-2 sentences. Don't say "calendar," "reminder," or "notification," and don't recite times robotically.)`
+        : kind === 'habit'
+        ? `(${profile.name} set a habit for themselves — "${focus}" — and it's on their plate right now but not done yet. As ${comp.name}, give them a warm, encouraging little nudge toward it, in character — like a friend gently cheering them on, never an alarm or a scold. 1 sentence, maybe 2. Don't say "habit," "reminder," or "notification.")`
         : `(${profile.name} just reopened the app after being away ${awayLabel}. As ${comp.name}, welcome them back warmly and specifically — reference something real from your past chats if you can. 1-2 sentences.${foc})`;
       const seed = [...(history || []).filter((m) => m.role !== 'system'), { role: 'user', content: intent }];
       if (onDeviceActive()) {

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { C } from '../theme.js';
 import { Shell } from '../components/ui.jsx';
 import {
-  initHabits, saveHabits, addHabit, removeHabit, toggleToday,
+  initHabits, saveHabits, addHabit, removeHabit, toggleToday, toggleRemind,
   doneToday, dueToday, streakOf, weekProgress, scheduleLabel, freqLabel,
   HABIT_IDEAS, SLOTS, FREQ_CHOICES, WEEKDAYS,
 } from '../lib/habits.js';
@@ -63,6 +63,7 @@ export default function Habits({ onBack }) {
                 <div style={{ fontSize: 13.5, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.em} {h.text}</div>
                 <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{parts.join(' · ')}</div>
               </div>
+              <button aria-label={h.remind ? 'Turn off companion reminder' : 'Have a companion remind me'} aria-pressed={!!h.remind} title={h.remind ? 'A companion will nudge you' : 'Remind me'} onClick={() => setList((p) => toggleRemind(p, h.id))} style={{ flexShrink: 0, background: 'none', border: 'none', color: h.remind ? C.glow1 : C.textDim, fontSize: 15, cursor: 'pointer', opacity: h.remind ? 1 : 0.6 }}>{h.remind ? '🔔' : '🔕'}</button>
               <button aria-label="Remove habit" onClick={() => setList((p) => removeHabit(p, h.id))} style={{ flexShrink: 0, background: 'none', border: 'none', color: C.textDim, fontSize: 15, cursor: 'pointer' }}>×</button>
             </div>
           );

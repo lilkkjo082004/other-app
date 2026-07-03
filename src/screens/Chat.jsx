@@ -38,6 +38,7 @@ import Recap from './Recap.jsx';
 import Journal from './Journal.jsx';
 import Goals from './Goals.jsx';
 import { goalToNudge, markNudged } from '../lib/goals.js';
+import { loadHabits, habitToRemind, remindKey, markHabitReminded } from '../lib/habits.js';
 import CheckIn from './CheckIn.jsx';
 import { CHECKIN_MOODS, checkinDue, recordCheckin } from '../lib/checkin.js';
 import { makeCardBlob, shareOrDownloadCard, makeProfileCardBlob } from '../lib/card.js';
@@ -480,6 +481,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   // mentioned at most once (lib/reminders.js), and never during a focus session
   // or while the tab is hidden.
   const remindBusyRef = useRef(false);
+  const habitBusyRef = useRef(false);
   const calEvents = () => {
     const out = [];
     for (const e of upcoming) { const t = Date.parse(e.when); if (t) out.push({ title: e.title, when: t, allDay: e.allDay }); }
@@ -520,6 +522,37 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
     return () => { alive = false; clearTimeout(first); clearInterval(iv); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [upcoming, comps, chatMode]);
+
+  // Habit reminders (opt-in per habit): when a reminded habit is due and its
+  // time has arrived, a companion gives a gentle in-chat nudge — at most once
+  // per habit per day. Same posture as the calendar/goal nudges above.
+  useEffect(() => {
+    let alive = true;
+    async function check() {
+      if (!alive || habitBusyRef.current || loadingRef.current) return;
+      if (focusRef.current && Date.now() < focusRef.current) return; // quiet during focus
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+      const awake = comps.filter((c) => c.status === 'awake');
+      if (!awake.length) return;
+      const now = Date.now();
+      const h = habitToRemind(loadHabits(), now);
+      if (!h) return;
+      habitBusyRef.current = true;
+      markHabitReminded(remindKey(h, now), now);
+      const c = awake[Math.floor(Math.random() * awake.length)];
+      setTyping(c); setLoading(true);
+      try {
+        const t = await proactiveCompanion(c, profFor(c), chatMode === 'group' ? 'group' : 'private', comps, msgsRef.current, 'habit', '', `${h.em} ${h.text}`);
+        if (alive) { setMsgs((p) => [...p, { role: 'assistant', companion: c, content: t, ts: Date.now() }]); if (autoSpeak && !calmEnabled()) speakAs(t, c); }
+      } catch (e) { /* ignore */ }
+      setTyping(null); setLoading(false);
+      habitBusyRef.current = false;
+    }
+    const first = setTimeout(check, 12000);
+    const iv = setInterval(check, 5 * 60 * 1000);
+    return () => { alive = false; clearTimeout(first); clearInterval(iv); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comps, chatMode]);
 
   // Best-effort local weather (on-device coords -> Open-Meteo) for grounding.
   useEffect(() => {

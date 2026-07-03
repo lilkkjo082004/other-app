@@ -94,6 +94,7 @@ function normalize(h) {
     when: SLOT_RANK[h.when] != null ? h.when : 'anytime',
     time: /^\d{2}:\d{2}$/.test(h.time || '') ? h.time : '',
     freq,
+    remind: !!h.remind,
     done,
   };
 }
@@ -120,10 +121,15 @@ export function addHabit(list, text, opts = {}) {
   const when = SLOT_RANK[opts.when] != null ? opts.when : 'anytime';
   const time = /^\d{2}:\d{2}$/.test(opts.time || '') ? opts.time : '';
   const freq = opts.freq && typeof opts.freq === 'object' ? opts.freq : { type: 'daily' };
-  const h = { id: 'h' + Math.abs(hash(t + when + time + JSON.stringify(freq) + list.length + Date.now())), em: opts.em || '✦', text: t, when, time, freq, done: [] };
+  const h = { id: 'h' + Math.abs(hash(t + when + time + JSON.stringify(freq) + list.length + Date.now())), em: opts.em || '✦', text: t, when, time, freq, remind: false, done: [] };
   return sortHabits([...list, h]);
 }
 export function removeHabit(list, id) { return list.filter((h) => h.id !== id); }
+
+// Turn a companion's gentle reminder for a habit on/off.
+export function toggleRemind(list, id) {
+  return list.map((h) => (h.id === id ? { ...h, remind: !h.remind } : h));
+}
 
 // Toggle today's completion (adds/removes today's dayKey in the log).
 export function toggleToday(list, id, now = Date.now()) {
@@ -227,5 +233,47 @@ function sortMinutes(h) {
   return SLOT_MINUTES[h.when] ?? SLOT_MINUTES.anytime;
 }
 export function sortHabits(list) { return [...list].sort((a, b) => sortMinutes(a) - sortMinutes(b)); }
+
+// ── Companion reminders (opt-in per habit) ───────────────────────────────────
+// A device-local, once-per-day-per-habit dedup so a companion nudges at most
+// once for a given habit each day.
+const REMIND_KEY = 'other_habit_reminded';
+export const remindKey = (h, now = Date.now()) => `${dayKey(now)}:${h.id}`;
+export function loadHabitReminded() {
+  try { return JSON.parse(localStorage.getItem(REMIND_KEY)) || {}; } catch (e) { return {}; }
+}
+export function markHabitReminded(key, now = Date.now()) {
+  try {
+    const m = loadHabitReminded();
+    m[key] = now;
+    const cut = now - 2 * DAY;
+    for (const k of Object.keys(m)) if (m[k] < cut) delete m[k]; // prune
+    localStorage.setItem(REMIND_KEY, JSON.stringify(m));
+  } catch (e) { /* ignore */ }
+}
+
+// Has the habit's time arrived today? Specific time wins; else a per-slot start
+// (local wall-clock, so it matches how the user set it).
+function pastScheduledTime(h, now) {
+  const d = new Date(now);
+  const mins = d.getHours() * 60 + d.getMinutes();
+  if (/^\d{2}:\d{2}$/.test(h.time || '')) { const [hh, mm] = h.time.split(':').map(Number); return mins >= hh * 60 + mm; }
+  const start = { morning: 6 * 60, afternoon: 12 * 60, evening: 18 * 60, anytime: 9 * 60 };
+  return mins >= (start[h.when] ?? 9 * 60);
+}
+
+// The first habit worth a companion nudge right now: reminders on, scheduled
+// today and not yet done, its time has arrived, and not already nudged today.
+export function habitToRemind(list, now = Date.now()) {
+  const reminded = loadHabitReminded();
+  for (const h of list || []) {
+    if (!h.remind) continue;
+    if (!dueToday(h, now)) continue;
+    if (!pastScheduledTime(h, now)) continue;
+    if (reminded[remindKey(h, now)]) continue;
+    return h;
+  }
+  return null;
+}
 
 function hash(s) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; }

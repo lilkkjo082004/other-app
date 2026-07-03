@@ -201,6 +201,17 @@ console.log('habits');
   const wid = wk[0].id;
   wk = habits.toggleToday(habits.toggleToday(wk, wid, now - 7 * DAY), wid, now);
   ok(habits.streakOf(wk.find((x) => x.id === wid), now) === 2, 'weekly streak counts consecutive weeks');
+
+  // opt-in companion reminders
+  let rl = habits.addHabit([], 'Meditate', { time: '00:00' }); // time already passed
+  const rid = rl[0].id;
+  ok(rl[0].remind === false && habits.habitToRemind(rl, now) === null, 'no reminder while the toggle is off');
+  rl = habits.toggleRemind(rl, rid);
+  ok(rl[0].remind === true, 'toggleRemind turns the reminder on');
+  const picked = habits.habitToRemind(rl, now);
+  ok(picked && picked.id === rid, 'a reminded, due, past-its-time habit is picked to nudge');
+  habits.markHabitReminded(habits.remindKey(picked, now), now);
+  ok(habits.habitToRemind(rl, now) === null, 'the same habit is not nudged twice in a day');
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);
