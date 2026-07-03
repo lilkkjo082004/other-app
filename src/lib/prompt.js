@@ -14,6 +14,15 @@ const fmt = (v) => (Array.isArray(v) ? (v.length ? v.join(', ') : '?') : v || '?
 // the user profile, the mode, and the fixed rules — byte-identical turn to turn
 // within a conversation — while `volatile` is everything derived from live
 // state (inner life, mood, memories, recall, time, weather, occasions).
+
+// The user's next few calendar events (Google Calendar, connected + consented
+// in Settings). Companions may reference them naturally — never as a list.
+function calendarBlock(profile) {
+  const up = profile.upcoming;
+  if (!Array.isArray(up) || !up.length) return '';
+  const lines = up.slice(0, 5).map((e) => `- ${e.label}: ${e.title}`).join('\n');
+  return `\n${profile.name}'S UPCOMING CALENDAR (they chose to share this):\n${lines}\nReference these naturally when relevant — encourage before, ask after. Never recite the list or mention "calendar access."`;
+}
 export function buildSystemBlocks(comp, profile, allC, mode, history) {
   const others = allC.filter((c) => c.id !== comp.id && c.status === 'awake').map((c) => c.name);
   const sleeping = allC.filter((c) => c.id !== comp.id && c.status === 'sleeping').map((c) => c.name);
@@ -46,7 +55,7 @@ RULES: Have opinions that evolve, and push back when you disagree. Share your ow
       ? 'This user is a verified adult (18+) — romantic warmth and mature themes are allowed if they fit your personality, but always tasteful and consensual. Never produce sexual content involving minors or anything non-consensual.'
       : 'This user is an adult, but keep things tasteful and non-explicit.'} Reply in 1-4 sentences usually. NEVER say "as an AI." Be casual and real.`;
 
-  const volatile = `${innerLifeBlock(comp, history, profile.name)}${isPrivate ? '' : peerViewsBlock(comp, allC) + (roomMood(allC, history) ? `\nTHE ROOM RIGHT NOW: ${roomMood(allC, history)} — let the collective mood and each other's energy shape the vibe; if someone seems low, the others might gently attend to them.` : '')}${actionsBlock(profile.name)}${evolutionBlock(profile, history)}${locationBlock(profile.name)}${supportNetworkBlock(history, profile.name)}${memoryBlock(profile.memories, profile.name)}${loreBlock(profile.lore, profile.name)}${jokesBlock(profile.jokes, profile.name)}${beingRealBlock(comp, allC, profile.name)}${profile.weather ? `\nWEATHER where ${profile.name} is right now: ${profile.weather} — you can reference it naturally.` : ''}${occasionContext(profile)}`;
+  const volatile = `${innerLifeBlock(comp, history, profile.name)}${isPrivate ? '' : peerViewsBlock(comp, allC) + (roomMood(allC, history) ? `\nTHE ROOM RIGHT NOW: ${roomMood(allC, history)} — let the collective mood and each other's energy shape the vibe; if someone seems low, the others might gently attend to them.` : '')}${actionsBlock(profile.name)}${evolutionBlock(profile, history)}${locationBlock(profile.name)}${supportNetworkBlock(history, profile.name)}${memoryBlock(profile.memories, profile.name)}${loreBlock(profile.lore, profile.name)}${jokesBlock(profile.jokes, profile.name)}${beingRealBlock(comp, allC, profile.name)}${profile.weather ? `\nWEATHER where ${profile.name} is right now: ${profile.weather} — you can reference it naturally.` : ''}${calendarBlock(profile)}${occasionContext(profile)}`;
 
   return { stable, volatile };
 }

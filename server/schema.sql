@@ -56,3 +56,12 @@ CREATE TABLE IF NOT EXISTS entitlements (
   expires_at INTEGER NOT NULL DEFAULT 0,
   updated_at INTEGER NOT NULL
 );
+
+-- Calendar subscription feed tokens (one per user). The token gates the public
+-- /calendar.ics feed URL that Apple/Google/Outlook subscribe to (webcal://).
+CREATE TABLE IF NOT EXISTS cal_tokens (
+  user_id    TEXT PRIMARY KEY,
+  token      TEXT NOT NULL UNIQUE,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_cal_token ON cal_tokens (token);

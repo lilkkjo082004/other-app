@@ -66,6 +66,13 @@ export async function moodSummary() {
   return call('/mood/summary');
 }
 
+// Mint (or fetch the existing) tokenized calendar-subscription feed URL for
+// this account — Apple/Google Calendar can subscribe to it and see companion
+// events, birthdays, and anniversaries. Returns { token, url }.
+export async function enableCalendarFeed() {
+  return call('/calendar/enable', { method: 'POST' });
+}
+
 // Current subscription entitlement for the signed-in user. Free for everyone
 // when not signed in / no backend; never throws (best-effort).
 export async function fetchEntitlement() {

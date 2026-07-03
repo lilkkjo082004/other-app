@@ -52,6 +52,7 @@ import Timeline from './Timeline.jsx';
 import Cowork from './Cowork.jsx';
 import Home from './Home.jsx';
 import ChatInput from '../components/ChatInput.jsx';
+import { googleConnected, listUpcoming, insertEvent, upcomingLabel } from '../lib/gcal.js';
 import WakingUp from './WakingUp.jsx';
 
 export default function Chat({ companions: init, profile, trialStart, restored, onPersist, onReset, onUpdateProfile, storageWarn, onDismissStorageWarn, cloud, authed, email, onSignIn, onSignOut }) {
@@ -98,6 +99,8 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   const [showPaywall, setShowPaywall] = useState(false);
   const photoInputRef = useRef(null);
   const [weather, setWeather] = useState('');
+  const [upcoming, setUpcoming] = useState([]);      // Google Calendar events (consented)
+  const [gcalAdded, setGcalAdded] = useState({});    // msg ts -> 'ok' | 'err' (action-card one-tap add)
   const [ambientArriving, setAmbientArriving] = useState(false);
   // Coordinator: at most one companion-initiated "emotional beat" (milestone,
   // vulnerability, rupture/repair, birthday/anniversary, curiosity) per open,
@@ -169,7 +172,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
 
   // A companion's own memory rides along on `profile` so its prompt/AI call
   // sees only what *it* remembers about the user.
-  const profFor = (c) => ({ ...profile, memories: memOf(c.id), lore, jokes, weather });
+  const profFor = (c) => ({ ...profile, memories: memOf(c.id), lore, jokes, weather, upcoming });
 
   // Find a companion sitting on a past event they haven't followed up on yet,
   // so they can proactively ask how it went. Picks the most recent such event.
@@ -473,6 +476,14 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
   useEffect(() => {
     let alive = true;
     (async () => { try { const w = await weatherNow(); if (alive && w) setWeather(w); } catch (e) { /* ignore */ } })();
+    // Upcoming Google Calendar events (only if connected + sharing enabled).
+    (async () => {
+      try {
+        if (!googleConnected()) return;
+        const ev = await listUpcoming();
+        if (alive && ev.length) setUpcoming(ev.map((e) => ({ ...e, label: upcomingLabel(e) })));
+      } catch (e) { /* ignore */ }
+    })();
     return () => { alive = false; };
   }, []);
 
@@ -1614,8 +1625,16 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
                     <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text }}>{actionTitle(m.action)}</div>
                     <div style={{ fontSize: 11.5, color: C.textSoft, marginTop: 1 }}>{formatWhen(m.action)}</div>
                     <div style={{ display: 'flex', gap: 8, marginTop: 9 }}>
-                      <button onClick={() => downloadICS(m.action)} style={{ flex: 1, padding: '7px 0', borderRadius: 8, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", fontSize: 12, fontWeight: 600, background: `${C.glow1}22`, border: `1px solid ${C.glow1}`, color: C.glow1 }}>Add to calendar</button>
-                      <a href={googleCalUrl(m.action)} target="_blank" rel="noreferrer" style={{ padding: '7px 12px', borderRadius: 8, fontFamily: "'DM Sans',sans-serif", fontSize: 12, fontWeight: 600, background: 'transparent', border: `1px solid ${C.border}`, color: C.textSoft, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>Google</a>
+                      {googleConnected() ? (
+                        <button disabled={gcalAdded[m.ts] === 'ok'} onClick={async () => { try { await insertEvent(m.action); setGcalAdded((p) => ({ ...p, [m.ts]: 'ok' })); } catch (e) { setGcalAdded((p) => ({ ...p, [m.ts]: 'err' })); } }} style={{ flex: 1, padding: '7px 0', borderRadius: 8, cursor: gcalAdded[m.ts] === 'ok' ? 'default' : 'pointer', fontFamily: "'DM Sans',sans-serif", fontSize: 12, fontWeight: 600, background: gcalAdded[m.ts] === 'ok' ? `${C.glow3}22` : `${C.glow1}22`, border: `1px solid ${gcalAdded[m.ts] === 'ok' ? C.glow3 : C.glow1}`, color: gcalAdded[m.ts] === 'ok' ? C.glow3 : C.glow1 }}>{gcalAdded[m.ts] === 'ok' ? '✓ Added to Google' : (gcalAdded[m.ts] === 'err' ? 'Retry Google add' : 'Add to Google Calendar')}</button>
+                      ) : (
+                        <button onClick={() => downloadICS(m.action)} style={{ flex: 1, padding: '7px 0', borderRadius: 8, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", fontSize: 12, fontWeight: 600, background: `${C.glow1}22`, border: `1px solid ${C.glow1}`, color: C.glow1 }}>Add to calendar</button>
+                      )}
+                      {googleConnected() ? (
+                        <button onClick={() => downloadICS(m.action)} title="Apple Calendar / Outlook (.ics)" style={{ padding: '7px 12px', borderRadius: 8, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", fontSize: 12, fontWeight: 600, background: 'transparent', border: `1px solid ${C.border}`, color: C.textSoft }}> Apple</button>
+                      ) : (
+                        <a href={googleCalUrl(m.action)} target="_blank" rel="noreferrer" style={{ padding: '7px 12px', borderRadius: 8, fontFamily: "'DM Sans',sans-serif", fontSize: 12, fontWeight: 600, background: 'transparent', border: `1px solid ${C.border}`, color: C.textSoft, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>Google</a>
+                      )}
                     </div>
                   </div>
                 )}

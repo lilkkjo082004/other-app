@@ -5,7 +5,8 @@ import { cap } from '../lib/zodiac.js';
 import { trialDaysLeft } from '../lib/entitlements.js';
 import { pushConfigured, pushSupported, isSubscribed, enablePush, disablePush, testPush, localNotify } from '../lib/push.js';
 import { locationSupported, locationEnabled, locationLabel, requestLocation, setLabel, clearLocation, getFavPlaces, addCurrentAsFavorite, removeFavPlace } from '../lib/location.js';
-import { deleteAccount, fetchEntitlement } from '../lib/api.js';
+import { deleteAccount, fetchEntitlement, enableCalendarFeed } from '../lib/api.js';
+import { googleCalendarConfigured, googleConnected, connectGoogle, disconnectGoogle, shareWithCompanions, setShareWithCompanions } from '../lib/gcal.js';
 import { MANAGE_URL } from '../config.js';
 import { onDeviceSupported, onDeviceEnabled, setOnDeviceEnabled, preloadEngine, setProgressHandler, ON_DEVICE_LABEL } from '../lib/ondevice.js';
 import { calmEnabled, setCalm } from '../lib/comfort.js';
@@ -104,6 +105,38 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
     catch (e) { result = { ok: false, message: String(e.message || e) }; }
     setPushTest({ ...result, local });
     setTestBusy(false);
+  }
+
+  // Calendar: Google (browser OAuth) + Apple (webcal subscription feed).
+  const [gcalOn, setGcalOn] = useState(googleConnected());
+  const [gcalShare, setGcalShare] = useState(shareWithCompanions());
+  const [gcalBusy, setGcalBusy] = useState(false);
+  const [gcalErr, setGcalErr] = useState(null);
+  async function toggleGoogle() {
+    if (gcalBusy) return;
+    setGcalErr(null);
+    if (gcalOn) { disconnectGoogle(); setGcalOn(false); return; }
+    setGcalBusy(true);
+    try { await connectGoogle(); setGcalOn(true); }
+    catch (e) { setGcalErr('Google sign-in was cancelled or failed.'); }
+    setGcalBusy(false);
+  }
+  const toggleGcalShare = () => { const v = !gcalShare; setShareWithCompanions(v); setGcalShare(v); };
+  const [feedUrl, setFeedUrl] = useState(null);   // https URL from the backend
+  const [feedBusy, setFeedBusy] = useState(false);
+  const [feedErr, setFeedErr] = useState(null);
+  const [feedCopied, setFeedCopied] = useState(false);
+  const webcalUrl = feedUrl ? feedUrl.replace(/^https?:/, 'webcal:') : '';
+  async function getFeed() {
+    if (feedBusy) return;
+    setFeedErr(null); setFeedBusy(true);
+    try { const d = await enableCalendarFeed(); setFeedUrl(d.url); }
+    catch (e) { setFeedErr(String(e.message || e)); }
+    setFeedBusy(false);
+  }
+  async function copyFeed() {
+    try { await navigator.clipboard.writeText(webcalUrl); setFeedCopied(true); setTimeout(() => setFeedCopied(false), 1600); }
+    catch (e) { setFeedErr('Couldn’t copy — long-press the link instead.'); }
   }
 
   const [locOn, setLocOn] = useState(locationEnabled());
@@ -413,6 +446,59 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
               </div>
             ) : <div style={{ fontSize: 11, color: C.textDim, marginTop: 8 }}>This device can't access location.</div>}
             {favErr && <div style={{ fontSize: 11, color: C.danger, marginTop: 8 }}>{favErr}</div>}
+          </div>
+        )}
+
+        <div style={{ height: 10 }} />
+        {section('Calendar')}
+        {googleCalendarConfigured() ? (
+          <div style={{ ...card }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13 }}>Google Calendar</div>
+                <div style={{ fontSize: 11, color: C.textDim, lineHeight: 1.5 }}>{gcalOn ? 'Connected — companion plans can be added with one tap.' : 'Connect to add companion plans & reminders with one tap.'}</div>
+              </div>
+              {gcalOn
+                ? <button onClick={toggleGoogle} style={{ background: 'none', border: 'none', color: C.danger, fontSize: 12, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif", whiteSpace: 'nowrap' }}>Disconnect</button>
+                : <button className="bp" onClick={toggleGoogle} disabled={gcalBusy} style={{ padding: '8px 16px', fontSize: 12, whiteSpace: 'nowrap' }}>{gcalBusy ? 'Connecting…' : 'Connect'}</button>}
+            </div>
+            {gcalErr && <div style={{ fontSize: 11, color: C.danger, marginTop: 8 }}>{gcalErr}</div>}
+            {gcalOn && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13 }}>Companions can see upcoming events</div>
+                  <div style={{ fontSize: 11, color: C.textDim, lineHeight: 1.5 }}>Your next few events (titles & times only) so they can ask about your day. Read on this device, never stored on our servers.</div>
+                </div>
+                <Toggle on={gcalShare} onClick={toggleGcalShare} label="Companions can see upcoming events" />
+              </div>
+            )}
+          </div>
+        ) : (
+          <div style={{ ...card }}>
+            <div style={{ fontSize: 13 }}>Google Calendar</div>
+            <div style={{ fontSize: 11, color: C.textDim, lineHeight: 1.5, marginTop: 2 }}>Not available on this build yet — companion event cards still offer a Google Calendar link and .ics files that open in any calendar app.</div>
+          </div>
+        )}
+        {cloud && authed ? (
+          <div style={{ ...card }}>
+            <div style={{ fontSize: 13 }}>Apple Calendar & others</div>
+            <div style={{ fontSize: 11, color: C.textDim, lineHeight: 1.5, marginTop: 2 }}>Subscribe to your Other feed — companion plans, your birthday, and companion anniversaries appear automatically in Apple Calendar, Google Calendar, or Outlook.</div>
+            {feedUrl ? (
+              <div style={{ marginTop: 10 }}>
+                <a href={webcalUrl} style={{ display: 'inline-block', padding: '8px 16px', borderRadius: 9, background: `${C.glow1}22`, border: `1px solid ${C.glow1}`, color: C.glow1, fontSize: 12.5, fontWeight: 600, textDecoration: 'none' }}>Open in calendar app</a>
+                <button onClick={copyFeed} style={{ marginLeft: 10, background: 'none', border: 'none', color: feedCopied ? C.glow3 : C.textSoft, fontSize: 12, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>{feedCopied ? '✓ Copied' : 'Copy link'}</button>
+                <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 8, wordBreak: 'break-all', lineHeight: 1.5 }}>{webcalUrl}</div>
+                <div style={{ fontSize: 11, color: C.textDim, marginTop: 6, lineHeight: 1.5 }}>On iPhone: tap the button above. Elsewhere: paste the link into “Add calendar → From URL.” Anyone with this link can see the feed — keep it private.</div>
+              </div>
+            ) : (
+              <button onClick={getFeed} disabled={feedBusy} style={{ marginTop: 10, padding: '8px 16px', borderRadius: 9, background: 'transparent', border: `1px solid ${C.glow1}`, color: C.glow1, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>{feedBusy ? 'Setting up…' : 'Get my calendar link'}</button>
+            )}
+            {feedErr && <div style={{ fontSize: 11, color: C.danger, marginTop: 8 }}>{feedErr}</div>}
+          </div>
+        ) : (
+          <div style={{ ...card }}>
+            <div style={{ fontSize: 13 }}>Apple Calendar & others</div>
+            <div style={{ fontSize: 11, color: C.textDim, lineHeight: 1.5, marginTop: 2 }}>{cloud ? 'Sign in to get a personal calendar feed you can subscribe to in Apple Calendar. ' : ''}Companion event cards always offer .ics files that open in any calendar app.</div>
           </div>
         )}
 

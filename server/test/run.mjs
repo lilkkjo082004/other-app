@@ -185,6 +185,41 @@ console.log('subscriptions');
   ok(e.data.tier === 'free' && !e.data.active, 'expiration webhook downgrades to free');
 }
 
+console.log('calendar feed');
+{
+  const env2 = { store: (await import('../src/store-memory.js')).memoryStore(), SECRET: 'test-secret', ALLOWED_ORIGIN: '*' };
+  const call2 = async (method, path, { token, body: b } = {}) => {
+    const headers = {};
+    if (b) headers['content-type'] = 'application/json';
+    if (token) headers.authorization = 'Bearer ' + token;
+    const res = await handle(new Request('http://api' + path, { method, headers, body: b ? JSON.stringify(b) : undefined }), env2);
+    return res;
+  };
+  const su = await (await call2('POST', '/auth/signup', { body: { email: 'cal@other.app', password: 'hunter2pw' } })).json();
+  // seed a state with an action, a dob, and a companion
+  const future = new Date(Date.now() + 3 * 86400000).toISOString();
+  await call2('PUT', '/state', { token: su.token, body: { state: {
+    profile: { name: 'Sam', dob: '1995-08-05' },
+    companions: [{ id: 'c1', name: 'Coral', status: 'awake', bornAt: Date.parse('2026-05-01') }],
+    messages: [{ role: 'assistant', content: 'ok!', action: { type: 'calendar', title: 'Dentist', start: future } }],
+  } } });
+  const en = await (await call2('POST', '/calendar/enable', { token: su.token })).json();
+  ok(!!en.token && en.url.includes('/calendar.ics?t='), 'enable returns a tokenized feed URL');
+  const en2 = await (await call2('POST', '/calendar/enable', { token: su.token })).json();
+  ok(en2.token === en.token, 'enable is idempotent (same token)');
+  const feedRes = await call2('GET', '/calendar.ics?t=' + en.token, {});
+  const feed = await feedRes.text();
+  ok(feedRes.status === 200 && feedRes.headers.get('content-type').includes('text/calendar'), 'feed serves text/calendar');
+  ok(feed.includes('BEGIN:VCALENDAR') && feed.includes('END:VCALENDAR'), 'feed is a VCALENDAR');
+  ok(feed.includes('SUMMARY:Dentist'), 'feed contains the companion-created event');
+  ok(feed.includes("Sam's birthday") && feed.includes('RRULE:FREQ=YEARLY'), 'feed contains the yearly birthday');
+  ok(feed.includes('Anniversary with Coral'), 'feed contains the companion anniversary');
+  const bad = await call2('GET', '/calendar.ics?t=wrongtoken', {});
+  ok(bad.status === 404, 'wrong token is 404');
+  const noauth = await call2('POST', '/calendar/enable', {});
+  ok(noauth.status === 401, 'enable requires auth');
+}
+
 console.log('photo moments (billing off)');
 {
   // With no BILLING_WEBHOOK_SECRET configured (keyless/dev), photos stay open.

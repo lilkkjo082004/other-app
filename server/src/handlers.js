@@ -80,6 +80,32 @@ export async function handle(request, env) {
     if (p === '/tts' && request.method === 'POST') return tts(request, env);
     if (p === '/billing/webhook' && request.method === 'POST') return billingWebhook(request, env);
 
+    // Calendar subscription feed (Apple Calendar / Outlook / Google via URL).
+    // enable: mint (or return) this user's tokenized feed URL. The feed itself
+    // is public-by-token so calendar apps can poll it without auth headers.
+    if (p === '/calendar/enable' && request.method === 'POST') {
+      const uid = await authUid(request, env);
+      if (!uid) return json({ error: 'unauthorized' }, 401, env);
+      if (!env.store.getCalToken) return json({ error: 'not supported' }, 501, env);
+      let token = await env.store.getCalToken(uid);
+      if (!token) {
+        token = [...crypto.getRandomValues(new Uint8Array(18))].map((b) => b.toString(16).padStart(2, '0')).join('');
+        await env.store.setCalToken(uid, token);
+      }
+      const base = new URL(request.url).origin;
+      return json({ token, url: `${base}/calendar.ics?t=${token}` }, 200, env);
+    }
+    if (p === '/calendar.ics' && request.method === 'GET') {
+      const token = new URL(request.url).searchParams.get('t') || '';
+      const uid = token && env.store.getUserIdByCalToken ? await env.store.getUserIdByCalToken(token) : null;
+      if (!uid) return json({ error: 'not found' }, 404, env);
+      const r = await env.store.getState(uid);
+      let state = null;
+      try { state = r ? JSON.parse(r.blob) : null; } catch (e) { /* corrupt blob */ }
+      const body = buildCalendarFeed(state || {});
+      return new Response(body, { status: 200, headers: { ...cors(env), 'content-type': 'text/calendar; charset=utf-8', 'cache-control': 'max-age=900' } });
+    }
+
     if (p === '/entitlement' && request.method === 'GET') {
       const uid = await authUid(request, env);
       if (!uid) return json({ error: 'unauthorized' }, 401, env);
@@ -340,6 +366,57 @@ async function modelForRequest(request, env) {
 }
 
 // Claude proxy — same contract as worker/ ({model,max_tokens,system,messages} -> {text}).
+// ── Calendar feed (RFC 5545) ────────────────────────────────────────────────
+// Built from the user's synced session: companion-created events/reminders
+// (message actions), plus yearly recurrences for the user's birthday and each
+// companion's "we met" anniversary. Companion chatter never leaves the blob —
+// only titles/times of things the user explicitly asked to schedule.
+function icsEsc(v) { return String(v || '').replace(/([,;\\])/g, '\\$1').replace(/\n/g, '\\n'); }
+function icsDate(ts) {
+  const d = new Date(ts); const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}00Z`;
+}
+function buildCalendarFeed(state) {
+  const now = Date.now();
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Other//Companions//EN', 'CALSCALE:GREGORIAN',
+    'X-WR-CALNAME:Other — with your companions', 'X-WR-CALDESC:Events and reminders made with your companions in Other'];
+  const push = (uid, startTs, endTs, summary, extra = []) => {
+    lines.push('BEGIN:VEVENT', `UID:${uid}@other.app`, `DTSTAMP:${icsDate(now)}`, `DTSTART:${icsDate(startTs)}`, `DTEND:${icsDate(endTs)}`, `SUMMARY:${icsEsc(summary)}`, ...extra, 'END:VEVENT');
+  };
+  // Companion-created actions (past 30 days .. any future)
+  const seen = new Set();
+  for (const m of (state.messages || [])) {
+    const a = m && m.action;
+    if (!a || (a.type !== 'calendar' && a.type !== 'reminder')) continue;
+    const start = Date.parse(a.start || a.at || '');
+    if (!Number.isFinite(start) || start < now - 30 * 86400000) continue;
+    const uid = 'act-' + start + '-' + (a.title || a.text || '').slice(0, 20).replace(/\W+/g, '');
+    if (seen.has(uid)) continue;
+    seen.add(uid);
+    const end = a.end ? Date.parse(a.end) : start + (a.type === 'reminder' ? 30 : 60) * 60000;
+    push(uid, start, end, a.title || a.text || 'Reminder', a.notes ? [`DESCRIPTION:${icsEsc(a.notes)}`] : []);
+  }
+  // Birthday (all-day yearly)
+  const dob = state.profile && state.profile.dob;
+  if (dob && /^\d{4}-\d{2}-\d{2}$/.test(dob)) {
+    const [, mm, dd] = dob.split('-');
+    const year = new Date().getUTCFullYear();
+    lines.push('BEGIN:VEVENT', 'UID:bday@other.app', `DTSTAMP:${icsDate(now)}`,
+      `DTSTART;VALUE=DATE:${year}${mm}${dd}`, 'RRULE:FREQ=YEARLY',
+      `SUMMARY:${icsEsc((state.profile.name || 'Your') + "'s birthday ✦")}`, 'END:VEVENT');
+  }
+  // Companion anniversaries (yearly, from bornAt)
+  for (const c of (state.companions || [])) {
+    if (!c || c.status === 'deleted' || !c.bornAt) continue;
+    const b = new Date(c.bornAt); const pad = (n) => String(n).padStart(2, '0');
+    lines.push('BEGIN:VEVENT', `UID:anniv-${c.id}@other.app`, `DTSTAMP:${icsDate(now)}`,
+      `DTSTART;VALUE=DATE:${b.getUTCFullYear()}${pad(b.getUTCMonth() + 1)}${pad(b.getUTCDate())}`, 'RRULE:FREQ=YEARLY',
+      `SUMMARY:${icsEsc('Anniversary with ' + c.name + ' ♡')}`, 'END:VEVENT');
+  }
+  lines.push('END:VCALENDAR');
+  return lines.join('\r\n');
+}
+
 function hasImageContent(messages) {
   for (const m of messages || []) {
     if (Array.isArray(m?.content) && m.content.some((blk) => blk?.type === 'image')) return true;

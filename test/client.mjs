@@ -20,6 +20,7 @@ const { dailyGuidance, weeklyOutlook, companionOfDay } = await import('../src/li
 const { addRitual, toggleToday, refreshForToday } = await import('../src/lib/rituals.js');
 const { addGoal, newGoal, toggleGoal, goalToNudge, markNudged } = await import('../src/lib/goals.js');
 const { saveSession, loadSession, ARCHIVE_THRESHOLD, KEEP_RECENT } = await import('../src/lib/storage.js');
+const { buildSystemBlocks } = await import('../src/lib/prompt.js');
 
 console.log('checkin');
 {
@@ -121,6 +122,19 @@ console.log('storage archive trim');
   ok(loaded.messages[loaded.messages.length - 1].content === 'm' + (ARCHIVE_THRESHOLD + 99), 'newest message survives the trim');
   const small = saveSession({ profile: { name: 'T' }, companions: [], messages: msgs.slice(0, 10) });
   ok(small.ok && loadSession().messages.length === 10, 'short histories are stored untouched');
+}
+
+console.log('calendar prompt block');
+{
+  const comp = { id: 'c1', name: 'Coral', pronouns: 'they/them', zodiac: 'pisces', personality: 'warm', quirk: 'x', color: { name: 'x' }, colorName: 'x', status: 'awake', apparentAge: 'peer' };
+  const base = { name: 'Sam', ageGroup: 'adult' };
+  const withCal = buildSystemBlocks(comp, { ...base, upcoming: [{ label: 'Tue Jul 7, 3:00 PM', title: 'Dentist' }] }, [comp], 'c1', []);
+  ok(withCal.volatile.includes("SAM'S UPCOMING CALENDAR".replace('SAM', 'Sam')) && withCal.volatile.includes('Dentist'), 'shared events appear in the volatile prompt block');
+  ok(withCal.volatile.includes('Never recite the list'), 'companions are told not to recite the calendar');
+  const noCal = buildSystemBlocks(comp, base, [comp], 'c1', []);
+  ok(!noCal.volatile.includes('UPCOMING CALENDAR'), 'no calendar block when nothing is shared');
+  const empty = buildSystemBlocks(comp, { ...base, upcoming: [] }, [comp], 'c1', []);
+  ok(!empty.volatile.includes('UPCOMING CALENDAR'), 'empty upcoming list adds nothing');
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

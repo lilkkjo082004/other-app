@@ -4,6 +4,20 @@ export function d1Store(DB) {
     async getUserByEmail(email) {
       return await DB.prepare('SELECT id, email, pw_hash, pw_salt FROM users WHERE email = ?').bind(email).first();
     },
+    async setCalToken(uid, token) {
+      await DB.prepare(
+        'INSERT INTO cal_tokens (user_id, token, created_at) VALUES (?, ?, ?) ' +
+        'ON CONFLICT(user_id) DO UPDATE SET token = excluded.token'
+      ).bind(uid, token, Date.now()).run();
+    },
+    async getCalToken(uid) {
+      const r = await DB.prepare('SELECT token FROM cal_tokens WHERE user_id = ?').bind(uid).first();
+      return r ? r.token : null;
+    },
+    async getUserIdByCalToken(token) {
+      const r = await DB.prepare('SELECT user_id FROM cal_tokens WHERE token = ?').bind(token).first();
+      return r ? r.user_id : null;
+    },
     async createUser(email, hash, salt) {
       const id = 'u_' + crypto.randomUUID();
       await DB.prepare('INSERT INTO users (id, email, pw_hash, pw_salt, created_at) VALUES (?, ?, ?, ?, ?)')

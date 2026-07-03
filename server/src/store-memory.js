@@ -7,11 +7,22 @@ export function memoryStore() {
   const pushSubs = new Map(); // endpoint -> sub
   const rl = new Map(); // rate-limit key -> { count, windowStart }
   const entitlements = new Map(); // uid -> entitlement
+  const calTokens = new Map(); // uid -> token
   let seq = 1;
 
   return {
     async getUserByEmail(email) {
       return usersByEmail.get(email) || null;
+    },
+    async setCalToken(uid, token) {
+      calTokens.set(uid, token);
+    },
+    async getCalToken(uid) {
+      return calTokens.get(uid) || null;
+    },
+    async getUserIdByCalToken(token) {
+      for (const [uid, t] of calTokens) if (t === token) return uid;
+      return null;
     },
     async createUser(email, hash, salt) {
       const user = { id: 'u_' + seq++, email, pw_hash: hash, pw_salt: salt };

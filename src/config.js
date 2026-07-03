@@ -32,4 +32,9 @@ export const naturalVoiceEnabled = () => NATURAL_VOICE && ttsEndpoint().length >
 export const CHECKOUT_URL = import.meta.env.VITE_CHECKOUT_URL || '';
 export const MANAGE_URL = import.meta.env.VITE_MANAGE_URL || '';
 export const PLUS_PRICE = import.meta.env.VITE_PLUS_PRICE || '$9.99/mo';
+
+// Google Calendar OAuth client id (Google Cloud Console -> Credentials ->
+// OAuth client, type "Web application", with the app's origin authorized).
+// Without it the Calendar section shows a not-configured note.
+export const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 export const billingEnabled = () => CHECKOUT_URL.length > 0;
