@@ -35,6 +35,7 @@ Companion Gen,Renaming later,"User can rename a companion anytime (profile ✎);
 Companion Gen,Self-pronouns,Companions choose he/she/they,Built,P0,
 Companion Gen,Color identity,Distinct color per companion,Built,P0,8-color palette
 Companion Gen,Companion selection,Choose 1 (free) or all 3 (trial),Built,P0,
+Companion Gen,Edit at first meeting,"Rename + set pronouns on each generated companion before selecting (inline editor on the selection screen)",Built,P1,NEW; screens/CompanionSelect.jsx inline edit; edits flow to onSelect
 Companion Gen,"""Older"" presentation",Companions present as older for 18+,Built,P1,UPDATED Future->Built; apparentAge in companions.js
 Builder Traits,Demeanor / Energy / Humor / Depth / Social,Personality trait seeds,Built,P0,
 Builder Traits,Romantic energy,Slow burn etc.,Built,P0,Filtered for under 18
@@ -42,6 +43,7 @@ Builder Traits,Protectiveness / Communication / Archetype / Interest,Relationshi
 Chat System,Group chat,All awake companions participate,Built,P0,
 Chat System,Private one-on-one,Truly private from other companions,Built,P0,
 Chat System,Companion-initiated chat,Returning welcome + unprompted idle thoughts,Built,P1,UPDATED Future->Built; NEW proactive
+Chat System,Onboarding memory in prompt,"Companions carry the user's onboarding answers as known context (humanized labels, not raw slugs) and are told not to re-ask what they already know",Built,P0,NEW; prompt.js LABELS map + 'you already KNOW' instruction
 Chat System,Proactive memory follow-ups,"Companions ask how a remembered past event went, deduped",Built,P1,"NEW; pendingFollowups/markFollowed, return + idle"
 Chat System,While-you-were-away recap,Labeled ambient catch-up divider on open,Built,P2,NEW
 Chat System,Companion disagreements,"Companions disagree, own opinions",Built,P0,

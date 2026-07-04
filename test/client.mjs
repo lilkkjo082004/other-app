@@ -124,6 +124,19 @@ console.log('calendar prompt block');
   ok(!empty.volatile.includes('UPCOMING CALENDAR'), 'empty upcoming list adds nothing');
 }
 
+console.log('profile memory prompt block');
+{
+  const comp = { id: 'c1', name: 'Coral', pronouns: 'they/them', zodiac: 'pisces', personality: 'warm', quirk: 'x', color: { name: 'x' }, colorName: 'x', status: 'awake', apparentAge: 'peer' };
+  const profile = { name: 'Sam', ageGroup: 'adult', vibe: 'calm', communication: 'direct', loveLang: 'words', needs: ['encouragement', 'fun'], activities: ['gaming', 'music'] };
+  const { stable } = buildSystemBlocks(comp, profile, [comp], 'c1', []);
+  ok(stable.includes('Calm & grounded'), 'vibe slug is humanized to its label');
+  ok(stable.includes('Words of affirmation'), 'love-language slug is humanized');
+  ok(stable.includes('Someone who cheers me on') && stable.includes('More laughter & fun'), 'multi-select need slugs are humanized');
+  ok(stable.includes('Gaming') && stable.includes('Music'), 'activity slugs are humanized');
+  ok(!/Energy: calm\b/.test(stable) && !/Love language: words\b/.test(stable), 'raw slugs no longer leak into the prompt');
+  ok(stable.includes('already KNOW') && /never re-ask/i.test(stable), 'companions are told they already know the profile and not to re-ask it');
+}
+
 console.log('calendar reminders');
 {
   const now = 1_700_000_000_000;

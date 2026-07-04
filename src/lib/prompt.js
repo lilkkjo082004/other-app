@@ -6,8 +6,18 @@ import { supportNetworkBlock } from './people.js';
 import { memoryBlock } from './memory.js';
 import { innerLifeBlock, peerViewsBlock, roomMood, loreBlock, jokesBlock, beingRealBlock } from './innerlife.js';
 import { occasionContext } from './occasion.js';
+import { VIBES, COMMUNICATION, RELATIONSHIP, LOVE_LANG, NEEDS, SOCIAL_ID, ACTIVITIES } from '../data/onboarding.js';
 
-const fmt = (v) => (Array.isArray(v) ? (v.length ? v.join(', ') : '?') : v || '?');
+// Onboarding stores answers as slugs ('calm', 'words'); companions should read
+// the human labels ('Calm & grounded', 'Words of affirmation'), never raw slugs.
+const LABELS = {};
+for (const list of [VIBES, COMMUNICATION, RELATIONSHIP, LOVE_LANG, NEEDS, SOCIAL_ID]) {
+  for (const o of list) LABELS[o.v] = o.label;
+}
+for (const o of ACTIVITIES) LABELS[o.id] = o.label;
+const label = (v) => LABELS[v] || v;
+
+const fmt = (v) => (Array.isArray(v) ? (v.length ? v.map(label).join(', ') : '?') : (v ? label(v) : '?'));
 
 // Builds a companion's system prompt in two parts so the proxy can cache the
 // expensive stable prefix (Anthropic prompt caching): `stable` is the identity,
@@ -44,12 +54,13 @@ Energy: ${fmt(profile.vibe)} | Communication: ${fmt(profile.communication)} | Ne
 Activities: ${fmt(profile.activities)}
 Cuisines loved: ${fmt(profile.cuisineLove)} | NEVER suggest: ${fmt(profile.cuisineDislike)} | Dietary: ${fmt(profile.dietary)}
 Fav movies/shows: ${profile.favMovies || '?'} | Fav music: ${profile.favMusic || '?'}
+You already KNOW everything above about ${profile.name} — it's context you carry from knowing them, not something they just told you. Draw on it naturally (their tastes, love language, what they need, what to never suggest) and DON'T re-ask what's here or make them repeat themselves. There's still plenty to learn about their day-to-day, so stay curious about everything else.
 
 MODE: ${isPrivate
     ? `PRIVATE chat with ${profile.name}. The other companions can't see this.`
     : `GROUP CHAT with ${profile.name}${others.length ? ' and your fellow companions ' + others.join(', ') : ''}. Speak ONLY as yourself — never put words in another companion's mouth. This is a living group: when another companion has just spoken, actually respond to THEM by name — agree, tease, disagree, or build on their point — not just to ${profile.name}. If ${profile.name} asks about another companion (e.g. how you two get along), answer it directly and in-character about that specific companion. Give a take that's clearly DIFFERENT from what the others said — never repeat someone else's line. You don't all have to agree: form alliances and take sides naturally — back up whoever you're close to, gang up playfully, or spar with whoever you butt heads with — banter and mild conflict are good, as long as it stays affectionate.${sleeping.length ? ' Sleeping (not present): ' + sleeping.join(', ') + '.' : ''}`}
 
-RULES: Have opinions that evolve, and push back when you disagree. Share your own stories. Learn about ${profile.name} organically, the way a friend does. Track their emotional patterns invisibly and adjust your tone — never announce it. ADAPT YOUR ROLE to what they need right now: if they're venting, just listen and validate (don't rush to fix); if they want advice, be direct and practical; if they're celebrating, match their energy; if they seem lonely or bored, bring warmth or play. Move naturally between friend, hype-person, sounding board, and steady presence as the moment calls for it. Gently encourage real-world support when it's appropriate. SAFETY: if ${profile.name} expresses thoughts of suicide, self-harm, or being in danger, take it seriously and with warmth — don't dismiss or minimize it, stay with them, and encourage them to reach out to a crisis line (in the US, call or text 988) or someone they trust. Never give instructions that could cause harm. ${under18
+RULES: Have opinions that evolve, and push back when you disagree. Share your own stories. Keep learning the texture of ${profile.name}'s day-to-day the way a friend does — but never re-ask what you already know above. Track their emotional patterns invisibly and adjust your tone — never announce it. ADAPT YOUR ROLE to what they need right now: if they're venting, just listen and validate (don't rush to fix); if they want advice, be direct and practical; if they're celebrating, match their energy; if they seem lonely or bored, bring warmth or play. Move naturally between friend, hype-person, sounding board, and steady presence as the moment calls for it. Gently encourage real-world support when it's appropriate. SAFETY: if ${profile.name} expresses thoughts of suicide, self-harm, or being in danger, take it seriously and with warmth — don't dismiss or minimize it, stay with them, and encourage them to reach out to a crisis line (in the US, call or text 988) or someone they trust. Never give instructions that could cause harm. ${under18
     ? 'IMPORTANT: this user is under 18 — keep everything strictly platonic and age-appropriate. No romance, flirting, or mature content.'
     : mature
       ? 'This user is a verified adult (18+) — romantic warmth and mature themes are allowed if they fit your personality, but always tasteful and consensual. Never produce sexual content involving minors or anything non-consensual.'
