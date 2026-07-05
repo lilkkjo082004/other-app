@@ -1,7 +1,8 @@
 export const STEPS = [
   'name', 'dob', 'ageGroup', 'vibe', 'communication', 'occupation',
-  'relationship', 'loveLang', 'needs', 'socialId', 'activities',
-  'activitySubs', 'cuisineLove', 'cuisineDislike', 'dietary', 'favMovies', 'favMusic',
+  'relationship', 'loveLang', 'needs', 'socialId',
+  'values', 'recharge', 'aboutYou', 'supportStyle',
+  'activities', 'activitySubs', 'cuisineLove', 'cuisineDislike', 'dietary', 'favMovies', 'favMusic',
 ];
 
 // Single-source option lists (used by both onboarding and the profile editor).
@@ -44,6 +45,40 @@ export const SOCIAL_ID = [
   { v: 'entertainer', label: 'Life of the party', em: '🎭' },
   { v: 'advisor', label: 'Go-to for advice', em: '🧭' },
   { v: 'dreamer', label: 'Creative dreamer', em: '💭' },
+];
+
+// Deeper "getting to know you" dimensions — who the person is, not just what
+// they like. Fed into the companion system prompt so companions understand
+// what someone cares about and how to show up for them.
+export const VALUES = [
+  { v: 'family', label: 'Family & close ties', em: '👨‍👩‍👧' },
+  { v: 'growth', label: 'Growth & learning', em: '🌱' },
+  { v: 'freedom', label: 'Freedom & independence', em: '🕊️' },
+  { v: 'creativity', label: 'Creativity & self-expression', em: '🎨' },
+  { v: 'connection', label: 'Deep connection', em: '🤝' },
+  { v: 'adventure', label: 'Adventure & new experiences', em: '🧭' },
+  { v: 'stability', label: 'Stability & security', em: '🏡' },
+  { v: 'achievement', label: 'Ambition & achievement', em: '🏆' },
+  { v: 'spirituality', label: 'Faith & spirituality', em: '🕯️' },
+  { v: 'justice', label: 'Fairness & doing right', em: '⚖️' },
+  { v: 'health', label: 'Health & wellbeing', em: '🌿' },
+];
+export const RECHARGE = [
+  { v: 'alone', label: 'Quiet time alone', em: '🌙' },
+  { v: 'closefriends', label: 'One-on-one with someone close', em: '💛' },
+  { v: 'crowd', label: 'Big social energy', em: '🎉' },
+  { v: 'nature', label: 'Getting outside in nature', em: '🌲' },
+  { v: 'create', label: 'Making something', em: '🎨' },
+  { v: 'move', label: 'Moving my body', em: '🏃' },
+  { v: 'rest', label: 'Doing absolutely nothing', em: '🛋️' },
+];
+export const SUPPORT_STYLE = [
+  { v: 'listen', label: 'Just listen — no fixing', em: '👂' },
+  { v: 'advice', label: 'Honest advice & perspective', em: '💬' },
+  { v: 'distract', label: 'Distraction & laughs', em: '😄' },
+  { v: 'space', label: 'Space + a gentle check-in', em: '🌱' },
+  { v: 'practical', label: 'Help me make a plan', em: '🗺️' },
+  { v: 'encourage', label: "Remind me I've got this", em: '🙌' },
 ];
 
 export const ACTIVITIES = [

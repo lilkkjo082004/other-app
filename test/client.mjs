@@ -127,7 +127,7 @@ console.log('calendar prompt block');
 console.log('profile memory prompt block');
 {
   const comp = { id: 'c1', name: 'Coral', pronouns: 'they/them', zodiac: 'pisces', personality: 'warm', quirk: 'x', color: { name: 'x' }, colorName: 'x', status: 'awake', apparentAge: 'peer' };
-  const profile = { name: 'Sam', ageGroup: 'adult', vibe: 'calm', communication: 'direct', loveLang: 'words', needs: ['encouragement', 'fun'], activities: ['gaming', 'music'] };
+  const profile = { name: 'Sam', ageGroup: 'adult', vibe: 'calm', communication: 'direct', loveLang: 'words', needs: ['encouragement', 'fun'], activities: ['gaming', 'music'], values: ['growth', 'family'], recharge: ['alone'], supportStyle: ['listen', 'space'], aboutYou: 'Just moved to a new city and figuring it out.' };
   const { stable } = buildSystemBlocks(comp, profile, [comp], 'c1', []);
   ok(stable.includes('Calm & grounded'), 'vibe slug is humanized to its label');
   ok(stable.includes('Words of affirmation'), 'love-language slug is humanized');
@@ -135,6 +135,14 @@ console.log('profile memory prompt block');
   ok(stable.includes('Gaming') && stable.includes('Music'), 'activity slugs are humanized');
   ok(!/Energy: calm\b/.test(stable) && !/Love language: words\b/.test(stable), 'raw slugs no longer leak into the prompt');
   ok(stable.includes('already KNOW') && /never re-ask/i.test(stable), 'companions are told they already know the profile and not to re-ask it');
+  // Deeper "getting to know you" dimensions
+  ok(stable.includes('Growth & learning') && stable.includes('Family & close ties'), 'values slugs are humanized');
+  ok(stable.includes('Quiet time alone'), 'recharge slug is humanized');
+  ok(stable.includes('Just listen') && stable.includes('Space + a gentle check-in'), 'support-style slugs are humanized');
+  ok(stable.includes('In their own words') && stable.includes('Just moved to a new city'), 'free-text aboutYou is carried into the prompt verbatim');
+  ok(/what helps them most is/.test(stable), 'stated support preference steers the role-adaptation rule');
+  const bare = buildSystemBlocks(comp, { name: 'Sam', ageGroup: 'adult' }, [comp], 'c1', []).stable;
+  ok(!bare.includes('In their own words') && !/what helps them most is/.test(bare), 'no support/aboutYou lines when those answers are absent');
 }
 
 console.log('calendar reminders');

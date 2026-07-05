@@ -9,6 +9,10 @@ Onboarding,Relationship status,Multi-select current situation,Built,P0,
 Onboarding,Love language,Multi-select love languages,Built,P0,
 Onboarding,Emotional needs,What they wish they had more of,Built,P0,
 Onboarding,Social identity,How friends describe them,Built,P0,
+Onboarding,Core values,"Multi-select: what matters most to them (family, growth, freedom, creativity, etc.)",Built,P1,NEW; deepens companion understanding; VALUES in data/onboarding.js
+Onboarding,How they recharge,"Multi-select social/energy style (alone, one-on-one, crowds, nature, moving, resting)",Built,P1,NEW; RECHARGE list
+Onboarding,In their own words,"Open free-text: what's going on in their life right now — carried into the prompt verbatim",Built,P1,NEW; aboutYou; highest-impact for feeling known
+Onboarding,Support style,"Multi-select how they want support when struggling (listen, advice, distract, space, plan, encourage) — steers role adaptation",Built,P1,NEW; SUPPORT_STYLE feeds prompt RULES
 Onboarding,Activities (15 options),Multi-select hobbies and interests,Built,P0,
 Onboarding,Activity subcategories,Drill-down genres/types per activity,Built,P0,Optional
 Onboarding,Cuisines loved,Multi-select favorite food types,Built,P0,

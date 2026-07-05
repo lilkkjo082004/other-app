@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { C } from '../theme.js';
 import { Shell, Prog, Pills, Checks } from '../components/ui.jsx';
-import { STEPS, ACTIVITIES, CUISINES, DIETARY, VIBES, COMMUNICATION, RELATIONSHIP, LOVE_LANG, NEEDS, SOCIAL_ID } from '../data/onboarding.js';
+import { STEPS, ACTIVITIES, CUISINES, DIETARY, VIBES, COMMUNICATION, RELATIONSHIP, LOVE_LANG, NEEDS, SOCIAL_ID, VALUES, RECHARGE, SUPPORT_STYLE } from '../data/onboarding.js';
 import { ageTier } from '../lib/age.js';
 
 const DRAFT_KEY = 'other_onboarding_v1';
@@ -96,6 +96,14 @@ export default function Onboarding({ onComplete }) {
   if (sid === 'needs') return W(<><Back /><Q icon="✧" q="What do you wish you had more of?" sub="Select all that resonate." /><Checks opts={NEEDS} sel={sel} onTog={tog} /><button className="bp" onClick={() => save(sel)} style={{ marginTop: 12, width: '100%' }}>{sel.length ? `Continue (${sel.length})` : 'Skip'}</button></>);
 
   if (sid === 'socialId') return W(<><Back /><Q icon="❖" q="How would your closest friend describe you?" sub="Pick all that fit." /><Checks opts={SOCIAL_ID} sel={sel} onTog={tog} /><button className="bp" onClick={() => save(sel)} style={{ marginTop: 12, width: '100%' }}>{sel.length ? `Continue (${sel.length})` : 'Skip'}</button></>);
+
+  if (sid === 'values') return W(<><Back /><Q icon="✦" q="What matters most to you?" sub="The things you'd want a close friend to just… get. Pick all that ring true." /><div style={{ maxHeight: 360, overflowY: 'auto', marginBottom: 12 }}><Checks opts={VALUES} sel={sel} onTog={tog} /></div><button className="bp" onClick={() => save(sel)} style={{ width: '100%' }}>{sel.length ? `Continue (${sel.length})` : 'Skip'}</button></>);
+
+  if (sid === 'recharge') return W(<><Back /><Q icon="🔋" q="How do you recharge?" sub="When you're drained, what fills you back up?" /><Checks opts={RECHARGE} sel={sel} onTog={tog} /><button className="bp" onClick={() => save(sel)} style={{ marginTop: 12, width: '100%' }}>{sel.length ? `Continue (${sel.length})` : 'Skip'}</button></>);
+
+  if (sid === 'aboutYou') return W(<><Back /><Q icon="💬" q="In your own words — what's going on in your life?" sub="Anything you'd want a new friend to know: what you're navigating, chasing, or carrying right now. No pressure to be polished." /><textarea autoFocus value={txt} onChange={(e) => setTxt(e.target.value)} rows={5} placeholder="I just moved to a new city and I'm figuring things out. Working toward…" style={taStyle} /><button className="bp" onClick={() => save(txt.trim() || 'not specified')} style={{ marginTop: 10, width: '100%' }}>{txt.trim() ? 'Continue' : 'Skip'}</button></>);
+
+  if (sid === 'supportStyle') return W(<><Back /><Q icon="🫶" q="When you're going through it, what helps most?" sub="So your companions know how to show up for you. Pick all that fit." /><Checks opts={SUPPORT_STYLE} sel={sel} onTog={tog} /><button className="bp" onClick={() => save(sel)} style={{ marginTop: 12, width: '100%' }}>{sel.length ? `Continue (${sel.length})` : 'Skip'}</button></>);
 
   if (sid === 'activities') return W(<><Back /><Q icon="🎯" q="What do you like to do?" sub="Pick all your activities and hobbies." /><div style={{ maxHeight: 360, overflowY: 'auto', marginBottom: 12 }}><Checks opts={ACTIVITIES.map((a) => ({ v: a.id, label: a.label, em: a.em }))} sel={sel} onTog={tog} /></div><button className="bp" onClick={() => save(sel)} style={{ width: '100%' }}>{sel.length ? `Continue (${sel.length})` : 'Skip'}</button></>);
 
