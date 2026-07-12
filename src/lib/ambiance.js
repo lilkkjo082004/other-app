@@ -1,9 +1,11 @@
-// Ambiance packs — gentle ambient soundscapes for The Space. The built-ins are
-// synthesized live with the Web Audio API (no files, no network): layered
-// stereo noise beds (pink/brown), LFO-driven motion, and randomized one-shot
-// events (raindrops, fire crackles, bird calls) so nothing sounds mechanical.
-// Users can also upload their OWN sound (any audio the browser plays), stored
-// on-device in IndexedDB and looped. Custom keys are `custom:<id>`.
+// Ambiance packs — gentle ambient soundscapes for The Space and Cowork. Most
+// built-ins are synthesized live with the Web Audio API (no files, no network):
+// layered stereo noise beds (pink/brown), LFO-driven motion, and randomized
+// one-shot events (raindrops, bird calls) so nothing sounds mechanical. Fire is
+// the exception — a real crackle recording (public/sounds/fire.mp3), seamlessly
+// crossfade-looped so the repeat is inaudible (see playFire). Users can also
+// upload their OWN sound (any audio the browser plays), stored on-device in
+// IndexedDB and looped. Custom keys are `custom:<id>`.
 const KEY = 'other_ambiance_v1';
 
 export const AMBIANCES = [
@@ -37,6 +39,10 @@ export function setAmbianceVolume(v) {
     catch (e) { try { master.gain.value = vol; } catch (e2) { /* ignore */ } }
   }
   if (audioEl) { try { audioEl.volume = vol; } catch (e) { /* ignore */ } }
+  // Fire voices are level-controlled directly; move the ceiling and apply it to
+  // whichever voice is currently at full (the crossfade controller handles the rest).
+  fireTarget = vol;
+  try { if (fireA && !fireB) fireA.volume = vol; } catch (e) { /* ignore */ }
 }
 export const isCustom = (key) => typeof key === 'string' && key.startsWith('custom:');
 
@@ -86,6 +92,20 @@ let ctx = null, nodes = [], timers = [], master = null, generation = 0;
 let audioEl = null, audioUrl = null;   // for custom uploaded sounds
 let playingKey = null;                 // the ambiance currently sounding, if any
 let sharedBurst = null;                // small shared noise buffer for one-shots
+
+// ── Fire: a real crackle recording, seamlessly looped ────────────────────────
+// The Fire soundscape plays public/sounds/fire.mp3 instead of the synth. A
+// plain loop=true restart is audible (a gap + the same crackle snapping back to
+// the top), so instead we run two <audio> voices and equal-power crossfade from
+// the ending one into a fresh one over the last few seconds — the bed sounds
+// continuous and the loop never announces itself. The file is fetched once as a
+// Blob (Range/seek-friendly, and it bypasses any service-worker media quirks).
+const FIRE_SRC = `${(import.meta.env && import.meta.env.BASE_URL) || './'}sounds/fire.mp3`;
+const FIRE_CF = 3.0;                   // crossfade seconds at the loop seam
+let fireBlobUrl = null;                // cached object URL for the recording
+let fireA = null, fireB = null;        // current + incoming voices during a crossfade
+let fireTimer = null;                  // controller interval
+let fireTarget = 0.5;                  // volume ceiling (tracks the slider)
 
 export function isAmbiancePlaying() { return !!playingKey; }
 
@@ -359,6 +379,11 @@ export function stopAmbiance() {
   if (master) { try { master.disconnect(); } catch (e) { /* ignore */ } master = null; }
   if (audioEl) { try { audioEl.pause(); audioEl.src = ''; } catch (e) { /* ignore */ } audioEl = null; }
   if (audioUrl) { try { URL.revokeObjectURL(audioUrl); } catch (e) { /* ignore */ } audioUrl = null; }
+  // Fire loop: stop the crossfade controller and both voices (keep the cached
+  // Blob URL so re-entering Fire doesn't re-download the clip).
+  if (fireTimer) { clearInterval(fireTimer); fireTimer = null; }
+  for (const el of [fireA, fireB]) { if (el) { try { el.pause(); el.src = ''; } catch (e) { /* ignore */ } } }
+  fireA = fireB = null;
   playingKey = null;
 }
 
@@ -378,6 +403,55 @@ async function playCustom(id) {
   } catch (e) { /* ignore */ }
 }
 
+const fireVoice = () => { const el = new Audio(fireBlobUrl); el.preload = 'auto'; el.volume = 0; return el; };
+
+// Equal-power crossfade gain for a fade position p ∈ [0,1] (constant perceived
+// loudness through the seam, unlike a linear fade which dips in the middle).
+const eqPower = (p) => Math.cos((1 - p) * 0.5 * Math.PI);
+
+// Play the fire recording, crossfading each playthrough into the next so the
+// loop is inaudible. Fetches the clip once, then reuses the cached Blob URL.
+async function playFire() {
+  if (!fireBlobUrl) {
+    try {
+      const res = await fetch(FIRE_SRC);
+      if (!res.ok) return;
+      fireBlobUrl = URL.createObjectURL(await res.blob());
+    } catch (e) { return; }
+  }
+  if (currentAmbiance() !== 'fire') return;   // user switched away while loading
+  fireTarget = ambianceVolume();
+  const gen = generation;                     // stopAmbiance() bumps this
+  const a = fireVoice();
+  fireA = a; fireB = null;
+  // Begin at a random point in the recording so the fire sounds different each
+  // session (not the same crackle every time you open Cowork).
+  a.addEventListener('loadedmetadata', () => {
+    if (fireA === a && a.duration > 40) { try { a.currentTime = Math.random() * (a.duration - FIRE_CF - 10); } catch (e) { /* ignore */ } }
+  }, { once: true });
+  a.play().catch(() => {});
+  fireTimer = setInterval(() => {
+    if (gen !== generation) return;           // superseded/stopped
+    const cur = fireA; if (!cur) return;
+    const d = cur.duration;
+    // Gentle fade-in on the very first voice so opening never clicks.
+    if (!fireB && cur.currentTime < 0.8) { cur.volume = fireTarget * eqPower(cur.currentTime / 0.8); return; }
+    if (!Number.isFinite(d) || d <= FIRE_CF + 1) { cur.volume = fireTarget; return; }
+    const overlapStart = d - FIRE_CF;
+    if (cur.currentTime < overlapStart) { if (!fireB) cur.volume = fireTarget; return; }
+    // In the seam: bring up a fresh voice and equal-power crossfade into it.
+    if (!fireB) { fireB = fireVoice(); fireB.play().catch(() => {}); }
+    const p = Math.min(1, Math.max(0, (cur.currentTime - overlapStart) / FIRE_CF));
+    cur.volume = fireTarget * eqPower(1 - p);
+    fireB.volume = fireTarget * eqPower(p);
+    if (cur.currentTime >= d - 0.15 || cur.ended) {
+      try { cur.pause(); cur.src = ''; } catch (e) { /* ignore */ }
+      fireA = fireB; fireB = null;
+      if (fireA) fireA.volume = fireTarget;
+    }
+  }, 50);
+}
+
 // Start (or switch to) a soundscape. Must be called from a user gesture the
 // first time so audio is allowed to play.
 export function playAmbiance(key) {
@@ -385,6 +459,7 @@ export function playAmbiance(key) {
   if (!key || key === 'off') return;
   playingKey = key;
   if (isCustom(key)) { playCustom(key.slice(7)); return; }
+  if (key === 'fire') { playFire(); return; }   // real recording, seamless loop
   const c = ac();
   if (!c) return;
   // Everything routes through a master gain: the volume slider controls the
@@ -408,37 +483,6 @@ export function playAmbiance(key) {
     // keeps it rarer and further away.
     once(3000, 8000, () => rumble(c, dest, { far: light }));
     every(light ? 25000 : 12000, light ? 60000 : 35000, () => { if (Math.random() < 0.85) rumble(c, dest, { far: light }); });
-  } else if (key === 'fire') {
-    // The crackle IS the fire — the bed underneath stays soft and airy so it
-    // never reads as a thunder-like rumble (small speakers only get the ticks).
-    const roar = voice(c, dest, { type: 'brown', lp: 240, gain: 0.03 });    // soft ember glow
-    lfo(c, roar.g.gain, 5.3, 0.007);
-    lfo(c, roar.g.gain, 0.17, 0.008);
-    const flame = voice(c, dest, { type: 'pink', hp: 250, lp: 1600, gain: 0.012 });  // flame movement
-    lfo(c, flame.g.gain, 7.1, 0.005);
-    voice(c, dest, { type: 'white', hp: 6000, gain: 0.003 });               // faint hiss
-    // Dense, prominent wood crackle: sharp snaps, splitting clusters, and
-    // deep pop-and-settle events as logs shift. Gains here look large because a
-    // narrow bandpass passes only ~15-30% of the burst's energy — after that
-    // attenuation the crackle peaks land well ABOVE the soft bed, as they should.
-    const snap = (at = 0, pan = rand(-0.6, 0.6)) =>
-      blip(c, dest, { bp: rand(2500, 8000), q: rand(3, 7), gain: rand(0.15, 0.4), decay: rand(0.005, 0.018), rate: rand(0.9, 1.8), pan, at });
-    every(25, 150, () => {
-      const r = Math.random();
-      if (r < 0.12) {
-        // log pop: a low knock followed by a burst of rapid splitting ticks
-        const pan = rand(-0.5, 0.5);
-        blip(c, dest, { bp: rand(350, 800), q: 2.5, gain: rand(0.25, 0.45), decay: rand(0.05, 0.12), rate: rand(0.5, 0.9), pan });
-        const ticks = 3 + Math.floor(Math.random() * 4);
-        for (let i = 0; i < ticks; i++) snap(rand(0.015, 0.18), pan + rand(-0.15, 0.15));
-      } else if (r < 0.45) {
-        // double-tick: wood splitting twice in quick succession
-        const pan = rand(-0.6, 0.6);
-        snap(0, pan); snap(rand(0.02, 0.05), pan);
-      } else {
-        snap();
-      }
-    });
   } else if (key === 'waves') {
     // A quiet distant-surf bed so it's never silent between waves…
     const bedW = voice(c, dest, { type: 'brown', lp: 450, gain: 0.018 });
