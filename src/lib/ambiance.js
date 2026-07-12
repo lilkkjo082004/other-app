@@ -1,11 +1,11 @@
 // Ambiance packs — gentle ambient soundscapes for The Space and Cowork. Most
 // built-ins are synthesized live with the Web Audio API (no files, no network):
 // layered stereo noise beds (pink/brown), LFO-driven motion, and randomized
-// one-shot events (raindrops, bird calls) so nothing sounds mechanical. Fire is
-// the exception — a real crackle recording (public/sounds/fire.mp3), seamlessly
-// crossfade-looped so the repeat is inaudible (see playFire). Users can also
-// upload their OWN sound (any audio the browser plays), stored on-device in
-// IndexedDB and looped. Custom keys are `custom:<id>`.
+// one-shot events (raindrops, bird calls) so nothing sounds mechanical. A couple
+// are real field recordings instead (Fire, Evening nature — see CLIP_SRC),
+// seamlessly crossfade-looped so the repeat is inaudible (see playClip). Users
+// can also upload their OWN sound (any audio the browser plays), stored
+// on-device in IndexedDB and looped. Custom keys are `custom:<id>`.
 const KEY = 'other_ambiance_v1';
 
 export const AMBIANCES = [
@@ -16,6 +16,7 @@ export const AMBIANCES = [
   { key: 'waves', label: 'Waves', em: '🌊' },
   { key: 'space', label: 'Deep space', em: '🌌' },
   { key: 'forest', label: 'Forest', em: '🌲' },
+  { key: 'evening', label: 'Evening nature', em: '🌆' },
 ];
 
 const VOL_KEY = 'other_ambiance_vol';
@@ -39,10 +40,10 @@ export function setAmbianceVolume(v) {
     catch (e) { try { master.gain.value = vol; } catch (e2) { /* ignore */ } }
   }
   if (audioEl) { try { audioEl.volume = vol; } catch (e) { /* ignore */ } }
-  // Fire voices are level-controlled directly; move the ceiling and apply it to
-  // whichever voice is currently at full (the crossfade controller handles the rest).
-  fireTarget = vol;
-  try { if (fireA && !fireB) fireA.volume = vol; } catch (e) { /* ignore */ }
+  // Recorded-clip voices are level-controlled directly; move the ceiling and
+  // apply it to the steady voice (the crossfade controller handles the rest).
+  clipTarget = vol;
+  try { if (clipA && !clipB) clipA.volume = vol; } catch (e) { /* ignore */ }
 }
 export const isCustom = (key) => typeof key === 'string' && key.startsWith('custom:');
 
@@ -93,19 +94,24 @@ let audioEl = null, audioUrl = null;   // for custom uploaded sounds
 let playingKey = null;                 // the ambiance currently sounding, if any
 let sharedBurst = null;                // small shared noise buffer for one-shots
 
-// ── Fire: a real crackle recording, seamlessly looped ────────────────────────
-// The Fire soundscape plays public/sounds/fire.mp3 instead of the synth. A
-// plain loop=true restart is audible (a gap + the same crackle snapping back to
-// the top), so instead we run two <audio> voices and equal-power crossfade from
-// the ending one into a fresh one over the last few seconds — the bed sounds
-// continuous and the loop never announces itself. The file is fetched once as a
+// ── Recorded soundscapes, seamlessly looped ──────────────────────────────────
+// Some soundscapes are real field recordings rather than synth. A plain
+// loop=true restart is audible (a gap + the same moment snapping back to the
+// top), so instead we run two <audio> voices and equal-power crossfade from the
+// ending one into a fresh one over the last few seconds — the bed sounds
+// continuous and the loop never announces itself. Each file is fetched once as a
 // Blob (Range/seek-friendly, and it bypasses any service-worker media quirks).
-const FIRE_SRC = `${(import.meta.env && import.meta.env.BASE_URL) || './'}sounds/fire.mp3`;
-const FIRE_CF = 3.0;                   // crossfade seconds at the loop seam
-let fireBlobUrl = null;                // cached object URL for the recording
-let fireA = null, fireB = null;        // current + incoming voices during a crossfade
-let fireTimer = null;                  // controller interval
-let fireTarget = 0.5;                  // volume ceiling (tracks the slider)
+const BASE = (import.meta.env && import.meta.env.BASE_URL) || './';
+const CLIP_SRC = {
+  fire: `${BASE}sounds/fire.mp3`,
+  evening: `${BASE}sounds/evening.mp3`,
+};
+const isClip = (key) => Object.prototype.hasOwnProperty.call(CLIP_SRC, key);
+const CLIP_CF = 3.0;                    // crossfade seconds at the loop seam
+const clipBlobs = {};                   // src -> cached object URL for the recording
+let clipA = null, clipB = null;         // current + incoming voices during a crossfade
+let clipTimer = null;                   // controller interval
+let clipTarget = 0.5;                   // volume ceiling (tracks the slider)
 
 export function isAmbiancePlaying() { return !!playingKey; }
 
@@ -379,11 +385,11 @@ export function stopAmbiance() {
   if (master) { try { master.disconnect(); } catch (e) { /* ignore */ } master = null; }
   if (audioEl) { try { audioEl.pause(); audioEl.src = ''; } catch (e) { /* ignore */ } audioEl = null; }
   if (audioUrl) { try { URL.revokeObjectURL(audioUrl); } catch (e) { /* ignore */ } audioUrl = null; }
-  // Fire loop: stop the crossfade controller and both voices (keep the cached
-  // Blob URL so re-entering Fire doesn't re-download the clip).
-  if (fireTimer) { clearInterval(fireTimer); fireTimer = null; }
-  for (const el of [fireA, fireB]) { if (el) { try { el.pause(); el.src = ''; } catch (e) { /* ignore */ } } }
-  fireA = fireB = null;
+  // Recorded-clip loop: stop the crossfade controller and both voices (keep the
+  // cached Blob URLs so re-entering a clip soundscape doesn't re-download it).
+  if (clipTimer) { clearInterval(clipTimer); clipTimer = null; }
+  for (const el of [clipA, clipB]) { if (el) { try { el.pause(); el.src = ''; } catch (e) { /* ignore */ } } }
+  clipA = clipB = null;
   playingKey = null;
 }
 
@@ -403,51 +409,53 @@ async function playCustom(id) {
   } catch (e) { /* ignore */ }
 }
 
-const fireVoice = () => { const el = new Audio(fireBlobUrl); el.preload = 'auto'; el.volume = 0; return el; };
+const clipVoice = (url) => { const el = new Audio(url); el.preload = 'auto'; el.volume = 0; return el; };
 
 // Equal-power crossfade gain for a fade position p ∈ [0,1] (constant perceived
 // loudness through the seam, unlike a linear fade which dips in the middle).
 const eqPower = (p) => Math.cos((1 - p) * 0.5 * Math.PI);
 
-// Play the fire recording, crossfading each playthrough into the next so the
+// Play a recorded soundscape, crossfading each playthrough into the next so the
 // loop is inaudible. Fetches the clip once, then reuses the cached Blob URL.
-async function playFire() {
-  if (!fireBlobUrl) {
+async function playClip(key) {
+  const src = CLIP_SRC[key];
+  let url = clipBlobs[src];
+  if (!url) {
     try {
-      const res = await fetch(FIRE_SRC);
+      const res = await fetch(src);
       if (!res.ok) return;
-      fireBlobUrl = URL.createObjectURL(await res.blob());
+      url = clipBlobs[src] = URL.createObjectURL(await res.blob());
     } catch (e) { return; }
   }
-  if (currentAmbiance() !== 'fire') return;   // user switched away while loading
-  fireTarget = ambianceVolume();
-  const gen = generation;                     // stopAmbiance() bumps this
-  const a = fireVoice();
-  fireA = a; fireB = null;
-  // Begin at a random point in the recording so the fire sounds different each
-  // session (not the same crackle every time you open Cowork).
+  if (currentAmbiance() !== key) return;       // user switched away while loading
+  clipTarget = ambianceVolume();
+  const gen = generation;                      // stopAmbiance() bumps this
+  const a = clipVoice(url);
+  clipA = a; clipB = null;
+  // Begin at a random point in the recording so it sounds different each session
+  // (not the same moment every time you open Cowork).
   a.addEventListener('loadedmetadata', () => {
-    if (fireA === a && a.duration > 40) { try { a.currentTime = Math.random() * (a.duration - FIRE_CF - 10); } catch (e) { /* ignore */ } }
+    if (clipA === a && a.duration > 40) { try { a.currentTime = Math.random() * (a.duration - CLIP_CF - 10); } catch (e) { /* ignore */ } }
   }, { once: true });
   a.play().catch(() => {});
-  fireTimer = setInterval(() => {
-    if (gen !== generation) return;           // superseded/stopped
-    const cur = fireA; if (!cur) return;
+  clipTimer = setInterval(() => {
+    if (gen !== generation) return;            // superseded/stopped
+    const cur = clipA; if (!cur) return;
     const d = cur.duration;
     // Gentle fade-in on the very first voice so opening never clicks.
-    if (!fireB && cur.currentTime < 0.8) { cur.volume = fireTarget * eqPower(cur.currentTime / 0.8); return; }
-    if (!Number.isFinite(d) || d <= FIRE_CF + 1) { cur.volume = fireTarget; return; }
-    const overlapStart = d - FIRE_CF;
-    if (cur.currentTime < overlapStart) { if (!fireB) cur.volume = fireTarget; return; }
+    if (!clipB && cur.currentTime < 0.8) { cur.volume = clipTarget * eqPower(cur.currentTime / 0.8); return; }
+    if (!Number.isFinite(d) || d <= CLIP_CF + 1) { cur.volume = clipTarget; return; }
+    const overlapStart = d - CLIP_CF;
+    if (cur.currentTime < overlapStart) { if (!clipB) cur.volume = clipTarget; return; }
     // In the seam: bring up a fresh voice and equal-power crossfade into it.
-    if (!fireB) { fireB = fireVoice(); fireB.play().catch(() => {}); }
-    const p = Math.min(1, Math.max(0, (cur.currentTime - overlapStart) / FIRE_CF));
-    cur.volume = fireTarget * eqPower(1 - p);
-    fireB.volume = fireTarget * eqPower(p);
+    if (!clipB) { clipB = clipVoice(url); clipB.play().catch(() => {}); }
+    const p = Math.min(1, Math.max(0, (cur.currentTime - overlapStart) / CLIP_CF));
+    cur.volume = clipTarget * eqPower(1 - p);
+    clipB.volume = clipTarget * eqPower(p);
     if (cur.currentTime >= d - 0.15 || cur.ended) {
       try { cur.pause(); cur.src = ''; } catch (e) { /* ignore */ }
-      fireA = fireB; fireB = null;
-      if (fireA) fireA.volume = fireTarget;
+      clipA = clipB; clipB = null;
+      if (clipA) clipA.volume = clipTarget;
     }
   }, 50);
 }
@@ -459,7 +467,7 @@ export function playAmbiance(key) {
   if (!key || key === 'off') return;
   playingKey = key;
   if (isCustom(key)) { playCustom(key.slice(7)); return; }
-  if (key === 'fire') { playFire(); return; }   // real recording, seamless loop
+  if (isClip(key)) { playClip(key); return; }   // real recording, seamless loop
   const c = ac();
   if (!c) return;
   // Everything routes through a master gain: the volume slider controls the
