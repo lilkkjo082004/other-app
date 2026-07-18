@@ -58,9 +58,11 @@ Chat System,Directed messages,Aim a message at one companion (@name / tap),Built
 Chat System,Conversation search,"Search messages + history (memories, letters, shared lore, inside jokes) with highlighted matches; tap a result to jump back into the conversation (flash highlight); date-jump chips to scroll to any day",Built,P1,"UPDATED; jump-to-message, history search, day-jump"
 Chat System,Call by name (voice),Say companion name to open private,Built,P0,+ toggle to disable
 Chat System,Auto-speak mode,Companions speak messages aloud,Built,P0,
-Chat System,Per-companion voice customization,"Pick voice + tone, live preview",Built,P1,NEW; lib/voice.js
+Chat System,Per-companion voice customization,"Pick voice + tone, with per-option preview (▶ hear before committing)",Built,P1,"UPDATED; lib/voice.js + voicetext.js, CompanionProfile per-option preview"
+Chat System,Auto-matched voices,"Each companion gets a fitting voice out of the box from its pronouns + personality (browser tone + device voice, and gendered ElevenLabs preset); user can override",Built,P1,"NEW; lib/voicetext.js browserToneFor/pickNaturalVoiceId/voiceGender, unit-tested"
+Chat System,Cleaner speech,"Emoji, decorative glyphs, markdown, links/URLs and [[ACTION]] directives stripped before speaking; long messages chunked by sentence + Chrome keep-alive so they don't cut off",Built,P1,"NEW; voicetext.cleanForSpeech/chunkForSpeech, voice.js keep-alive; browser-verified"
 Chat System,Speaker button per message,Tap to hear any message,Built,P0,
-Chat System,Natural (AI) voices,ElevenLabs via /tts proxy,Partial,P1,"UPDATED; wired, needs key (VITE_NATURAL_VOICE)"
+Chat System,Natural (AI) voices,"ElevenLabs via /tts proxy: 12 gender-balanced presets + per-companion expressiveness (voice_settings: stability/style/similarity)",Partial,P1,"UPDATED; wired + warm defaults, needs key (VITE_NATURAL_VOICE + ELEVENLABS_API_KEY)"
 Companion Dynamics,Autonomous personality,"Own likes, dislikes, opinions",Built,P0,
 Companion Dynamics,Personality evolution,Mood/familiarity/bond -> prompt,Built,P0,UPDATED Partial->Built; lib/evolution.js + cloud
 Companion Dynamics,Companion relationships,Bonds + storylines between companions,Built,P1,UPDATED Partial->Built; persisted bonds

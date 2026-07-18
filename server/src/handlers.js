@@ -230,12 +230,21 @@ async function tts(request, env) {
   const valid = (id) => typeof id === 'string' && /^[A-Za-z0-9]+$/.test(id);
   // Prefer a per-companion voice the client picked; else the configured list; else a default.
   const voiceId = valid(b?.voiceId) ? b.voiceId : (voices.length ? voices[(Number(b.voiceIdx) || 0) % voices.length] : '21m00Tcm4TlvDq8ikWAM');
+  // Optional per-companion expressiveness. Clamp to [0,1] and drop anything the
+  // client didn't send so ElevenLabs uses the voice's own default for it.
+  const num = (x) => (typeof x === 'number' && x >= 0 && x <= 1 ? x : undefined);
+  const vs = b?.voice_settings && typeof b.voice_settings === 'object' ? b.voice_settings : {};
+  const voiceSettings = {};
+  for (const k of ['stability', 'similarity_boost', 'style']) { const n = num(vs[k]); if (n !== undefined) voiceSettings[k] = n; }
+  if (typeof vs.use_speaker_boost === 'boolean') voiceSettings.use_speaker_boost = vs.use_speaker_boost;
+  const payload = { text, model_id: env.ELEVEN_MODEL || 'eleven_turbo_v2_5' };
+  if (Object.keys(voiceSettings).length) payload.voice_settings = voiceSettings;
   let up;
   try {
     up = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
       method: 'POST',
       headers: { 'xi-api-key': env.ELEVENLABS_API_KEY, 'content-type': 'application/json', accept: 'audio/mpeg' },
-      body: JSON.stringify({ text, model_id: env.ELEVEN_MODEL || 'eleven_turbo_v2_5' }),
+      body: JSON.stringify(payload),
     });
   } catch (e) {
     return json({ error: 'tts upstream failed', detail: String(e) }, 502, env);

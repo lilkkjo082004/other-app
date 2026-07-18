@@ -22,6 +22,7 @@ const { saveSession, loadSession, ARCHIVE_THRESHOLD, KEEP_RECENT } = await impor
 const { buildSystemBlocks } = await import('../src/lib/prompt.js');
 const { pickReminder, reminderKey, whenPhrase } = await import('../src/lib/reminders.js');
 const habits = await import('../src/lib/habits.js');
+const voicetext = await import('../src/lib/voicetext.js');
 
 console.log('checkin');
 {
@@ -238,6 +239,39 @@ console.log('habits');
   ok(picked && picked.id === rid, 'a reminded, due, past-its-time habit is picked to nudge');
   habits.markHabitReminded(habits.remindKey(picked, now), now);
   ok(habits.habitToRemind(rl, now) === null, 'the same habit is not nudged twice in a day');
+}
+
+console.log('voice text + matching');
+{
+  const { cleanForSpeech, chunkForSpeech, voiceGender, pickNaturalVoiceId, browserToneFor, NATURAL_VOICE_PRESETS } = voicetext;
+  // cleanForSpeech strips what reads badly aloud, keeps natural punctuation.
+  const dirty = "Hey ✦ *so* glad you're here 🔥 — check [this](https://x.com/y) out! [[ACTION:{\"type\":\"focus\",\"minutes\":25}]]";
+  const clean = cleanForSpeech(dirty);
+  ok(!/[*✦🔥]/.test(clean), 'emoji, decorative glyphs and markdown asterisks are stripped');
+  ok(!/\[\[ACTION|https?:\/\//.test(clean), 'action directives and URLs are removed');
+  ok(clean.includes('this') && !clean.includes(']('), 'markdown link keeps its label, drops the target');
+  ok(clean.includes('—') && clean.includes("you're"), 'em dash and apostrophes survive for natural pauses');
+  ok(cleanForSpeech('') === '' && cleanForSpeech(null) === '', 'empty/nullish input is safe');
+  // chunkForSpeech splits long text on sentence boundaries.
+  const long = Array.from({ length: 12 }, (_, i) => `Sentence number ${i} goes here.`).join(' ');
+  const chunks = chunkForSpeech(long, 120);
+  ok(chunks.length > 1 && chunks.every((c) => c.length <= 140), 'long text is split into sentence-aligned chunks');
+  ok(chunkForSpeech('Just one.').length === 1, 'short text stays a single chunk');
+  // voiceGender from pronouns only (never a name).
+  ok(voiceGender({ pronouns: 'she/her' }) === 'female', 'she/her -> female');
+  ok(voiceGender({ pronouns: 'he/him' }) === 'male', 'he/him -> male');
+  ok(voiceGender({ pronouns: 'they/them' }) === 'neutral', 'they/them -> neutral');
+  // Auto-matched natural voice respects pronouns and varies by index.
+  const she = NATURAL_VOICE_PRESETS.find((p) => p.id === pickNaturalVoiceId({ pronouns: 'she/her', voiceIdx: 0 }));
+  const he = NATURAL_VOICE_PRESETS.find((p) => p.id === pickNaturalVoiceId({ pronouns: 'he/him', voiceIdx: 0 }));
+  ok(she && she.g === 'female', 'she/her auto-matches a female natural voice');
+  ok(he && he.g === 'male', 'he/him auto-matches a male natural voice');
+  ok(pickNaturalVoiceId({ voice: { kind: 'natural', voiceId: 'CUSTOM123' } }) === 'CUSTOM123', 'an explicit natural pick is honored over auto-match');
+  // Personality nudges the browser tone.
+  const calm = browserToneFor({ pronouns: 'they/them', personality: 'calm and gentle', voiceIdx: 1 });
+  const playful = browserToneFor({ pronouns: 'they/them', personality: 'playful and chaotic', voiceIdx: 1 });
+  ok(playful.rate > calm.rate, 'a playful companion speaks faster than a calm one');
+  ok(browserToneFor({ pronouns: 'she/her' }).pitch > browserToneFor({ pronouns: 'he/him' }).pitch, 'female base pitch sits above male');
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

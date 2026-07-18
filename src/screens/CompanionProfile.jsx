@@ -202,23 +202,31 @@ export default function CompanionProfile({ companion: c, trialStart, history, co
               </div>
               {natural ? (
                 <>
-                  <div style={{ fontSize: 11, color: C.textSoft, marginBottom: 10 }}>Pick a natural voice for {c.name}.</div>
+                  <div style={{ fontSize: 11, color: C.textSoft, marginBottom: 10 }}>
+                    {c.voice?.kind === 'natural' ? `Pick a natural voice for ${c.name}.` : `Auto-matched to ${c.name}'s vibe — tap ▶ to hear one, tap the name to keep it.`}
+                  </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     {NATURAL_VOICE_PRESETS.map((p) => {
                       const on = c.voice?.kind === 'natural' && c.voice.voiceId === p.id;
                       return (
-                        <button key={p.id} onClick={() => onCustomize({ voice: { kind: 'natural', voiceId: p.id, name: p.name } })}
-                          style={{ textAlign: 'left', background: on ? `${col}1f` : C.surfaceUp, border: `1px solid ${on ? col : C.border}`, borderRadius: 10, padding: '7px 11px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>
-                          <div style={{ fontSize: 12, color: on ? col : C.text, fontWeight: 600 }}>{p.name}</div>
-                          <div style={{ fontSize: 10, color: C.textDim }}>{p.vibe}</div>
-                        </button>
+                        <div key={p.id} style={{ display: 'flex', alignItems: 'stretch', background: on ? `${col}1f` : C.surfaceUp, border: `1px solid ${on ? col : C.border}`, borderRadius: 10, overflow: 'hidden' }}>
+                          <button aria-label={`Preview ${p.name}`} onClick={() => speakAs(previewLine, { ...c, voice: { kind: 'natural', voiceId: p.id, name: p.name } })}
+                            style={{ background: 'none', border: 'none', borderRight: `1px solid ${on ? `${col}55` : C.border}`, color: on ? col : C.textSoft, padding: '0 9px', cursor: 'pointer', fontSize: 11 }}>▶</button>
+                          <button onClick={() => onCustomize({ voice: { kind: 'natural', voiceId: p.id, name: p.name } })}
+                            style={{ textAlign: 'left', background: 'none', border: 'none', padding: '7px 11px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>
+                            <div style={{ fontSize: 12, color: on ? col : C.text, fontWeight: 600 }}>{p.name}</div>
+                            <div style={{ fontSize: 10, color: C.textDim }}>{p.vibe}</div>
+                          </button>
+                        </div>
                       );
                     })}
                   </div>
                 </>
               ) : (
                 <>
-                  <div style={{ fontSize: 11, color: C.textSoft, marginBottom: 10 }}>Choose a system voice and tone for {c.name}.</div>
+                  <div style={{ fontSize: 11, color: C.textSoft, marginBottom: 10 }}>
+                    {c.voice?.kind === 'browser' ? `Choose a system voice and tone for ${c.name}.` : `Auto-matched to ${c.name}'s pronouns + vibe. Pick a voice or tone to change it.`}
+                  </div>
                   {devices.length > 0 ? (
                     <select value={cv.voiceURI || ''} onChange={(e) => onCustomize({ voice: { kind: 'browser', voiceURI: e.target.value, pitch: cv.pitch ?? 1, rate: cv.rate ?? 0.96 } })}
                       style={{ width: '100%', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 9, padding: '9px 10px', fontSize: 12, color: C.text, outline: 'none', marginBottom: 10 }}>
@@ -232,8 +240,12 @@ export default function CompanionProfile({ companion: c, trialStart, history, co
                     {VOICE_TONES.map((t) => {
                       const on = (cv.pitch ?? 1) === t.pitch && (cv.rate ?? 0.96) === t.rate;
                       return (
-                        <button key={t.key} onClick={() => onCustomize({ voice: { kind: 'browser', voiceURI: cv.voiceURI || '', pitch: t.pitch, rate: t.rate } })}
-                          style={{ background: on ? `${col}1f` : 'transparent', border: `1px solid ${on ? col : C.border}`, color: on ? col : C.textSoft, borderRadius: 20, padding: '6px 13px', fontSize: 12, cursor: 'pointer', fontWeight: on ? 600 : 400, fontFamily: "'DM Sans',sans-serif" }}>{t.label}</button>
+                        <div key={t.key} style={{ display: 'flex', alignItems: 'center', background: on ? `${col}1f` : 'transparent', border: `1px solid ${on ? col : C.border}`, borderRadius: 20, overflow: 'hidden' }}>
+                          <button aria-label={`Preview ${t.label} tone`} onClick={() => speakAs(previewLine, { ...c, voice: { kind: 'browser', voiceURI: cv.voiceURI || '', pitch: t.pitch, rate: t.rate } })}
+                            style={{ background: 'none', border: 'none', color: on ? col : C.textDim, padding: '6px 8px 6px 11px', cursor: 'pointer', fontSize: 10 }}>▶</button>
+                          <button onClick={() => onCustomize({ voice: { kind: 'browser', voiceURI: cv.voiceURI || '', pitch: t.pitch, rate: t.rate } })}
+                            style={{ background: 'none', border: 'none', color: on ? col : C.textSoft, padding: '6px 13px 6px 4px', fontSize: 12, cursor: 'pointer', fontWeight: on ? 600 : 400, fontFamily: "'DM Sans',sans-serif" }}>{t.label}</button>
+                        </div>
                       );
                     })}
                   </div>

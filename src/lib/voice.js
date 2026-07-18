@@ -1,41 +1,33 @@
 import { useState, useRef, useCallback } from 'react';
 import { naturalVoiceEnabled, ttsEndpoint } from '../config.js';
 import { authHeader } from './api.js';
+import {
+  cleanForSpeech, chunkForSpeech, browserToneFor, pickNaturalVoiceId,
+  NATURAL_VOICE_PRESETS, VOICE_TONES, DEFAULT_VOICE_SETTINGS,
+} from './voicetext.js';
 
-// Fallback browser-voice "tones" by index, used when a companion hasn't picked
-// its own voice yet. Each index gets a distinct pitch/rate + device voice.
-const VOICE_PROFILES = [
-  { pitch: 1.0, rate: 0.96 },
-  { pitch: 1.28, rate: 1.05 },
-  { pitch: 0.82, rate: 0.9 },
-  { pitch: 1.12, rate: 1.0 },
-  { pitch: 0.92, rate: 0.88 },
-];
-
-// Named tone presets for the browser-voice picker.
-export const VOICE_TONES = [
-  { key: 'warm', label: 'Warm', pitch: 1.0, rate: 0.95 },
-  { key: 'bright', label: 'Bright', pitch: 1.3, rate: 1.06 },
-  { key: 'deep', label: 'Deep', pitch: 0.8, rate: 0.9 },
-  { key: 'soft', label: 'Soft', pitch: 1.12, rate: 0.86 },
-];
-
-// Curated ElevenLabs default voices (available on any account) for the natural-
-// voice picker. Users pick the one that fits each companion.
-export const NATURAL_VOICE_PRESETS = [
-  { id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel', vibe: 'calm · warm' },
-  { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Bella', vibe: 'soft · gentle' },
-  { id: 'AZnzlk1XvdvUeBnXmlld', name: 'Domi', vibe: 'bold · confident' },
-  { id: 'MF3mGyEYCl7XYWbV9V6O', name: 'Elli', vibe: 'bright · emotional' },
-  { id: 'ErXwobaYiN019PkySvjV', name: 'Antoni', vibe: 'easy · friendly' },
-  { id: 'TxGEqnHWrfWFTfGW9XjX', name: 'Josh', vibe: 'deep · steady' },
-  { id: 'VR6AewLTigWG4xSOukaG', name: 'Arnold', vibe: 'crisp · grounded' },
-  { id: 'yoZ06aMxZJJ28mfd3POQ', name: 'Sam', vibe: 'low · raspy' },
-];
+export { NATURAL_VOICE_PRESETS, VOICE_TONES } from './voicetext.js';
 
 export function listBrowserVoices() {
   const v = (typeof window !== 'undefined' && window.speechSynthesis && window.speechSynthesis.getVoices()) || [];
   return v.filter((x) => x.lang && x.lang.toLowerCase().startsWith('en'));
+}
+
+// Heuristic gender hints from a device-voice's name/URI, so an auto-matched
+// companion gets a same-gender system voice where the platform exposes one.
+const FEMALE_HINT = /female|\bwoman\b|samantha|victoria|karen|moira|tessa|fiona|serena|allison|ava|susan|zoe|amelie|anna|kate|nicky|catherine|google uk english female|google us english female/i;
+const MALE_HINT = /\bmale\b|\bman\b|daniel|thomas|alex|fred|david|george|james|oliver|arthur|gordon|aaron|nathan|reed|rishi|\btom\b|\blee\b|bruce|google uk english male|google us english male/i;
+
+function deviceVoiceFor(comp, voices, gender) {
+  if (!voices.length) return null;
+  const idx = (comp && comp.voiceIdx) || 0;
+  if (gender !== 'neutral') {
+    const want = gender === 'female' ? FEMALE_HINT : MALE_HINT;
+    const avoid = gender === 'female' ? MALE_HINT : FEMALE_HINT;
+    const matches = voices.filter((v) => want.test(`${v.name} ${v.voiceURI}`) && !avoid.test(`${v.name} ${v.voiceURI}`));
+    if (matches.length) return matches[idx % matches.length];
+  }
+  return voices[idx % voices.length];
 }
 
 function browserVoiceFor(comp) {
@@ -45,44 +37,60 @@ function browserVoiceFor(comp) {
     const match = voices.find((x) => x.voiceURI === v.voiceURI);
     return { voice: match || (voices.length ? voices[0] : null), pitch: v.pitch ?? 1, rate: v.rate ?? 0.96 };
   }
-  const idx = typeof comp === 'number' ? comp : (comp && comp.voiceIdx) || 0;
-  const prof = VOICE_PROFILES[idx % VOICE_PROFILES.length];
-  return { voice: voices.length ? voices[idx % voices.length] : null, pitch: prof.pitch, rate: prof.rate };
+  // No explicit pick — auto-match by pronouns + personality.
+  const tone = browserToneFor(comp);
+  const voice = typeof comp === 'number'
+    ? (voices[comp % voices.length] || null)
+    : deviceVoiceFor(comp, voices, tone.gender);
+  return { voice, pitch: tone.pitch, rate: tone.rate };
 }
 
-function speakBrowser(text, comp) {
-  if (!window.speechSynthesis) return;
+// Chrome silently stops utterances longer than ~15s; a periodic resume() keeps
+// long messages going. Runs only while something is speaking.
+let keepAlive = null;
+function startKeepAlive() {
+  stopKeepAlive();
+  keepAlive = setInterval(() => {
+    try { if (window.speechSynthesis && window.speechSynthesis.speaking) window.speechSynthesis.resume(); } catch (e) { /* no-op */ }
+  }, 8000);
+}
+function stopKeepAlive() { if (keepAlive) { clearInterval(keepAlive); keepAlive = null; } }
+
+// Speak via the browser, one sentence-chunk at a time. `onDone` fires when the
+// whole message has finished (used by call mode).
+function speakBrowser(text, comp, onDone) {
+  if (!window.speechSynthesis) { onDone && onDone(); return; }
   window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
+  stopKeepAlive();
+  const chunks = chunkForSpeech(cleanForSpeech(text));
+  if (!chunks.length) { onDone && onDone(); return; }
   const { voice, pitch, rate } = browserVoiceFor(comp);
-  if (voice) u.voice = voice;
-  u.pitch = pitch;
-  u.rate = rate;
-  window.speechSynthesis.speak(u);
-}
-
-// Promise that resolves when the browser finishes speaking (for call mode).
-function speakBrowserAsync(text, comp) {
-  return new Promise((resolve) => {
-    if (!window.speechSynthesis) { resolve(); return; }
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    const { voice, pitch, rate } = browserVoiceFor(comp);
+  let i = 0;
+  const next = () => {
+    if (i >= chunks.length) { stopKeepAlive(); onDone && onDone(); return; }
+    const u = new SpeechSynthesisUtterance(chunks[i++]);
     if (voice) u.voice = voice;
     u.pitch = pitch;
     u.rate = rate;
-    u.onend = () => resolve();
-    u.onerror = () => resolve();
+    u.onend = next;
+    u.onerror = next;
     window.speechSynthesis.speak(u);
-  });
+  };
+  startKeepAlive();
+  next();
 }
 
 let currentAudio = null;
 async function speakNatural(text, comp) {
+  const clean = cleanForSpeech(text);
+  if (!clean) return;
   const v = comp && typeof comp === 'object' ? comp.voice : null;
-  const body = { text };
-  if (v && v.kind === 'natural' && v.voiceId) body.voiceId = v.voiceId;
-  else body.voiceIdx = (typeof comp === 'number' ? comp : (comp && comp.voiceIdx)) || 0;
+  const body = {
+    text: clean,
+    voiceId: pickNaturalVoiceId(comp),
+    voiceIdx: (typeof comp === 'number' ? comp : (comp && comp.voiceIdx)) || 0,
+    voice_settings: (v && v.settings) || DEFAULT_VOICE_SETTINGS,
+  };
   const res = await fetch(ttsEndpoint(), {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...authHeader() },
@@ -106,13 +114,14 @@ async function speakNatural(text, comp) {
 export function speakAsAsync(text, comp) {
   if (naturalVoiceEnabled()) {
     if (window.speechSynthesis) window.speechSynthesis.cancel();
-    return speakNatural(text, comp).catch(() => speakBrowserAsync(text, comp));
+    return speakNatural(text, comp).catch(() => new Promise((r) => speakBrowser(text, comp, r)));
   }
-  return speakBrowserAsync(text, comp);
+  return new Promise((r) => speakBrowser(text, comp, r));
 }
 
 // Stop any in-progress speech (browser or natural).
 export function stopSpeaking() {
+  stopKeepAlive();
   try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) { /* no-op */ }
   try { if (currentAudio) { currentAudio.pause(); currentAudio = null; } } catch (e) { /* no-op */ }
 }
