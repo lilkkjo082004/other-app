@@ -7,6 +7,7 @@
 // and work offline. It's opt-in (a Settings toggle) because of that first
 // download. kokoro-js is dynamically imported so it never bloats the main bundle.
 import { cleanForSpeech, chunkForSpeech, voiceGender } from './voicetext.js';
+import { voiceVolume } from './voicevol.js';
 
 const MODEL_ID = 'onnx-community/Kokoro-82M-v1.0-ONNX';
 const PREF_KEY = 'other_local_voice';
@@ -196,7 +197,7 @@ export async function speakLocal(text, comp) {
   // Build the effect chain: source → lowshelf → highshelf → gain → out.
   const low = ctx.createBiquadFilter(); low.type = 'lowshelf'; low.frequency.value = 320; low.gain.value = p.low;
   const high = ctx.createBiquadFilter(); high.type = 'highshelf'; high.frequency.value = 3400; high.gain.value = p.high;
-  const gain = ctx.createGain(); gain.gain.value = p.volume;
+  const gain = ctx.createGain(); gain.gain.value = p.volume * voiceVolume();
   low.connect(high); high.connect(gain); gain.connect(ctx.destination);
   const src = ctx.createBufferSource();
   src.buffer = toBuffer(ctx, { audio: merged, sampling_rate: sr });

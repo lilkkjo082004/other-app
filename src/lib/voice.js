@@ -7,6 +7,9 @@ import {
 } from './voicetext.js';
 
 import { localVoiceEnabled, supportsLocalTts, speakLocal, stopLocal } from './localtts.js';
+import { voiceVolume } from './voicevol.js';
+
+export { voiceVolume, setVoiceVolume } from './voicevol.js';
 
 export { NATURAL_VOICE_PRESETS, VOICE_TONES, DEFAULT_MELODIC, browserToneFor, isNaturalVoice } from './voicetext.js';
 
@@ -84,7 +87,7 @@ function speakBrowser(text, comp, onDone) {
     if (voice) u.voice = voice;
     u.pitch = seg.pitch;
     u.rate = seg.rate;
-    u.volume = volume ?? 1;
+    u.volume = Math.max(0, Math.min(1, (volume ?? 1) * voiceVolume()));
     u.onend = next;
     u.onerror = next;
     window.speechSynthesis.speak(u);
@@ -114,6 +117,7 @@ async function speakNatural(text, comp) {
   if (currentAudio) { currentAudio.pause(); currentAudio = null; }
   const url = URL.createObjectURL(new Blob([buf], { type: 'audio/mpeg' }));
   const audio = new Audio(url);
+  audio.volume = voiceVolume();
   currentAudio = audio;
   await audio.play();
   // Resolve only once playback finishes, so callers (call mode) can wait.

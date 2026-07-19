@@ -10,6 +10,8 @@ import { googleCalendarConfigured, googleConnected, connectGoogle, disconnectGoo
 import { MANAGE_URL } from '../config.js';
 import { onDeviceSupported, onDeviceEnabled, setOnDeviceEnabled, preloadEngine, setProgressHandler, ON_DEVICE_LABEL } from '../lib/ondevice.js';
 import { supportsLocalTts, localVoiceEnabled, setLocalVoiceEnabled, warmLocalTts, speakLocal } from '../lib/localtts.js';
+import { voiceVolume, setVoiceVolume } from '../lib/voicevol.js';
+import { speakAs, stopSpeaking } from '../lib/voice.js';
 import { calmEnabled, setCalm } from '../lib/comfort.js';
 import { loadSession, saveSession } from '../lib/storage.js';
 import { downloadReadableExport } from '../lib/dataexport.js';
@@ -79,6 +81,8 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
   }
   const living = comps.filter((c) => c.status !== 'deleted');
   const allAwake = living.length > 0 && living.every((c) => c.status === 'awake');
+  const [vVol, setVVol] = useState(voiceVolume());
+  const previewVol = () => { stopSpeaking(); speakAs('This is how loud I am now.', living.find((c) => c.status === 'awake') || 0); };
 
   const showPush = pushConfigured() && pushSupported() && authed;
   const [pushOn, setPushOn] = useState(false);
@@ -427,6 +431,20 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
         <div style={{ ...card, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div><div style={{ fontSize: 13 }}>Auto-speak</div><div style={{ fontSize: 11, color: C.textDim }}>Companions read messages aloud</div></div>
           <Toggle on={autoSpeak} onClick={() => onAutoSpeak(!autoSpeak)} />
+        </div>
+        <div style={{ ...card }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div><div style={{ fontSize: 13 }}>Voice volume</div><div style={{ fontSize: 11, color: C.textDim }}>How loud your companions speak</div></div>
+            <span style={{ fontSize: 11, color: C.textSoft, minWidth: 34, textAlign: 'right' }}>{Math.round(vVol * 100)}%</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span aria-hidden style={{ fontSize: 13 }}>🔈</span>
+            <input type="range" min="0" max="1" step="0.05" value={vVol} aria-label="Voice volume"
+              onChange={(e) => { const v = parseFloat(e.target.value); setVVol(v); setVoiceVolume(v); }}
+              onPointerUp={previewVol}
+              style={{ flex: 1, accentColor: C.glow1, cursor: 'pointer' }} />
+            <span aria-hidden style={{ fontSize: 13 }}>🔊</span>
+          </div>
         </div>
         {onVoiceCall && (
           <div style={{ ...card, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

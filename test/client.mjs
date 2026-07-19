@@ -24,6 +24,7 @@ const { pickReminder, reminderKey, whenPhrase } = await import('../src/lib/remin
 const habits = await import('../src/lib/habits.js');
 const voicetext = await import('../src/lib/voicetext.js');
 const localtts = await import('../src/lib/localtts.js');
+const voicevol = await import('../src/lib/voicevol.js');
 
 console.log('checkin');
 {
@@ -318,6 +319,15 @@ console.log('on-device voice (kokoro)');
   ok(bright.low < 0 && bright.high > 0, 'negative warmth tilts brighter');
   ok(localVoiceParams({ kind: 'local', volume: 0.5 }).volume === 0.5, 'volume passes through');
   ok(localVoiceParams({ kind: 'local', pitch: 99 }).playbackRate <= 1.5, 'out-of-range pitch is clamped');
+}
+
+console.log('master voice volume');
+{
+  const { voiceVolume, setVoiceVolume } = voicevol;
+  ok(voiceVolume() === 1, 'defaults to full volume');
+  ok(setVoiceVolume(0.4) === 0.4 && voiceVolume() === 0.4, 'set + read back');
+  ok(setVoiceVolume(5) === 1 && setVoiceVolume(-1) === 0, 'clamps to [0,1]');
+  setVoiceVolume(1);
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);
