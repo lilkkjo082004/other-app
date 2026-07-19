@@ -6,7 +6,7 @@ import { trialDaysLeft, COMPANION_PRICE } from '../lib/entitlements.js';
 import { bondInfo } from '../lib/evolution.js';
 import { relationshipsFor } from '../lib/relationships.js';
 import { naturalVoiceEnabled } from '../config.js';
-import { speakAs, listBrowserVoices, NATURAL_VOICE_PRESETS, VOICE_TONES } from '../lib/voice.js';
+import { speakAs, listBrowserVoices, NATURAL_VOICE_PRESETS, VOICE_TONES, browserToneFor, isNaturalVoice, DEFAULT_MELODIC } from '../lib/voice.js';
 import { splitMemories } from '../lib/memory.js';
 import SquishyBlob from '../components/SquishyBlob.jsx';
 import { currentActivity } from '../lib/presence.js';
@@ -222,36 +222,71 @@ export default function CompanionProfile({ companion: c, trialStart, history, co
                     })}
                   </div>
                 </>
-              ) : (
-                <>
-                  <div style={{ fontSize: 11, color: C.textSoft, marginBottom: 10 }}>
-                    {c.voice?.kind === 'browser' ? `Choose a system voice and tone for ${c.name}.` : `Auto-matched to ${c.name}'s pronouns + vibe. Pick a voice or tone to change it.`}
+              ) : (() => {
+                const eff = c.voice && c.voice.kind === 'browser' ? c.voice : null;
+                const autoTone = browserToneFor(c);
+                const cur = {
+                  voiceURI: eff?.voiceURI || '',
+                  pitch: eff?.pitch ?? autoTone.pitch,
+                  rate: eff?.rate ?? autoTone.rate,
+                  melodic: eff?.melodic ?? DEFAULT_MELODIC,
+                  volume: eff?.volume ?? 1,
+                };
+                const voiceWith = (patch) => ({ kind: 'browser', voiceURI: cur.voiceURI, pitch: cur.pitch, rate: cur.rate, melodic: cur.melodic, volume: cur.volume, ...patch });
+                const setV = (patch) => onCustomize({ voice: voiceWith(patch) });
+                const prev = (patch) => speakAs(previewLine, { ...c, voice: voiceWith(patch) });
+                // Natural/neural voices first — they sound the most human.
+                const ranked = [...devices].sort((a, b) => (isNaturalVoice(b) ? 1 : 0) - (isNaturalVoice(a) ? 1 : 0));
+                const hasNatural = ranked.some(isNaturalVoice);
+                // Inlined (not a nested component) so dragging never remounts the input.
+                const sld = (labelLeft, labelRight, k, min, max, step) => (
+                  <div style={{ marginBottom: 11 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: C.textSoft, marginBottom: 3 }}>
+                      <span>{labelLeft}</span><span style={{ color: C.textDim }}>{labelRight}</span>
+                    </div>
+                    <input type="range" min={min} max={max} step={step} value={cur[k]} aria-label={`${labelLeft} to ${labelRight}`}
+                      onChange={(e) => setV({ [k]: +e.target.value })}
+                      onPointerUp={(e) => prev({ [k]: +e.target.value })}
+                      style={{ width: '100%', accentColor: col, cursor: 'pointer' }} />
                   </div>
-                  {devices.length > 0 ? (
-                    <select value={cv.voiceURI || ''} onChange={(e) => onCustomize({ voice: { kind: 'browser', voiceURI: e.target.value, pitch: cv.pitch ?? 1, rate: cv.rate ?? 0.96 } })}
-                      style={{ width: '100%', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 9, padding: '9px 10px', fontSize: 12, color: C.text, outline: 'none', marginBottom: 10 }}>
-                      <option value="">Default voice</option>
-                      {devices.map((v) => <option key={v.voiceURI} value={v.voiceURI}>{v.name}</option>)}
-                    </select>
-                  ) : (
-                    <div style={{ fontSize: 11, color: C.textDim, marginBottom: 10 }}>No system voices detected — tone still applies.</div>
-                  )}
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {VOICE_TONES.map((t) => {
-                      const on = (cv.pitch ?? 1) === t.pitch && (cv.rate ?? 0.96) === t.rate;
-                      return (
-                        <div key={t.key} style={{ display: 'flex', alignItems: 'center', background: on ? `${col}1f` : 'transparent', border: `1px solid ${on ? col : C.border}`, borderRadius: 20, overflow: 'hidden' }}>
-                          <button aria-label={`Preview ${t.label} tone`} onClick={() => speakAs(previewLine, { ...c, voice: { kind: 'browser', voiceURI: cv.voiceURI || '', pitch: t.pitch, rate: t.rate } })}
-                            style={{ background: 'none', border: 'none', color: on ? col : C.textDim, padding: '6px 8px 6px 11px', cursor: 'pointer', fontSize: 10 }}>▶</button>
-                          <button onClick={() => onCustomize({ voice: { kind: 'browser', voiceURI: cv.voiceURI || '', pitch: t.pitch, rate: t.rate } })}
-                            style={{ background: 'none', border: 'none', color: on ? col : C.textSoft, padding: '6px 13px 6px 4px', fontSize: 12, cursor: 'pointer', fontWeight: on ? 600 : 400, fontFamily: "'DM Sans',sans-serif" }}>{t.label}</button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div style={{ fontSize: 10, color: C.textDim, marginTop: 10 }}>Want lifelike AI voices? They turn on with the backend (VITE_NATURAL_VOICE).</div>
-                </>
-              )}
+                );
+                return (
+                  <>
+                    <div style={{ fontSize: 11, color: C.textSoft, marginBottom: 10 }}>
+                      {eff ? `Fine-tune ${c.name}'s voice.` : `Auto-matched to ${c.name}'s pronouns + vibe — adjust anything below to make it yours.`}
+                    </div>
+                    {devices.length > 0 ? (
+                      <>
+                        <select value={cur.voiceURI} onChange={(e) => { setV({ voiceURI: e.target.value }); prev({ voiceURI: e.target.value }); }}
+                          style={{ width: '100%', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 9, padding: '9px 10px', fontSize: 12, color: C.text, outline: 'none', marginBottom: hasNatural ? 4 : 12 }}>
+                          <option value="">Auto voice</option>
+                          {ranked.map((v) => <option key={v.voiceURI} value={v.voiceURI}>{v.name}{isNaturalVoice(v) ? ' · Natural' : ''}</option>)}
+                        </select>
+                        {hasNatural && <div style={{ fontSize: 10, color: C.textDim, marginBottom: 12 }}>Voices marked “Natural” sound the most human — try one of those first.</div>}
+                      </>
+                    ) : (
+                      <div style={{ fontSize: 11, color: C.textDim, marginBottom: 10 }}>No system voices detected — the sliders still apply.</div>
+                    )}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+                      {VOICE_TONES.map((t) => {
+                        const on = Math.abs(cur.pitch - t.pitch) < 0.001 && Math.abs(cur.rate - t.rate) < 0.001;
+                        return (
+                          <button key={t.key} onClick={() => { setV({ pitch: t.pitch, rate: t.rate }); prev({ pitch: t.pitch, rate: t.rate }); }}
+                            style={{ background: on ? `${col}1f` : 'transparent', border: `1px solid ${on ? col : C.border}`, color: on ? col : C.textSoft, borderRadius: 20, padding: '6px 13px', fontSize: 12, cursor: 'pointer', fontWeight: on ? 600 : 400, fontFamily: "'DM Sans',sans-serif" }}>{t.label}</button>
+                        );
+                      })}
+                    </div>
+                    {sld('Deep', 'High', 'pitch', 0.5, 1.8, 0.02)}
+                    {sld('Slow', 'Fast', 'rate', 0.6, 1.3, 0.02)}
+                    {sld('Flat', 'Melodic', 'melodic', 0, 1, 0.05)}
+                    {sld('Soft', 'Full', 'volume', 0.2, 1, 0.05)}
+                    <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                      <button onClick={() => speakAs(previewLine, c)} style={{ flex: 1, background: `${col}1f`, border: `1px solid ${col}66`, color: col, borderRadius: 10, padding: '9px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>▶ Preview voice</button>
+                      {eff && <button onClick={() => onCustomize({ voice: null })} style={{ background: 'none', border: `1px solid ${C.border}`, color: C.textSoft, borderRadius: 10, padding: '9px 14px', fontSize: 12, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>Reset to auto</button>}
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           );
         })()}

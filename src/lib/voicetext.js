@@ -35,6 +35,9 @@ export const VOICE_TONES = [
 // reads more human than the flat, over-stable default.
 export const DEFAULT_VOICE_SETTINGS = { stability: 0.4, similarity_boost: 0.8, style: 0.3, use_speaker_boost: true };
 
+// Default "melodic" amount (0 flat … 1 very expressive) for browser speech.
+export const DEFAULT_MELODIC = 0.35;
+
 // Strip everything that reads badly aloud — action directives, markdown,
 // links/URLs, and decorative symbols/emoji — while KEEPING punctuation that
 // shapes natural pauses (em dashes, commas, ellipses, quotes).
@@ -58,6 +61,14 @@ export function cleanForSpeech(text) {
   return s;
 }
 
+// Split text into individual sentences (for per-sentence intonation).
+export function splitSentences(text) {
+  const s = String(text || '').trim();
+  if (!s) return [];
+  const parts = (s.match(/[^.!?…]+[.!?…]*(?:\s+|$)/g) || [s]).map((p) => p.trim()).filter(Boolean);
+  return parts.length ? parts : [s];
+}
+
 // Break long text into sentence-aligned chunks (~max chars). Speaking these as
 // separate utterances avoids Chrome's ~15s cutoff and lets the keep-alive tick.
 export function chunkForSpeech(text, max = 220) {
@@ -72,6 +83,42 @@ export function chunkForSpeech(text, max = 220) {
   }
   if (cur.trim()) out.push(cur.trim());
   return out;
+}
+
+// Plan a sentence-by-sentence "melodic" pitch/rate contour so browser speech
+// isn't a flat monotone. The Web Speech API only lets us set one pitch per
+// utterance, so we vary it PER sentence: questions rise, exclamations lift +
+// quicken, statements settle slightly, plus a gentle lilt between sentences.
+// `melodic` (0 flat … 1 strong) scales all of it; at 0 every chunk = base.
+export function speechChunks(text, opts = {}) {
+  const basePitch = opts.pitch ?? 1;
+  const baseRate = opts.rate ?? 0.96;
+  const melodic = clamp(opts.melodic ?? 0, 0, 1);
+  // When melodic, speak sentence-by-sentence so intonation can vary between
+  // them; when flat, group into larger chunks (fewer utterance gaps).
+  const chunks = melodic > 0 ? splitSentences(text) : chunkForSpeech(text);
+  return chunks.map((c, i) => {
+    let p = basePitch, r = baseRate;
+    if (melodic > 0) {
+      const end = c.trim().slice(-1);
+      if (end === '?') p += 0.14 * melodic;
+      else if (end === '!') { p += 0.10 * melodic; r += 0.04 * melodic; }
+      else p -= 0.03 * melodic;                  // declarative settle
+      p += ((i % 2) ? 1 : -1) * 0.045 * melodic; // sentence-to-sentence lilt
+    }
+    return { text: c, pitch: clamp(p, 0.4, 2), rate: clamp(r, 0.4, 1.8) };
+  });
+}
+
+// Whether a device voice is a higher-quality "natural"/neural one (vs. the old
+// robotic built-ins). Online (non-local) voices are generally the good ones.
+export function isNaturalVoice(v) {
+  if (!v) return false;
+  const s = `${v.name || ''} ${v.voiceURI || ''}`.toLowerCase();
+  if (/natural|neural|premium|enhanced|online/.test(s)) return true;
+  if (v.localService === false) return true;
+  if (/google|siri|samantha|aria|jenny|guy|libby|eloquence/.test(s)) return true;
+  return false;
 }
 
 // Voice gender inferred from a companion's chosen pronouns (never from a name).

@@ -243,7 +243,7 @@ console.log('habits');
 
 console.log('voice text + matching');
 {
-  const { cleanForSpeech, chunkForSpeech, voiceGender, pickNaturalVoiceId, browserToneFor, NATURAL_VOICE_PRESETS } = voicetext;
+  const { cleanForSpeech, chunkForSpeech, voiceGender, pickNaturalVoiceId, browserToneFor, NATURAL_VOICE_PRESETS, speechChunks, isNaturalVoice } = voicetext;
   // cleanForSpeech strips what reads badly aloud, keeps natural punctuation.
   const dirty = "Hey ✦ *so* glad you're here 🔥 — check [this](https://x.com/y) out! [[ACTION:{\"type\":\"focus\",\"minutes\":25}]]";
   const clean = cleanForSpeech(dirty);
@@ -272,6 +272,21 @@ console.log('voice text + matching');
   const playful = browserToneFor({ pronouns: 'they/them', personality: 'playful and chaotic', voiceIdx: 1 });
   ok(playful.rate > calm.rate, 'a playful companion speaks faster than a calm one');
   ok(browserToneFor({ pronouns: 'she/her' }).pitch > browserToneFor({ pronouns: 'he/him' }).pitch, 'female base pitch sits above male');
+  // speechChunks: melodic contour varies pitch by sentence; flat = constant.
+  const flat = speechChunks('Are you sure? Yes. Wow!', { pitch: 1, rate: 1, melodic: 0 });
+  ok(flat.every((s) => s.pitch === 1 && s.rate === 1), 'melodic 0 keeps every chunk at the base pitch/rate');
+  const mel = speechChunks('Are you sure? I am. Wow!', { pitch: 1, rate: 1, melodic: 1 });
+  ok(mel.length === 3, 'melodic splits per sentence so intonation can vary');
+  const q = mel[0], stmt = mel[1], exc = mel[2];
+  ok(q.pitch > stmt.pitch, 'a question rises above a statement when melodic');
+  ok(exc.rate > 1, 'an exclamation quickens when melodic');
+  ok(mel.some((s) => s.pitch !== 1), 'melodic makes pitch vary from the base');
+  ok(speechChunks('Hi. Bye.', { pitch: 1.4, rate: 0.9, melodic: 0 }).every((s) => s.pitch === 1.4 && s.rate === 0.9), 'base pitch/rate carry through to chunks');
+  // isNaturalVoice flags neural/online voices, not old local ones.
+  ok(isNaturalVoice({ name: 'Microsoft Aria Online (Natural)', localService: false }), 'a "Natural" online voice is detected');
+  ok(isNaturalVoice({ name: 'Custom', localService: false }), 'any online (non-local) voice counts as natural');
+  ok(!isNaturalVoice({ name: 'Fred', localService: true }), 'an old local voice is not flagged natural');
+  ok(!isNaturalVoice(null), 'nullish voice is safe');
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

@@ -2,11 +2,11 @@ import { useState, useRef, useCallback } from 'react';
 import { naturalVoiceEnabled, ttsEndpoint } from '../config.js';
 import { authHeader } from './api.js';
 import {
-  cleanForSpeech, chunkForSpeech, browserToneFor, pickNaturalVoiceId,
-  NATURAL_VOICE_PRESETS, VOICE_TONES, DEFAULT_VOICE_SETTINGS,
+  cleanForSpeech, speechChunks, browserToneFor, pickNaturalVoiceId, isNaturalVoice,
+  NATURAL_VOICE_PRESETS, VOICE_TONES, DEFAULT_VOICE_SETTINGS, DEFAULT_MELODIC,
 } from './voicetext.js';
 
-export { NATURAL_VOICE_PRESETS, VOICE_TONES } from './voicetext.js';
+export { NATURAL_VOICE_PRESETS, VOICE_TONES, DEFAULT_MELODIC, browserToneFor, isNaturalVoice } from './voicetext.js';
 
 export function listBrowserVoices() {
   const v = (typeof window !== 'undefined' && window.speechSynthesis && window.speechSynthesis.getVoices()) || [];
@@ -21,13 +21,18 @@ const MALE_HINT = /\bmale\b|\bman\b|daniel|thomas|alex|fred|david|george|james|o
 function deviceVoiceFor(comp, voices, gender) {
   if (!voices.length) return null;
   const idx = (comp && comp.voiceIdx) || 0;
+  let pool = voices;
   if (gender !== 'neutral') {
     const want = gender === 'female' ? FEMALE_HINT : MALE_HINT;
     const avoid = gender === 'female' ? MALE_HINT : FEMALE_HINT;
     const matches = voices.filter((v) => want.test(`${v.name} ${v.voiceURI}`) && !avoid.test(`${v.name} ${v.voiceURI}`));
-    if (matches.length) return matches[idx % matches.length];
+    if (matches.length) pool = matches;
   }
-  return voices[idx % voices.length];
+  // Prefer natural/neural voices within the pool — the single biggest lever for
+  // sounding human — falling back to the whole pool if none are natural.
+  const natural = pool.filter(isNaturalVoice);
+  const finalPool = natural.length ? natural : pool;
+  return finalPool[idx % finalPool.length];
 }
 
 function browserVoiceFor(comp) {
@@ -35,14 +40,18 @@ function browserVoiceFor(comp) {
   const v = comp && typeof comp === 'object' ? comp.voice : null;
   if (v && v.kind === 'browser') {
     const match = voices.find((x) => x.voiceURI === v.voiceURI);
-    return { voice: match || (voices.length ? voices[0] : null), pitch: v.pitch ?? 1, rate: v.rate ?? 0.96 };
+    return {
+      voice: match || (typeof comp === 'object' ? deviceVoiceFor(comp, voices, browserToneFor(comp).gender) : (voices[0] || null)),
+      pitch: v.pitch ?? 1, rate: v.rate ?? 0.96,
+      melodic: v.melodic ?? DEFAULT_MELODIC, volume: v.volume ?? 1,
+    };
   }
   // No explicit pick — auto-match by pronouns + personality.
   const tone = browserToneFor(comp);
   const voice = typeof comp === 'number'
     ? (voices[comp % voices.length] || null)
     : deviceVoiceFor(comp, voices, tone.gender);
-  return { voice, pitch: tone.pitch, rate: tone.rate };
+  return { voice, pitch: tone.pitch, rate: tone.rate, melodic: DEFAULT_MELODIC, volume: 1 };
 }
 
 // Chrome silently stops utterances longer than ~15s; a periodic resume() keeps
@@ -62,16 +71,18 @@ function speakBrowser(text, comp, onDone) {
   if (!window.speechSynthesis) { onDone && onDone(); return; }
   window.speechSynthesis.cancel();
   stopKeepAlive();
-  const chunks = chunkForSpeech(cleanForSpeech(text));
-  if (!chunks.length) { onDone && onDone(); return; }
-  const { voice, pitch, rate } = browserVoiceFor(comp);
+  const { voice, pitch, rate, melodic, volume } = browserVoiceFor(comp);
+  const plan = speechChunks(cleanForSpeech(text), { pitch, rate, melodic });
+  if (!plan.length) { onDone && onDone(); return; }
   let i = 0;
   const next = () => {
-    if (i >= chunks.length) { stopKeepAlive(); onDone && onDone(); return; }
-    const u = new SpeechSynthesisUtterance(chunks[i++]);
+    if (i >= plan.length) { stopKeepAlive(); onDone && onDone(); return; }
+    const seg = plan[i++];
+    const u = new SpeechSynthesisUtterance(seg.text);
     if (voice) u.voice = voice;
-    u.pitch = pitch;
-    u.rate = rate;
+    u.pitch = seg.pitch;
+    u.rate = seg.rate;
+    u.volume = volume ?? 1;
     u.onend = next;
     u.onerror = next;
     window.speechSynthesis.speak(u);
