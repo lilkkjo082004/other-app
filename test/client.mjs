@@ -306,6 +306,18 @@ console.log('on-device voice (kokoro)');
   ok(mirrorUrl(`${hf}voices/af_heart.bin`, 'https://site.app/other-app/').endsWith('/other-app/models/kokoro/voices/af_heart.bin'), 'a voice .bin URL is redirected to the self-hosted mirror');
   ok(mirrorUrl(`${hf}onnx/model_quantized.onnx`, 'https://site.app/other-app/').includes('/models/kokoro/onnx/model_quantized.onnx'), 'the onnx weight URL is redirected too');
   ok(mirrorUrl('https://example.com/thing.json', 'https://site.app/') === null, 'unrelated URLs are left alone');
+  // Voice customization: sliders -> Kokoro speed + Web Audio params.
+  const { localVoiceParams } = localtts;
+  const neutral = localVoiceParams({ kind: 'local', pitch: 1, rate: 1, warmth: 0, volume: 1 });
+  ok(Math.abs(neutral.playbackRate - 1) < 1e-9 && Math.abs(neutral.speed - 1) < 1e-9 && neutral.low === 0 && neutral.high === 0, 'neutral settings map to no-op params');
+  const high = localVoiceParams({ kind: 'local', pitch: 1.4, rate: 1 });
+  ok(high.playbackRate > 1 && high.speed < 1, 'raising pitch speeds playback but compensates tempo via lower Kokoro speed');
+  const warm = localVoiceParams({ kind: 'local', warmth: 1 });
+  ok(warm.low > 0 && warm.high < 0, 'warmth tilts the shelf EQ toward the low end');
+  const bright = localVoiceParams({ kind: 'local', warmth: -1 });
+  ok(bright.low < 0 && bright.high > 0, 'negative warmth tilts brighter');
+  ok(localVoiceParams({ kind: 'local', volume: 0.5 }).volume === 0.5, 'volume passes through');
+  ok(localVoiceParams({ kind: 'local', pitch: 99 }).playbackRate <= 1.5, 'out-of-range pitch is clamped');
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

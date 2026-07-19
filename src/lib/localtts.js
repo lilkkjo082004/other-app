@@ -6,7 +6,7 @@
 // (transformers.js uses the Cache Storage API), so later sessions are instant
 // and work offline. It's opt-in (a Settings toggle) because of that first
 // download. kokoro-js is dynamically imported so it never bloats the main bundle.
-import { cleanForSpeech, splitSentences, voiceGender } from './voicetext.js';
+import { cleanForSpeech, chunkForSpeech, voiceGender } from './voicetext.js';
 
 const MODEL_ID = 'onnx-community/Kokoro-82M-v1.0-ONNX';
 const PREF_KEY = 'other_local_voice';
@@ -118,65 +118,103 @@ export async function warmLocalTts(onProgress) {
   return modelPromise;
 }
 
-let currentAudio = null;
-let speakToken = 0;
+const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+const num = (x, d) => (typeof x === 'number' && Number.isFinite(x) ? x : d);
 
-function rawToUrl(raw) {
-  if (raw && typeof raw.toBlob === 'function') return URL.createObjectURL(raw.toBlob());
-  if (raw && typeof raw.toWav === 'function') return URL.createObjectURL(new Blob([raw.toWav()], { type: 'audio/wav' }));
-  // Fallback: encode Float32 PCM to a 16-bit WAV.
-  const data = raw.audio || raw.data || new Float32Array();
-  const sr = raw.sampling_rate || raw.samplingRate || 24000;
-  return URL.createObjectURL(new Blob([encodeWav(data, sr)], { type: 'audio/wav' }));
+// Kokoro itself only exposes `voice` + `speed`, so the customization sliders are
+// realised with Web Audio on top of the generated PCM: playbackRate shifts pitch
+// (with a compensating Kokoro `speed` so tempo stays put), a low/high shelf pair
+// tilts the timbre (warm/deep ↔ bright), and a gain sets volume. Pure + exported
+// so the mapping is unit-testable.
+export function localVoiceParams(voice) {
+  const v = voice && voice.kind === 'local' ? voice : {};
+  const pitch = clamp(num(v.pitch, 1), 0.7, 1.5);
+  const rate = clamp(num(v.rate, 1), 0.6, 1.4);
+  const warmth = clamp(num(v.warmth, 0), -1, 1);
+  const volume = clamp(num(v.volume, 1), 0, 1);
+  return {
+    playbackRate: pitch,                    // shifts pitch (and tempo)…
+    speed: clamp(rate / pitch, 0.5, 2),     // …compensated so net tempo ≈ rate
+    low: warmth * 8,                        // dB low-shelf: + = warmer/deeper
+    high: -warmth * 6,                      // dB high-shelf: opposite tilt
+    volume,
+  };
 }
 
-function encodeWav(samples, sampleRate) {
-  const buf = new ArrayBuffer(44 + samples.length * 2);
-  const view = new DataView(buf);
-  const w = (o, s) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
-  w(0, 'RIFF'); view.setUint32(4, 36 + samples.length * 2, true); w(8, 'WAVE');
-  w(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
-  view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true);
-  w(36, 'data'); view.setUint32(40, samples.length * 2, true);
-  let o = 44;
-  for (let i = 0; i < samples.length; i++, o += 2) {
-    const s = Math.max(-1, Math.min(1, samples[i]));
-    view.setInt16(o, s < 0 ? s * 0x8000 : s * 0x7fff, true);
-  }
+let audioCtx = null;
+let chain = null;       // { sources: [], onended }
+let speakToken = 0;
+
+function getCtx() {
+  if (!audioCtx) { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null; audioCtx = new AC(); }
+  if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  return audioCtx;
+}
+
+function toBuffer(ctx, raw) {
+  const data = raw.audio || raw.data;
+  const sr = raw.sampling_rate || raw.samplingRate || 24000;
+  const buf = ctx.createBuffer(1, data.length, sr);
+  buf.getChannelData(0).set(data);
   return buf;
 }
 
-function playUrl(url) {
-  return new Promise((resolve) => {
-    const el = new Audio(url);
-    currentAudio = el;
-    el.onended = () => { URL.revokeObjectURL(url); resolve(); };
-    el.onerror = () => { URL.revokeObjectURL(url); resolve(); };
-    el.play().catch(() => resolve());
-  });
-}
-
-// Speak a companion's line on-device. Synthesizes and plays sentence-by-sentence
-// so the first words start sooner. Resolves when playback finishes. Throws if the
-// model can't load — callers fall back to browser speech.
+// Speak a companion's line on-device. Generates the whole line (chunked only to
+// avoid the model's length cap, then concatenated) so there are NO gaps between
+// sentences, and plays it through the pitch/timbre/volume chain. Resolves when
+// playback finishes; throws if the model can't load (callers fall back to browser
+// speech).
 export async function speakLocal(text, comp) {
   const clean = cleanForSpeech(text);
   if (!clean) return;
   const model = await warmLocalTts();
   const voice = localVoiceId(comp);
+  const p = localVoiceParams(comp && comp.voice);
   const token = ++speakToken;
   stopLocal(true);
-  for (const sentence of splitSentences(clean)) {
-    if (token !== speakToken) return;              // superseded by a newer call
-    let raw;
-    try { raw = await model.generate(sentence, { voice }); }
-    catch (e) { continue; }
+  const ctx = getCtx();
+  if (!ctx) return;
+
+  // Synthesize chunk-by-chunk (large chunks — usually one) and concatenate the
+  // PCM so the whole line plays as one continuous, gapless buffer.
+  const parts = [];
+  let sr = 24000;
+  for (const chunk of chunkForSpeech(clean, 300)) {
     if (token !== speakToken) return;
-    await playUrl(rawToUrl(raw));
+    let raw;
+    try { raw = await model.generate(chunk, { voice, speed: p.speed }); }
+    catch (e) { continue; }
+    const data = raw.audio || raw.data;
+    if (data && data.length) { parts.push(data); sr = raw.sampling_rate || raw.samplingRate || sr; }
   }
+  if (token !== speakToken || !parts.length) return;
+  const total = parts.reduce((n, a) => n + a.length, 0);
+  const merged = new Float32Array(total);
+  let off = 0;
+  for (const a of parts) { merged.set(a, off); off += a.length; }
+
+  // Build the effect chain: source → lowshelf → highshelf → gain → out.
+  const low = ctx.createBiquadFilter(); low.type = 'lowshelf'; low.frequency.value = 320; low.gain.value = p.low;
+  const high = ctx.createBiquadFilter(); high.type = 'highshelf'; high.frequency.value = 3400; high.gain.value = p.high;
+  const gain = ctx.createGain(); gain.gain.value = p.volume;
+  low.connect(high); high.connect(gain); gain.connect(ctx.destination);
+  const src = ctx.createBufferSource();
+  src.buffer = toBuffer(ctx, { audio: merged, sampling_rate: sr });
+  src.playbackRate.value = p.playbackRate;
+  src.connect(low);
+  chain = { src, nodes: [low, high, gain] };
+  await new Promise((resolve) => {
+    src.onended = resolve;
+    try { src.start(); } catch (e) { resolve(); }
+  });
+  if (chain && chain.src === src) chain = null;
 }
 
 export function stopLocal(keepToken) {
   if (!keepToken) speakToken++;
-  if (currentAudio) { try { currentAudio.pause(); currentAudio.src = ''; } catch (e) { /* ignore */ } currentAudio = null; }
+  if (chain) {
+    try { chain.src.onended = null; chain.src.stop(); } catch (e) { /* ignore */ }
+    try { chain.src.disconnect(); for (const n of chain.nodes) n.disconnect(); } catch (e) { /* ignore */ }
+    chain = null;
+  }
 }

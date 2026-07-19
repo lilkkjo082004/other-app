@@ -202,29 +202,55 @@ export default function CompanionProfile({ companion: c, trialStart, history, co
                 <span style={label}>Voice</span>
                 <button onClick={() => speakAs(previewLine, c)} style={{ background: `${col}1f`, border: `1px solid ${col}66`, color: col, borderRadius: 20, padding: '4px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>▶ Preview</button>
               </div>
-              {local ? (
-                <>
-                  <div style={{ fontSize: 11, color: C.textSoft, marginBottom: 10 }}>
-                    {c.voice?.kind === 'local' ? `Realistic on-device voice for ${c.name}.` : `Auto-matched to ${c.name}'s vibe — tap ▶ to hear one (first play loads the voice), tap the name to keep it.`}
+              {local ? (() => {
+                const lv = c.voice && c.voice.kind === 'local' ? c.voice : {};
+                const cur = { pitch: lv.pitch ?? 1, rate: lv.rate ?? 1, warmth: lv.warmth ?? 0, volume: lv.volume ?? 1 };
+                const voiceWith = (patch) => ({ kind: 'local', voiceId: lv.voiceId, name: lv.name, pitch: cur.pitch, rate: cur.rate, warmth: cur.warmth, volume: cur.volume, ...patch });
+                const setLV = (patch) => onCustomize({ voice: voiceWith(patch) });
+                const prev = (patch) => speakAs(previewLine, { ...c, voice: voiceWith(patch) });
+                const sld = (labelLeft, labelRight, k, min, max, step) => (
+                  <div style={{ marginBottom: 11 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: C.textSoft, marginBottom: 3 }}>
+                      <span>{labelLeft}</span><span style={{ color: C.textDim }}>{labelRight}</span>
+                    </div>
+                    <input type="range" min={min} max={max} step={step} value={cur[k]} aria-label={`${labelLeft} to ${labelRight}`}
+                      onChange={(e) => setLV({ [k]: +e.target.value })}
+                      onPointerUp={(e) => prev({ [k]: +e.target.value })}
+                      style={{ width: '100%', accentColor: col, cursor: 'pointer' }} />
                   </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {LOCAL_VOICE_PRESETS.map((p) => {
-                      const on = c.voice?.kind === 'local' && c.voice.voiceId === p.id;
-                      return (
-                        <div key={p.id} style={{ display: 'flex', alignItems: 'stretch', background: on ? `${col}1f` : C.surfaceUp, border: `1px solid ${on ? col : C.border}`, borderRadius: 10, overflow: 'hidden' }}>
-                          <button aria-label={`Preview ${p.name}`} onClick={() => speakAs(previewLine, { ...c, voice: { kind: 'local', voiceId: p.id, name: p.name } })}
-                            style={{ background: 'none', border: 'none', borderRight: `1px solid ${on ? `${col}55` : C.border}`, color: on ? col : C.textSoft, padding: '0 9px', cursor: 'pointer', fontSize: 11 }}>▶</button>
-                          <button onClick={() => onCustomize({ voice: { kind: 'local', voiceId: p.id, name: p.name } })}
-                            style={{ textAlign: 'left', background: 'none', border: 'none', padding: '7px 11px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>
-                            <div style={{ fontSize: 12, color: on ? col : C.text, fontWeight: 600 }}>{p.name}</div>
-                            <div style={{ fontSize: 10, color: C.textDim }}>{p.vibe}</div>
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </>
-              ) : natural ? (
+                );
+                return (
+                  <>
+                    <div style={{ fontSize: 11, color: C.textSoft, marginBottom: 10 }}>
+                      {lv.voiceId ? `Realistic on-device voice for ${c.name} — pick a voice, then fine-tune below.` : `Auto-matched to ${c.name}'s vibe — tap ▶ to hear one, tap the name to keep it, then fine-tune below.`}
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+                      {LOCAL_VOICE_PRESETS.map((p) => {
+                        const on = lv.voiceId === p.id;
+                        return (
+                          <div key={p.id} style={{ display: 'flex', alignItems: 'stretch', background: on ? `${col}1f` : C.surfaceUp, border: `1px solid ${on ? col : C.border}`, borderRadius: 10, overflow: 'hidden' }}>
+                            <button aria-label={`Preview ${p.name}`} onClick={() => prev({ voiceId: p.id, name: p.name })}
+                              style={{ background: 'none', border: 'none', borderRight: `1px solid ${on ? `${col}55` : C.border}`, color: on ? col : C.textSoft, padding: '0 9px', cursor: 'pointer', fontSize: 11 }}>▶</button>
+                            <button onClick={() => setLV({ voiceId: p.id, name: p.name })}
+                              style={{ textAlign: 'left', background: 'none', border: 'none', padding: '7px 11px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>
+                              <div style={{ fontSize: 12, color: on ? col : C.text, fontWeight: 600 }}>{p.name}</div>
+                              <div style={{ fontSize: 10, color: C.textDim }}>{p.vibe}</div>
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {sld('Deep', 'High', 'pitch', 0.7, 1.5, 0.02)}
+                    {sld('Slow', 'Fast', 'rate', 0.6, 1.4, 0.02)}
+                    {sld('Bright', 'Warm', 'warmth', -1, 1, 0.05)}
+                    {sld('Soft', 'Full', 'volume', 0.2, 1, 0.05)}
+                    <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                      <button onClick={() => speakAs(previewLine, c)} style={{ flex: 1, background: `${col}1f`, border: `1px solid ${col}66`, color: col, borderRadius: 10, padding: '9px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>▶ Preview voice</button>
+                      {c.voice?.kind === 'local' && <button onClick={() => onCustomize({ voice: null })} style={{ background: 'none', border: `1px solid ${C.border}`, color: C.textSoft, borderRadius: 10, padding: '9px 14px', fontSize: 12, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>Reset to auto</button>}
+                    </div>
+                  </>
+                );
+              })() : natural ? (
                 <>
                   <div style={{ fontSize: 11, color: C.textSoft, marginBottom: 10 }}>
                     {c.voice?.kind === 'natural' ? `Pick a natural voice for ${c.name}.` : `Auto-matched to ${c.name}'s vibe — tap ▶ to hear one, tap the name to keep it.`}
