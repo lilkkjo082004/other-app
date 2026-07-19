@@ -9,6 +9,7 @@ import { deleteAccount, fetchEntitlement, enableCalendarFeed } from '../lib/api.
 import { googleCalendarConfigured, googleConnected, connectGoogle, disconnectGoogle, shareWithCompanions, setShareWithCompanions } from '../lib/gcal.js';
 import { MANAGE_URL } from '../config.js';
 import { onDeviceSupported, onDeviceEnabled, setOnDeviceEnabled, preloadEngine, setProgressHandler, ON_DEVICE_LABEL } from '../lib/ondevice.js';
+import { supportsLocalTts, localVoiceEnabled, setLocalVoiceEnabled, warmLocalTts, speakLocal } from '../lib/localtts.js';
 import { calmEnabled, setCalm } from '../lib/comfort.js';
 import { loadSession, saveSession } from '../lib/storage.js';
 import { downloadReadableExport } from '../lib/dataexport.js';
@@ -57,6 +58,24 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
     setProgressHandler((p) => setOdProg({ pct: Math.round((p.progress || 0) * 100), text: p.text || 'Downloading model…' }));
     try { await preloadEngine(); setOdReady(true); setOdProg(null); }
     catch (e) { setOdProg({ pct: 0, text: 'Could not load the on-device model on this device.', error: true }); }
+  }
+  // On-device neural voice (free, no server). First enable downloads the model.
+  const lvSupported = supportsLocalTts();
+  const [lvOn, setLvOn] = useState(localVoiceEnabled());
+  const [lvProg, setLvProg] = useState(null);   // { pct, text, error } | null
+  const [lvReady, setLvReady] = useState(false);
+  async function toggleLocalVoice() {
+    if (lvOn) { setLocalVoiceEnabled(false); setLvOn(false); setLvProg(null); setLvReady(false); return; }
+    setLocalVoiceEnabled(true); setLvOn(true); setLvReady(false); setLvProg({ pct: 0, text: 'Downloading voice…' });
+    try {
+      await warmLocalTts((pct) => setLvProg({ pct, text: 'Downloading voice…' }));
+      setLvReady(true); setLvProg(null);
+      // A little hello so they hear it worked.
+      speakLocal("Hi — this is my real voice now.", comps.find((c) => c.status === 'awake') || 0).catch(() => {});
+    } catch (e) {
+      setLocalVoiceEnabled(false); setLvOn(false);
+      setLvProg({ pct: 0, text: 'Could not load the on-device voice on this device.', error: true });
+    }
   }
   const living = comps.filter((c) => c.status !== 'deleted');
   const allAwake = living.length > 0 && living.every((c) => c.status === 'awake');
@@ -413,6 +432,24 @@ export default function Settings({ profile, comps, autoSpeak, trialStart, cloud,
           <div style={{ ...card, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ flex: 1, paddingRight: 10 }}><div style={{ fontSize: 13 }}>Call by name</div><div style={{ fontSize: 11, color: C.textDim }}>Tap the mic to open a companion by voice</div></div>
             <Toggle on={voiceCall !== false} onClick={() => onVoiceCall(!(voiceCall !== false))} />
+          </div>
+        )}
+        {lvSupported && (
+          <div style={{ ...card }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13 }}>Realistic voice (on device)</div>
+                <div style={{ fontSize: 11, color: C.textDim, lineHeight: 1.4 }}>Free & private, runs on your device — sounds far more human than the built-in voice. First time downloads ~80MB, then works offline.</div>
+              </div>
+              <Toggle on={lvOn} onClick={toggleLocalVoice} label="Realistic voice" />
+            </div>
+            {lvProg && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ fontSize: 11, color: lvProg.error ? C.danger : C.textSoft, marginBottom: 6 }}>{lvProg.text}{!lvProg.error && lvProg.pct ? ` · ${lvProg.pct}%` : ''}</div>
+                {!lvProg.error && <div style={{ height: 6, borderRadius: 4, background: C.surfaceUp, overflow: 'hidden' }}><div style={{ width: `${lvProg.pct}%`, height: '100%', background: C.glow1, transition: 'width 0.3s' }} /></div>}
+              </div>
+            )}
+            {lvReady && <div style={{ fontSize: 11, color: C.glow3, marginTop: 10 }}>✓ Realistic voice ready — pick each companion’s voice on their profile.</div>}
           </div>
         )}
 

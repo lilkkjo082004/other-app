@@ -7,6 +7,7 @@ import { bondInfo } from '../lib/evolution.js';
 import { relationshipsFor } from '../lib/relationships.js';
 import { naturalVoiceEnabled } from '../config.js';
 import { speakAs, listBrowserVoices, NATURAL_VOICE_PRESETS, VOICE_TONES, browserToneFor, isNaturalVoice, DEFAULT_MELODIC } from '../lib/voice.js';
+import { localVoiceEnabled, supportsLocalTts, LOCAL_VOICE_PRESETS } from '../lib/localtts.js';
 import { splitMemories } from '../lib/memory.js';
 import SquishyBlob from '../components/SquishyBlob.jsx';
 import { currentActivity } from '../lib/presence.js';
@@ -190,6 +191,7 @@ export default function CompanionProfile({ companion: c, trialStart, history, co
           </div>
         )}
         {onCustomize && c.status !== 'deleted' && (() => {
+          const local = localVoiceEnabled() && supportsLocalTts();
           const natural = naturalVoiceEnabled();
           const cv = c.voice && c.voice.kind === 'browser' ? c.voice : {};
           const devices = listBrowserVoices();
@@ -200,7 +202,29 @@ export default function CompanionProfile({ companion: c, trialStart, history, co
                 <span style={label}>Voice</span>
                 <button onClick={() => speakAs(previewLine, c)} style={{ background: `${col}1f`, border: `1px solid ${col}66`, color: col, borderRadius: 20, padding: '4px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>▶ Preview</button>
               </div>
-              {natural ? (
+              {local ? (
+                <>
+                  <div style={{ fontSize: 11, color: C.textSoft, marginBottom: 10 }}>
+                    {c.voice?.kind === 'local' ? `Realistic on-device voice for ${c.name}.` : `Auto-matched to ${c.name}'s vibe — tap ▶ to hear one (first play loads the voice), tap the name to keep it.`}
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {LOCAL_VOICE_PRESETS.map((p) => {
+                      const on = c.voice?.kind === 'local' && c.voice.voiceId === p.id;
+                      return (
+                        <div key={p.id} style={{ display: 'flex', alignItems: 'stretch', background: on ? `${col}1f` : C.surfaceUp, border: `1px solid ${on ? col : C.border}`, borderRadius: 10, overflow: 'hidden' }}>
+                          <button aria-label={`Preview ${p.name}`} onClick={() => speakAs(previewLine, { ...c, voice: { kind: 'local', voiceId: p.id, name: p.name } })}
+                            style={{ background: 'none', border: 'none', borderRight: `1px solid ${on ? `${col}55` : C.border}`, color: on ? col : C.textSoft, padding: '0 9px', cursor: 'pointer', fontSize: 11 }}>▶</button>
+                          <button onClick={() => onCustomize({ voice: { kind: 'local', voiceId: p.id, name: p.name } })}
+                            style={{ textAlign: 'left', background: 'none', border: 'none', padding: '7px 11px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>
+                            <div style={{ fontSize: 12, color: on ? col : C.text, fontWeight: 600 }}>{p.name}</div>
+                            <div style={{ fontSize: 10, color: C.textDim }}>{p.vibe}</div>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : natural ? (
                 <>
                   <div style={{ fontSize: 11, color: C.textSoft, marginBottom: 10 }}>
                     {c.voice?.kind === 'natural' ? `Pick a natural voice for ${c.name}.` : `Auto-matched to ${c.name}'s vibe — tap ▶ to hear one, tap the name to keep it.`}

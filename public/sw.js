@@ -32,6 +32,9 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return; // leave the AI proxy etc. to the network
+  // On-device voice weights (~86MB) are cached by transformers.js itself — don't
+  // also store them in the app-shell cache (avoids doubling the storage).
+  if (url.pathname.includes('/models/kokoro/')) return;
 
   // App navigations: network-first (revalidating past any HTTP cache so a new
   // deploy is picked up immediately), falling back to the cached shell offline.

@@ -23,6 +23,7 @@ const { buildSystemBlocks } = await import('../src/lib/prompt.js');
 const { pickReminder, reminderKey, whenPhrase } = await import('../src/lib/reminders.js');
 const habits = await import('../src/lib/habits.js');
 const voicetext = await import('../src/lib/voicetext.js');
+const localtts = await import('../src/lib/localtts.js');
 
 console.log('checkin');
 {
@@ -287,6 +288,24 @@ console.log('voice text + matching');
   ok(isNaturalVoice({ name: 'Custom', localService: false }), 'any online (non-local) voice counts as natural');
   ok(!isNaturalVoice({ name: 'Fred', localService: true }), 'an old local voice is not flagged natural');
   ok(!isNaturalVoice(null), 'nullish voice is safe');
+}
+
+console.log('on-device voice (kokoro)');
+{
+  const { localVoiceId, LOCAL_VOICE_PRESETS, mirrorUrl } = localtts;
+  // Auto-match on-device voice by pronouns; explicit pick honored.
+  const she = LOCAL_VOICE_PRESETS.find((p) => p.id === localVoiceId({ pronouns: 'she/her', voiceIdx: 0 }));
+  const he = LOCAL_VOICE_PRESETS.find((p) => p.id === localVoiceId({ pronouns: 'he/him', voiceIdx: 0 }));
+  ok(she && she.g === 'female', 'she/her auto-matches a female Kokoro voice');
+  ok(he && he.g === 'male', 'he/him auto-matches a male Kokoro voice');
+  ok(localVoiceId({ voice: { kind: 'local', voiceId: 'af_bella' } }) === 'af_bella', 'an explicit on-device pick is honored');
+  ok(localVoiceId({ voice: { kind: 'local', voiceId: 'not_a_voice' } }) !== 'not_a_voice', 'an invalid voice id falls back to auto-match');
+  ok(LOCAL_VOICE_PRESETS.some((p) => p.g === 'female') && LOCAL_VOICE_PRESETS.some((p) => p.g === 'male'), 'preset list is gender-balanced');
+  // Self-host redirect maps HF weight URLs onto our own origin, and only those.
+  const hf = 'https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/';
+  ok(mirrorUrl(`${hf}voices/af_heart.bin`, 'https://site.app/other-app/').endsWith('/other-app/models/kokoro/voices/af_heart.bin'), 'a voice .bin URL is redirected to the self-hosted mirror');
+  ok(mirrorUrl(`${hf}onnx/model_quantized.onnx`, 'https://site.app/other-app/').includes('/models/kokoro/onnx/model_quantized.onnx'), 'the onnx weight URL is redirected too');
+  ok(mirrorUrl('https://example.com/thing.json', 'https://site.app/') === null, 'unrelated URLs are left alone');
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

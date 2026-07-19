@@ -47,6 +47,12 @@ jobs:
 
       - run: npm ci
 
+      - name: Mirror on-device voice weights (self-hosted, no runtime HF dependency)
+        # Downloads Kokoro-82M q8 + the curated voices into public/models/kokoro
+        # so the shipped site serves them itself. Non-fatal if HF is unreachable
+        # (the app falls back to HF at runtime), so a hiccup can't break a deploy.
+        run: node scripts/fetch-kokoro.mjs || echo "voice mirror incomplete — will fall back to HF at runtime"
+
       - name: Build with production backend wiring
         # These are PUBLIC, non-secret values (already present in the deployed
         # worker's wrangler.toml and the shipped bundle). Baking them in here

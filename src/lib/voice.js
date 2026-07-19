@@ -6,6 +6,8 @@ import {
   NATURAL_VOICE_PRESETS, VOICE_TONES, DEFAULT_VOICE_SETTINGS, DEFAULT_MELODIC,
 } from './voicetext.js';
 
+import { localVoiceEnabled, supportsLocalTts, speakLocal, stopLocal } from './localtts.js';
+
 export { NATURAL_VOICE_PRESETS, VOICE_TONES, DEFAULT_MELODIC, browserToneFor, isNaturalVoice } from './voicetext.js';
 
 export function listBrowserVoices() {
@@ -123,6 +125,10 @@ async function speakNatural(text, comp) {
 
 // Like speakAs, but returns a Promise that resolves when speech finishes.
 export function speakAsAsync(text, comp) {
+  if (localVoiceEnabled() && supportsLocalTts()) {
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    return speakLocal(text, comp).catch(() => new Promise((r) => speakBrowser(text, comp, r)));
+  }
   if (naturalVoiceEnabled()) {
     if (window.speechSynthesis) window.speechSynthesis.cancel();
     return speakNatural(text, comp).catch(() => new Promise((r) => speakBrowser(text, comp, r)));
@@ -130,17 +136,23 @@ export function speakAsAsync(text, comp) {
   return new Promise((r) => speakBrowser(text, comp, r));
 }
 
-// Stop any in-progress speech (browser or natural).
+// Stop any in-progress speech (browser, natural, or on-device).
 export function stopSpeaking() {
   stopKeepAlive();
   try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) { /* no-op */ }
   try { if (currentAudio) { currentAudio.pause(); currentAudio = null; } } catch (e) { /* no-op */ }
+  try { stopLocal(); } catch (e) { /* no-op */ }
 }
 
 // Speak as a companion. `comp` is the companion object (preferred — carries its
 // chosen voice) or a legacy numeric voiceIdx. Uses natural (AI) voices when
 // configured, always falling back to the browser's speech synthesis.
 export function speakAs(text, comp) {
+  if (localVoiceEnabled() && supportsLocalTts()) {
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    speakLocal(text, comp).catch(() => speakBrowser(text, comp));
+    return;
+  }
   if (naturalVoiceEnabled()) {
     if (window.speechSynthesis) window.speechSynthesis.cancel();
     speakNatural(text, comp).catch(() => speakBrowser(text, comp));
