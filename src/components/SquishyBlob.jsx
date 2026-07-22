@@ -49,7 +49,7 @@ function personalityBounce(comp) {
   return 0.55;
 }
 
-export default function SquishyBlob({ comp, size = 110, interactive = false, poke = null, bump = 0, grabbed = false, softness = null, vitality = 1, glow = true, sigil = true, style }) {
+export default function SquishyBlob({ comp, size = 110, interactive = false, poke = null, pokes = null, bump = 0, grabbed = false, softness = null, vitality = 1, glow = true, sigil = true, style }) {
   const color = comp?.color?.primary || '#7c5bf5';
   const glowC = comp?.color?.glow || `${color}66`;
   const seed = useMemo(() => hashStr(comp?.id || comp?.name || 'x'), [comp?.id, comp?.name]);
@@ -78,8 +78,9 @@ export default function SquishyBlob({ comp, size = 110, interactive = false, pok
 
   const pathRef = useRef(null);
   const simRef = useRef(null);
-  const pokesRef = useRef(new Map());  // pointerId -> {x,y,pressure} in viewBox units (multi-touch)
-  const propPokeRef = useRef(null);
+  const pokesRef = useRef(new Map());  // pointerId -> {x,y,pressure} in viewBox units (multi-touch, own handlers)
+  const propPokeRef = useRef(null);    // single external poke (legacy)
+  const propPokesRef = useRef(null);   // external multi-touch array (e.g. The Space)
   const bumpRef = useRef(bump);
   const paramsRef = useRef({});
   const svgRef = useRef(null);
@@ -100,6 +101,7 @@ export default function SquishyBlob({ comp, size = 110, interactive = false, pok
     };
   }, [bounce, vitality, grabbed]);
   useEffect(() => { propPokeRef.current = poke; }, [poke]);
+  useEffect(() => { propPokesRef.current = pokes; }, [pokes]);
 
   // A pet/tap "boing": kick every point outward, then it jiggles back.
   useEffect(() => {
@@ -126,8 +128,9 @@ export default function SquishyBlob({ comp, size = 110, interactive = false, pok
       // interactive, else a single external poke (e.g. dragging in The Space).
       const actives = interactive
         ? Array.from(pokesRef.current.values())
-        : (propPokeRef.current ? [propPokeRef.current] : []);
-      const grabbed = interactive ? actives.length > 0 : P.grabbed;
+        : (propPokesRef.current && propPokesRef.current.length ? propPokesRef.current
+          : (propPokeRef.current ? [propPokeRef.current] : []));
+      const grabbed = interactive ? actives.length > 0 : (P.grabbed || actives.length > 0);
       // Springs go softer while held, so pulling feels like gooey slime that
       // stretches, then it firms up to recover once you let go.
       const k = grabbed ? P.k * 0.72 : P.k;
