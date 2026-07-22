@@ -51,10 +51,10 @@ export default function CompanionProfile({ companion: c, trialStart, history, co
         <span style={{ fontSize: 15, fontWeight: 600 }}>{c.name}</span>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px 40px', textAlign: 'center' }}>
-        <div style={{ width: 132, height: 132, margin: '8px auto 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <SquishyBlob comp={c} size={120} interactive vitality={sleeping ? 0.3 : vitality(c, history || [])} softness={typeof c.blob === 'number' ? c.blob : null} />
+        <div style={{ width: 210, height: 210, margin: '4px auto 0', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'none' }}>
+          <SquishyBlob comp={c} size={200} interactive vitality={sleeping ? 0.3 : vitality(c, history || [])} softness={typeof c.blob === 'number' ? c.blob : null} />
         </div>
-        <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 2 }}>Touch and drag {c.name} — they're squishy ✦</div>
+        <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 2 }}>Poke, drag & stretch {c.name} with one or two fingers — they're slime ✦</div>
         {editingName ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, margin: '16px 0 0' }}>
             <input autoFocus value={draftName} maxLength={24}

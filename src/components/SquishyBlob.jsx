@@ -13,7 +13,7 @@ import React, { useRef, useEffect, useMemo } from 'react';
 const VB = 120;          // viewBox units
 const CX = 60, CY = 60;  // centre
 const R = 38;            // rest radius
-const N = 16;            // surface points
+const N = 22;            // surface points (more = smoother tendrils when pulled)
 
 function hashStr(str) {
   let h = 2166136261;
@@ -78,7 +78,7 @@ export default function SquishyBlob({ comp, size = 110, interactive = false, pok
 
   const pathRef = useRef(null);
   const simRef = useRef(null);
-  const pokeRef = useRef(null);       // {x,y,pressure} in viewBox units, or null
+  const pokesRef = useRef(new Map());  // pointerId -> {x,y,pressure} in viewBox units (multi-touch)
   const propPokeRef = useRef(null);
   const bumpRef = useRef(bump);
   const paramsRef = useRef({});
@@ -87,10 +87,14 @@ export default function SquishyBlob({ comp, size = 110, interactive = false, pok
   // Keep live params/poke for the rAF loop without restarting it.
   useEffect(() => {
     paramsRef.current = {
-      k: 0.165 - 0.075 * bounce,        // spring stiffness (looser = bouncier)
-      damp: 0.82 - 0.17 * bounce,       // velocity retention per frame
-      coupling: 0.18,                    // neighbour cohesion (goop, not spikes)
-      pull: 0.5,                         // adhesion toward the finger
+      k: 0.15 - 0.07 * bounce,          // spring stiffness (looser = bouncier/gooier)
+      damp: 0.84 - 0.16 * bounce,       // velocity retention per frame
+      coupling: 0.16,                    // neighbour cohesion (goop, not spikes)
+      pull: 0.85,                        // adhesion — grabbed patch clings to the finger
+      reach: R * 1.15,                   // LOCAL grab radius, so pulling stretches a
+                                         // patch into a tendril instead of flattening
+                                         // the whole body toward the fingers
+      maxStretch: R * 1.9,               // how far the surface can be pulled (tendrils)
       wobble: R * 0.028 * (0.45 + 0.55 * vitality),
       grabbed,
     };
@@ -118,10 +122,18 @@ export default function SquishyBlob({ comp, size = 110, interactive = false, pok
       if (!mounted) return;
       t += 0.016;
       const P = paramsRef.current;
-      const active = interactive ? pokeRef.current : propPokeRef.current;
+      // All fingers currently on this blob (multi-touch): own touches when
+      // interactive, else a single external poke (e.g. dragging in The Space).
+      const actives = interactive
+        ? Array.from(pokesRef.current.values())
+        : (propPokeRef.current ? [propPokeRef.current] : []);
+      const grabbed = interactive ? actives.length > 0 : P.grabbed;
+      // Springs go softer while held, so pulling feels like gooey slime that
+      // stretches, then it firms up to recover once you let go.
+      const k = grabbed ? P.k * 0.72 : P.k;
+      const reach = P.reach || R * 2, maxStretch = P.maxStretch || R * 2;
       const ndx = new Float64Array(N), ndy = new Float64Array(N);
-      // squash slightly while held, so it reads as "grabbed goop"
-      const restScale = P.grabbed ? 0.93 : 1;
+      const restScale = grabbed ? 0.96 : 1;
 
       for (let i = 0; i < N; i++) {
         const prev = (i - 1 + N) % N, next = (i + 1) % N;
@@ -131,20 +143,21 @@ export default function SquishyBlob({ comp, size = 110, interactive = false, pok
         const tx = rest.bx[i] * restScale + (rest.bx[i] / len) * wob;
         const ty = rest.by[i] * restScale + (rest.by[i] / len) * wob;
 
-        let ax = -(P.k) * (s.dx[i] - (tx - rest.bx[i]));
-        let ay = -(P.k) * (s.dy[i] - (ty - rest.by[i]));
+        let ax = -k * (s.dx[i] - (tx - rest.bx[i]));
+        let ay = -k * (s.dy[i] - (ty - rest.by[i]));
         // neighbour cohesion — spread deformation smoothly
         ax += P.coupling * ((s.dx[prev] + s.dx[next]) / 2 - s.dx[i]);
         ay += P.coupling * ((s.dy[prev] + s.dy[next]) / 2 - s.dy[i]);
 
-        // finger adhesion: nearby surface stretches toward the touch point
-        if (active) {
-          const px = CX + rest.bx[i] + s.dx[i], py = CY + rest.by[i] + s.dy[i];
-          const dxp = active.x - px, dyp = active.y - py;
+        // finger adhesion: nearby surface clings and stretches toward EACH
+        // touch point — two fingers can pull the body apart into tendrils.
+        const px = CX + rest.bx[i] + s.dx[i], py = CY + rest.by[i] + s.dy[i];
+        for (const a of actives) {
+          const dxp = a.x - px, dyp = a.y - py;
           const dist = Math.hypot(dxp, dyp);
-          const w = Math.max(0, 1 - dist / (R * 1.7));
+          const w = Math.max(0, 1 - dist / reach);
           if (w > 0) {
-            const f = P.pull * w * w * (0.6 + (active.pressure || 0.5));
+            const f = P.pull * w * w * (0.55 + (a.pressure || 0.5));
             ax += dxp * f; ay += dyp * f;
           }
         }
@@ -154,7 +167,7 @@ export default function SquishyBlob({ comp, size = 110, interactive = false, pok
         ndx[i] = s.dx[i] + s.vx[i];
         ndy[i] = s.dy[i] + s.vy[i];
         const m = Math.hypot(ndx[i], ndy[i]);
-        if (m > R * 1.15) { ndx[i] *= (R * 1.15) / m; ndy[i] *= (R * 1.15) / m; }
+        if (m > maxStretch) { ndx[i] *= maxStretch / m; ndy[i] *= maxStretch / m; }
       }
       s.dx.set(ndx); s.dy.set(ndy);
 
@@ -172,24 +185,45 @@ export default function SquishyBlob({ comp, size = 110, interactive = false, pok
     return () => { mounted = false; cancelAnimationFrame(raf); };
   }, [rest, interactive]);
 
+  const pad = Math.round(size * 0.18); // room for tendrils/glow to spill out
+
   // --- interactive pointer handling (own deformation, e.g. profile) ---
+  // Tracks every active finger/pen by pointerId, so you can poke, drag and
+  // stretch the slime with one or two fingers at once.
   const toVB = (e) => {
     const r = svgRef.current?.getBoundingClientRect();
     if (!r) return null;
-    return { x: (e.clientX - r.left) / r.width * VB, y: (e.clientY - r.top) / r.height * VB, pressure: e.pressure > 0 ? e.pressure : 0.5 };
+    // Map screen coords into the SVG's ACTUAL viewBox, which is inset by `pad`
+    // on every side — otherwise fingers register too close to the centre.
+    const vb = VB + pad * 2;
+    return {
+      x: -pad + (e.clientX - r.left) / r.width * vb,
+      y: -pad + (e.clientY - r.top) / r.height * vb,
+      pressure: e.pressure > 0 ? e.pressure : 0.5,
+    };
   };
-  const down = (e) => { if (!interactive) return; e.currentTarget.setPointerCapture?.(e.pointerId); pokeRef.current = toVB(e); };
-  const move = (e) => { if (!interactive || !pokeRef.current) return; pokeRef.current = toVB(e); };
-  const up = () => { if (interactive) pokeRef.current = null; };
+  const down = (e) => {
+    if (!interactive) return;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    const p = toVB(e); if (p) pokesRef.current.set(e.pointerId, p);
+  };
+  const move = (e) => {
+    if (!interactive || !pokesRef.current.has(e.pointerId)) return;
+    const p = toVB(e); if (p) pokesRef.current.set(e.pointerId, p);
+  };
+  const up = (e) => {
+    if (!interactive) return;
+    if (e && e.pointerId != null) pokesRef.current.delete(e.pointerId);
+    else pokesRef.current.clear();
+  };
 
-  const pad = Math.round(size * 0.18); // room for tendrils/glow to spill out
   return (
     <svg
       ref={svgRef}
       width={size} height={size}
       viewBox={`${-pad} ${-pad} ${VB + pad * 2} ${VB + pad * 2}`}
       aria-hidden="true"
-      onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onPointerLeave={up}
+      onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
       style={{ display: 'block', flexShrink: 0, overflow: 'visible', touchAction: interactive ? 'none' : 'auto', cursor: interactive ? 'grab' : 'inherit', filter: glow ? `drop-shadow(0 0 ${Math.round(size * 0.16 * (0.5 + 0.5 * vitality))}px ${glowC})` : 'none', WebkitTapHighlightColor: 'transparent', ...style }}
     >
       <defs>
