@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { C } from '../theme.js';
 import { Shell } from '../components/ui.jsx';
 import SquishyBlob from '../components/SquishyBlob.jsx';
+import { companionMood } from '../lib/mood.js';
 import { genAmbient, bumpBond } from '../lib/relationships.js';
 import { currentActivity } from '../lib/presence.js';
 import { vitality } from '../lib/innerlife.js';
@@ -246,7 +247,7 @@ export default function CompanionSpace({ comps, bonds, positions, onPositions, o
                 <span key={h.key} style={{ position: 'absolute', left: '50%', top: 6, marginLeft: h.dx, fontSize: 16, pointerEvents: 'none', animation: 'heartRise 1.1s ease-out forwards' }}>{h.emoji}</span>
               ))}
               <div key={`pop-${pets[c.id] || 0}`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', animation: pets[c.id] ? 'petPop 0.5s ease' : 'none', filter: talking ? `drop-shadow(0 0 10px ${c.color?.glow || 'rgba(124,91,245,0.5)'})` : 'none' }}>
-                <SquishyBlob comp={c} size={SIZE} glow vitality={vit} softness={typeof c.blob === 'number' ? c.blob : null} bump={pets[c.id] || 0} grabbed={dragging} pokes={pokes.filter((pk) => pk.id === c.id)} />
+                <SquishyBlob comp={c} size={SIZE} glow vitality={vit} softness={typeof c.blob === 'number' ? c.blob : null} bump={pets[c.id] || 0} grabbed={dragging} pokes={pokes.filter((pk) => pk.id === c.id)} mood={companionMood(c, [])} />
                 <span style={{ fontSize: 11, color: C.textSoft, marginTop: 6, fontWeight: 600, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 3 }}>
                   {!awake && <span style={{ fontSize: 9 }}>💤</span>}{c.name}
                 </span>

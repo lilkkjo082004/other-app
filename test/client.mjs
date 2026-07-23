@@ -25,6 +25,7 @@ const habits = await import('../src/lib/habits.js');
 const voicetext = await import('../src/lib/voicetext.js');
 const localtts = await import('../src/lib/localtts.js');
 const voicevol = await import('../src/lib/voicevol.js');
+const mood = await import('../src/lib/mood.js');
 
 console.log('checkin');
 {
@@ -328,6 +329,20 @@ console.log('master voice volume');
   ok(setVoiceVolume(0.4) === 0.4 && voiceVolume() === 0.4, 'set + read back');
   ok(setVoiceVolume(5) === 1 && setVoiceVolume(-1) === 0, 'clamps to [0,1]');
   setVoiceVolume(1);
+}
+
+console.log('companion mood (face/expression)');
+{
+  const { companionMood } = mood;
+  const hist = (mood2, n = 3) => Array.from({ length: n }, (_, i) => ({ role: 'user', content: `I feel ${mood2}`, ts: i }));
+  ok(companionMood({ status: 'sleeping' }).expression === 'sleepy', 'a sleeping companion is sleepy');
+  ok(companionMood({ personality: 'warm playful' }, []).expression === 'happy' || companionMood({ personality: 'warm playful' }, []).expression === 'content', 'no history -> content/happy baseline');
+  ok(companionMood({ personality: 'warm' }, hist('sad')).expression === 'soft', 'attunes soft when the user is sad');
+  ok(companionMood({ personality: 'warm' }, hist('excited')).expression === 'excited', 'lights up when the user is excited');
+  const low = companionMood({ personality: 'warm' }, hist('sad'));
+  const up = companionMood({ personality: 'warm' }, hist('excited'));
+  ok(up.valence > low.valence && up.energy > low.energy, 'excited reads higher valence + energy than sad');
+  ok(low.valence >= -1 && up.valence <= 1 && low.energy >= 0, 'valence/energy stay in range');
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

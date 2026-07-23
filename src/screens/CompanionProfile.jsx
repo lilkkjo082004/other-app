@@ -4,6 +4,7 @@ import { Shell } from '../components/ui.jsx';
 import { ZODIAC, cap } from '../lib/zodiac.js';
 import { trialDaysLeft, COMPANION_PRICE } from '../lib/entitlements.js';
 import { bondInfo } from '../lib/evolution.js';
+import { companionMood } from '../lib/mood.js';
 import { relationshipsFor } from '../lib/relationships.js';
 import { naturalVoiceEnabled } from '../config.js';
 import { speakAs, listBrowserVoices, NATURAL_VOICE_PRESETS, VOICE_TONES, browserToneFor, isNaturalVoice, DEFAULT_MELODIC } from '../lib/voice.js';
@@ -52,7 +53,7 @@ export default function CompanionProfile({ companion: c, trialStart, history, co
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px 40px', textAlign: 'center' }}>
         <div style={{ width: 210, height: 210, margin: '4px auto 0', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'none' }}>
-          <SquishyBlob comp={c} size={200} interactive vitality={sleeping ? 0.3 : vitality(c, history || [])} softness={typeof c.blob === 'number' ? c.blob : null} />
+          <SquishyBlob comp={c} size={200} interactive vitality={sleeping ? 0.3 : vitality(c, history || [])} softness={typeof c.blob === 'number' ? c.blob : null} mood={companionMood(c, history || [])} />
         </div>
         <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 2 }}>Poke, drag & stretch {c.name} with one or two fingers — they're slime ✦</div>
         {editingName ? (

@@ -29,6 +29,7 @@ import { seasonalTheme, seasonalDue, seasonalLine } from '../lib/seasonal.js';
 import { voiceNoteDue, markVoiceNote, waveform } from '../lib/voicenote.js';
 import Avatar from '../components/Avatar.jsx';
 import SquishyBlob from '../components/SquishyBlob.jsx';
+import { companionMood } from '../lib/mood.js';
 import UnlockSheet from '../components/UnlockSheet.jsx';
 import Settings from './Settings.jsx';
 import CompanionProfile from './CompanionProfile.jsx';
@@ -1473,7 +1474,7 @@ export default function Chat({ companions: init, profile, trialStart, restored, 
           ) : (
             <>
               <div style={{ width: 38, height: 38, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'none' }} title={`Poke ${priv.name}`}>
-                <SquishyBlob comp={priv} size={38} interactive glow={false} softness={typeof priv.blob === 'number' ? priv.blob : null} />
+                <SquishyBlob comp={priv} size={38} interactive glow={false} softness={typeof priv.blob === 'number' ? priv.blob : null} mood={companionMood(priv, msgs)} />
               </div>
               <div><div style={{ fontSize: 13, fontWeight: 600 }}>{priv.name}</div><div style={{ fontSize: 9, color: C.glow3 }}>Private</div></div>
             </>
